@@ -932,22 +932,66 @@ def load_products_list():
         ORDER BY
             p.nom;
     """
+
+    empty_schema = pd.DataFrame(
+        {
+            "id": pd.Series(dtype=int),
+            "nom": pd.Series(dtype=str),
+            "prix_achat": pd.Series(dtype=float),
+            "prix_vente": pd.Series(dtype=float),
+            "tva": pd.Series(dtype=float),
+            "categorie": pd.Series(dtype=str),
+            "stock_actuel": pd.Series(dtype=float),
+            "quantite_stock": pd.Series(dtype=float),
+            "codes_barres": pd.Series(dtype=str),
+            "statut_stock": pd.Series(dtype=str),
+        }
+    )
+    
     try:
         df = query_df(sql_query)
-        if "prix_achat" not in df.columns:
-            df["prix_achat"] = 0.0
-        if "categorie" not in df.columns:
-            df["categorie"] = "Non renseignée"
-        if "stock_actuel" not in df.columns:
-            df["stock_actuel"] = df.get("quantite_stock", 0)
-        if "quantite_stock" not in df.columns:
-            df["quantite_stock"] = df.get("stock_actuel", 0)
-        df['statut_stock'] = df['quantite_stock'].apply(lambda x: 'Stock OK' if x > 5 else ('Alerte Basse' if x > 0 else 'Épuisé'))
-        return df
-    except Exception as e:
-        st.error(f"Erreur critique de chargement des produits: {e}. Vérifiez la vue 'v_stock_produits'.")
-        return pd.DataFrame()
+    except Exception as exc:
+        st.error(
+            "Erreur critique de chargement des produits: "
+            f"{exc}. Vérifiez la connexion ou les vues SQL nécessaires."
+        )
+        return empty_schema.copy()
 
+    if df.empty:
+        return empty_schema.copy()
+
+    defaults: dict[str, Any] = {
+        "prix_achat": 0.0,
+        "prix_vente": 0.0,
+        "tva": 0.0,
+        "categorie": "Non renseignée",
+        "stock_actuel": 0.0,
+        "quantite_stock": 0.0,
+        "codes_barres": "",
+    }
+    for col, default in defaults.items():
+        if col not in df.columns:
+            df[col] = default
+
+    numeric_cols = ["prix_achat", "prix_vente", "tva", "stock_actuel", "quantite_stock"]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+    df["codes_barres"] = df.get("codes_barres", "").fillna("").astype(str)
+
+    if "id" in df.columns:
+        df["id"] = pd.to_numeric(df["id"], errors="coerce").fillna(0).astype(int)
+
+    if "nom" in df.columns:
+        df["nom"] = df["nom"].fillna("").astype(str)
+
+    df["categorie"] = df.get("categorie", "Non renseignée").fillna("Non renseignée").astype(str)
+
+    df["statut_stock"] = df["quantite_stock"].apply(
+        lambda x: "Stock OK" if x > 5 else ("Alerte Basse" if x > 0 else "Épuisé")
+    )
+
+    return df.reindex(columns=empty_schema.columns)
 
 @st.cache_data(ttl=120)
 def load_movement_timeseries(window_days: int = 30, product_id: int | None = None) -> pd.DataFrame:
