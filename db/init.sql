@@ -6,7 +6,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
     -- Mise à jour pour une meilleure catégorisation si nécessaire, sinon la liste originale est conservée.
-    CREATE TYPE type_cat AS ENUM ('Epicerie sucree', 'Epicerie salee', 'Alcool', 'Autre', 'Afrique', 'Boissons', 'Hygiene');
+    CREATE TYPE IF NOT EXISTS type_cat AS ENUM ('Epicerie sucree', 'Epicerie salee', 'Alcool', 'Autre', 'Afrique', 'Boissons', 'Hygiene');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 --------------------------------------------------------------------------------
@@ -102,7 +102,7 @@ WHERE p.actif = TRUE;
 -- Mise à jour de la vue v_alertes_rupture pour utiliser la colonne O(1)
 CREATE OR REPLACE VIEW v_alertes_rupture AS
 SELECT
-    p.id, p.nom, p.categorie, p.stock_actuel as stock, p.seuil_alerte
+    p.id, p.nom, COALESCE(p.categorie::text, 'Non renseignée') AS categorie, p.stock_actuel as stock, p.seuil_alerte
 FROM produits p
 WHERE p.stock_actuel <= COALESCE(p.seuil_alerte, 0)
 AND p.actif = TRUE

@@ -23,7 +23,7 @@ SET row_security = off;
 -- Name: type_cat; Type: TYPE; Schema: public; Owner: postgres
 --
 
-CREATE TYPE public.type_cat AS ENUM (
+CREATE TYPE IF NOT EXISTS public.type_cat AS ENUM (
     'Epicerie sucree',
     'Epicerie salee',
     'Alcool',
