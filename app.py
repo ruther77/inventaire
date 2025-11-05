@@ -1256,6 +1256,30 @@ if authentication_status:
 
     # Chargement des données (en cache)
     df_products = load_products_list()
+    
+        # Garantit la présence des colonnes critiques même si la requête SQL
+    # a été modifiée ou si la base renvoie un schéma partiel (ex: restauration
+    # depuis un dump incomplet). Cela évite des KeyError plus loin lorsque
+    # l'on manipule prix de vente / d'achat ou les codes-barres.
+    required_defaults: dict[str, Any] = {
+        "prix_vente": 0.0,
+        "prix_achat": 0.0,
+        "codes_barres": "",
+    }
+    for column, default_value in required_defaults.items():
+        if column not in df_products.columns:
+            df_products[column] = default_value
+
+    # Normalise les colonnes numériques et textuelles clés pour garantir
+    # un comportement homogène quelles que soient les données sources.
+    numeric_columns = ["prix_vente", "prix_achat"]
+    for column in numeric_columns:
+        df_products[column] = pd.to_numeric(
+            df_products.get(column), errors="coerce"
+        ).fillna(0.0)
+
+    df_products["codes_barres"] = df_products.get("codes_barres", "").fillna("").astype(str)
+
 
 
     # ---------------- Vitrine ----------------
