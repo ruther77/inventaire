@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --timeout 120 -r requirements.txt
 
 # --- STAGE 2 : FINAL (Production) ---
-FROM public.ecr.aws/docker/library/python:3.11-slim AS final
+FROM docker.io/library/python:3.11-slim AS final
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
