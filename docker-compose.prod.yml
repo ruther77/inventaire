@@ -1,0 +1,48 @@
+# docker-compose.yml (Version Corrigée et Complète pour 3 services)
+version: '3.8'
+
+services:
+  # 1. Base de Données PostgreSQL
+  db:
+    image: public.ecr.aws/docker/library/postgres:15-alpine
+    container_name: postgres_inventaire_v2
+    ports:
+      - "5432:5432" 
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: epicerie
+    volumes:
+      # Ceci est la ligne CRUCIALE pour réutiliser les données
+      - postgres_data:/var/lib/postgresql/data/
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'
+  # 2. Application Streamlit
+  app:
+    build: .
+    container_name: streamlit_inventaire_v2
+    ports:
+      - "8501:8501" 
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/epicerie
+    volumes:
+      - ./Produit.csv:/app/Produit.csv
+    depends_on:
+      - db
+
+  # 3. Service API Externe (FastAPI - LE NOUVEAU SERVICE)
+  api:
+    build: .
+    container_name: fastapi_inventaire
+    ports:
+      - "8000:8000" 
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/epicerie
+    # Commande pour lancer le serveur FastAPI
+    command: python -m uvicorn api_server:app --host 0.0.0.0 --port 8000
+    depends_on:
+      - db
+
+volumes:
+  # Volume qui stocke vos données réelles
+  postgres_data:
