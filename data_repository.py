@@ -1,16 +1,13 @@
-import os
+
 import pandas as pd
 from sqlalchemy import create_engine, text, TextClause
 from sqlalchemy.sql.elements import ClauseElement
 from sqlalchemy.engine import Engine
 import streamlit as st
 
-# Utilisation d'une variable d'environnement ou d'une valeur par défaut
-_DEFAULT_DB_HOST = os.getenv("DB_HOST", "localhost")
-DATABASE_URL = (
-    os.getenv("DATABASE_URL")
-    or f"postgresql+psycopg2://postgres:postgres@{_DEFAULT_DB_HOST}:5432/epicerie"
-)
+from database_url import get_database_url
+
+DATABASE_URL = get_database_url()
 
 @st.cache_resource
 def get_engine() -> Engine:

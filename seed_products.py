@@ -1,16 +1,18 @@
 
-import os, sys, re
+import sys, re
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:postgres@db:5432/epicerie")
+from database_url import get_database_url
+
+DATABASE_URL = get_database_url()
 
 def norm_cols(df):
     cols_map = {
-        "Nom":"nom", "nom":"nom",
-        "Prix de vente":"prix_vente", "prix_vente":"prix_vente", "prix": "prix_vente",
-        "TVA":"tva", "tva":"tva",
-        "Code-barres":"codes", "codes":"codes", "code_barres":"codes", "barcode":"codes", "ean":"codes",
+        "nom":"nom", "nom":"nom",
+        "prix_vente":"prix_vente", "prix_vente":"prix_vente", "prix": "prix_vente",
+        "Tva":"tva", "tva":"tva",
+        "Code-barres":"code", "codes":"code", "code_barres":"code", "barcode":"code", "ean":"codes,
         "qte_init":"qte_init", "Quantité disponible":"qte_init", "stock_initial":"qte_init"
     }
     return df.rename(columns={c: cols_map.get(c,c) for c in df.columns})
