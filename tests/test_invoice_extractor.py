@@ -181,3 +181,8 @@ def test_extract_products_applies_minimum_margin():
 def test_extract_text_from_unsupported_type():
     uploaded = DummyUpload("application/octet-stream", name="data.bin")
     assert invoice_extractor.extract_text_from_file(uploaded) == ""
+
+
+def test_invoice_extractor_source_has_no_merge_conflicts():
+    source = Path("invoice_extractor.py").read_text(encoding="utf-8")
+    assert "<<<<<<<" not in source

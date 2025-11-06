@@ -323,6 +323,8 @@ def extract_products_from_metro_invoice(
             }
             label = start_match.group("label").strip()
 <<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
             inline_detail = _parse_inline_summary(label)
             if inline_detail:
                 if "nom" in inline_detail:
@@ -332,6 +334,10 @@ def extract_products_from_metro_invoice(
             else:
                 designation_parts = [label] if label else []
 =======
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
             fallback_detail: dict[str, object] | None = None
             inline_tokens = _normalise_whitespace(label).split()
             parsed_count = 0
@@ -367,6 +373,12 @@ def extract_products_from_metro_invoice(
                 remaining_tokens = inline_tokens
             designation_text = " ".join(remaining_tokens).strip()
             designation_parts = [designation_text] if designation_text else []
+<<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
 >>>>>>> theirs
             continue
 
@@ -487,7 +499,3 @@ def extract_products_from_metro_invoice(
     )
     available = [col for col in desired_order if col in df.columns]
     return df.loc[:, available]
-
-# ... (le bloc if __name__ == '__main__': reste inchangé) ...
-if __name__ == '__main__':
-    pass
