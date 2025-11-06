@@ -792,6 +792,53 @@ def _process_uploaded_invoices(uploaded_files, context_label: str) -> None:
     _set_active_invoice_from_index(len(batches) - 1)
 
 
+def _prepare_invoice_dataframe(source_df: pd.DataFrame, margin_rate: float) -> pd.DataFrame:
+    """Normalise les colonnes numériques et calcule les totaux HT/TTC."""
+
+    if not isinstance(source_df, pd.DataFrame) or source_df.empty:
+        return source_df
+
+    working_df = source_df.copy()
+
+    if "quantite_recue" not in working_df.columns and "qte_init" in working_df.columns:
+        working_df["quantite_recue"] = working_df["qte_init"]
+
+    numeric_defaults: dict[str, float] = {
+        "prix_achat": 0.0,
+        "prix_vente": 0.0,
+        "tva": 0.0,
+        "prix_achat_catalogue": 0.0,
+        "prix_vente_catalogue": 0.0,
+        "tva_catalogue": 0.0,
+        "quantite_recue": 0.0,
+        "qte_init": 0.0,
+    }
+
+    for column, default_value in numeric_defaults.items():
+        if column not in working_df.columns:
+            working_df[column] = default_value
+        working_df[column] = pd.to_numeric(working_df[column], errors="coerce").fillna(default_value)
+
+    safe_margin = max(0.0, float(margin_rate))
+    working_df["prix_vente_minimum"] = (working_df["prix_achat"] * (1.0 + safe_margin)).round(2)
+    working_df["montant_ht"] = (working_df["prix_achat"] * working_df["quantite_recue"]).round(2)
+    working_df["montant_tva"] = (working_df["montant_ht"] * (working_df["tva"] / 100.0)).round(2)
+    working_df["montant_ttc"] = (working_df["montant_ht"] + working_df["montant_tva"]).round(2)
+
+    working_df["prix_vente_catalogue_ttc"] = (
+        working_df["prix_vente_catalogue"] * (1.0 + working_df["tva_catalogue"] / 100.0)
+    ).round(2)
+
+    purchase_base = working_df["prix_achat"].replace(0, pd.NA)
+    working_df["marge_catalogue_pct"] = (
+        (working_df["prix_vente_catalogue"] - working_df["prix_achat"]) / purchase_base
+    ).multiply(100).fillna(0.0).round(2)
+
+    working_df["alerte_marge"] = working_df["prix_vente_catalogue"] < working_df["prix_vente_minimum"]
+
+    return working_df
+
+
 def _render_invoice_selector(label: str, widget_key: str) -> None:
     batches = st.session_state.get("invoice_uploaded_batches", [])
     if not batches:
@@ -3789,6 +3836,18 @@ if authentication_status:
                     "Vérifiez les informations extraites. Vous pouvez ajuster les noms, les prix, la TVA ou les codes-barres avant l'importation."
                 )
 
+                margin_default = float(st.session_state.get("invoice_margin_percent", 30.0))
+                margin_percent = st.slider(
+                    "Marge minimale cible (%)",
+                    min_value=0.0,
+                    max_value=200.0,
+                    value=margin_default,
+                    step=1.0,
+                    key="invoice_margin_slider_extract",
+                )
+                st.session_state["invoice_margin_percent"] = margin_percent
+                margin_rate = margin_percent / 100.0
+
                 working_df = extracted_df.copy()
                 if "quantite_recue" not in working_df.columns and "qte_init" in working_df.columns:
                     working_df["quantite_recue"] = working_df["qte_init"]
@@ -3814,6 +3873,8 @@ if authentication_status:
                                 working_df["catalogue_id"]
                             )
                     working_df.drop(columns=["_code_lower"], inplace=True, errors="ignore")
+
+                working_df = _prepare_invoice_dataframe(working_df, margin_rate)
 
                 editable_df = st.data_editor(
                     working_df,
@@ -3848,12 +3909,37 @@ if authentication_status:
                         "prix_vente_catalogue": st.column_config.NumberColumn(
                             "Prix vente catalogue (€)", format="%.2f", disabled=True
                         ),
+                        "tva_catalogue": st.column_config.NumberColumn(
+                            "TVA catalogue (%)", format="%.2f", disabled=True
+                        ),
+                        "prix_vente_minimum": st.column_config.NumberColumn(
+                            "Prix vente minimum (€)", format="%.2f", disabled=True
+                        ),
+                        "prix_vente_catalogue_ttc": st.column_config.NumberColumn(
+                            "PV TTC catalogue (€)", format="%.2f €", disabled=True
+                        ),
+                        "marge_catalogue_pct": st.column_config.NumberColumn(
+                            "Marge catalogue (%)", format="%.2f %%", disabled=True
+                        ),
+                        "montant_ht": st.column_config.NumberColumn(
+                            "Montant HT (€)", format="%.2f €", disabled=True
+                        ),
+                        "montant_tva": st.column_config.NumberColumn(
+                            "Montant TVA (€)", format="%.2f €", disabled=True
+                        ),
+                        "montant_ttc": st.column_config.NumberColumn(
+                            "Montant TTC (€)", format="%.2f €", disabled=True
+                        ),
+                        "alerte_marge": st.column_config.CheckboxColumn(
+                            "Marge insuffisante", disabled=True
+                        ),
                     },
                 )
                 editable_df = pd.DataFrame(editable_df)
                 for col in ("nom", "codes"):
                     if col in editable_df.columns:
                         editable_df[col] = editable_df[col].fillna("")
+                editable_df = _prepare_invoice_dataframe(editable_df, margin_rate)
                 st.session_state["invoice_products_df"] = editable_df
 
                 col_download, col_import = st.columns(2)
@@ -3894,23 +3980,21 @@ if authentication_status:
                 if not isinstance(reconciliation_df, pd.DataFrame) or reconciliation_df.empty:
                     st.info("Chargez une facture et identifiez les produits pour accéder au rapprochement.")
                 else:
-                    working_df = reconciliation_df.copy()
-                    working_df["quantite_recue"] = pd.to_numeric(
-                        working_df.get("quantite_recue", working_df.get("qte_init", 0)), errors="coerce"
-                    ).fillna(0)
-                    working_df["prix_achat_facture"] = pd.to_numeric(
-                        working_df.get("prix_achat", working_df.get("prix_vente", 0)), errors="coerce"
-                    ).fillna(0)
-                    working_df["prix_achat_catalogue"] = pd.to_numeric(
-                        working_df.get("prix_achat_catalogue", 0), errors="coerce"
-                    ).fillna(0)
-                    working_df["valeur_facturee"] = working_df["quantite_recue"] * working_df["prix_achat_facture"]
-                    working_df["valeur_catalogue"] = working_df["quantite_recue"] * working_df["prix_achat_catalogue"]
-                    working_df["ecart_prix_unitaire"] = (
-                        working_df["prix_achat_facture"] - working_df["prix_achat_catalogue"]
+                    margin_percent = float(st.session_state.get("invoice_margin_percent", 30.0))
+                    margin_rate = margin_percent / 100.0
+                    working_df = _prepare_invoice_dataframe(reconciliation_df.copy(), margin_rate)
+                    working_df["prix_achat_facture"] = working_df.get("prix_achat", 0.0)
+                    working_df["valeur_facturee"] = working_df.get("montant_ht", 0.0)
+                    working_df["valeur_catalogue"] = (
+                        working_df["quantite_recue"] * working_df.get("prix_achat_catalogue", 0.0)
                     )
+                    working_df["ecart_prix_unitaire"] = (
+                        working_df["prix_achat_facture"] - working_df.get("prix_achat_catalogue", 0.0)
+                    )
+                    working_df["montant_tva_facture"] = working_df.get("montant_tva", 0.0)
+                    working_df["montant_ttc_facture"] = working_df.get("montant_ttc", 0.0)
 
-                    metrics_cols = st.columns(3)
+                    metrics_cols = st.columns(4)
                     metrics_cols[0].metric("Lignes rapprochées", f"{len(working_df):,}".replace(",", " "))
                     metrics_cols[1].metric(
                         "Produits identifiés",
@@ -3923,6 +4007,12 @@ if authentication_status:
                         delta=f"{delta_total:,.2f} €".replace(",", " "),
                         delta_color="inverse" if delta_total > 0 else "normal",
                     )
+                    total_tva = working_df["montant_tva_facture"].sum()
+                    metrics_cols[3].metric(
+                        "TVA facturée",
+                        f"{total_tva:,.2f} €".replace(",", " "),
+                        delta=f"{total_tva:,.2f} €".replace(",", " "),
+                    )
 
                     display_cols = [
                         "nom",
@@ -3930,9 +4020,16 @@ if authentication_status:
                         "quantite_recue",
                         "prix_achat_facture",
                         "prix_achat_catalogue",
+                        "prix_vente_catalogue",
+                        "prix_vente_minimum",
                         "ecart_prix_unitaire",
                         "valeur_facturee",
                         "valeur_catalogue",
+                        "montant_tva_facture",
+                        "montant_ttc_facture",
+                        "marge_catalogue_pct",
+                        "alerte_marge",
+                        "prix_vente_catalogue_ttc",
                         "catalogue_nom",
                         "catalogue_categorie",
                         "codes",
@@ -3950,12 +4047,31 @@ if authentication_status:
                             "prix_achat_catalogue": st.column_config.NumberColumn(
                                 "Prix catalogue (€)", format="%.2f €"
                             ),
+                            "prix_vente_catalogue": st.column_config.NumberColumn(
+                                "PV catalogue (€)", format="%.2f €"
+                            ),
+                            "prix_vente_minimum": st.column_config.NumberColumn(
+                                "PV minimum (€)", format="%.2f €"
+                            ),
                             "ecart_prix_unitaire": st.column_config.NumberColumn(
                                 "Écart unitaire (€)", format="%+.2f €"
                             ),
                             "valeur_facturee": st.column_config.NumberColumn("Montant facture (€)", format="%.2f €"),
                             "valeur_catalogue": st.column_config.NumberColumn(
                                 "Montant catalogue (€)", format="%.2f €"
+                            ),
+                            "montant_tva_facture": st.column_config.NumberColumn(
+                                "TVA facturée (€)", format="%.2f €"
+                            ),
+                            "montant_ttc_facture": st.column_config.NumberColumn(
+                                "Montant TTC (€)", format="%.2f €"
+                            ),
+                            "marge_catalogue_pct": st.column_config.NumberColumn(
+                                "Marge catalogue (%)", format="%.2f %%"
+                            ),
+                            "alerte_marge": st.column_config.CheckboxColumn("Marge insuffisante"),
+                            "prix_vente_catalogue_ttc": st.column_config.NumberColumn(
+                                "PV TTC catalogue (€)", format="%.2f €"
                             ),
                             "catalogue_nom": st.column_config.TextColumn("Produit catalogue"),
                             "catalogue_categorie": st.column_config.TextColumn("Catégorie"),
@@ -4146,6 +4262,18 @@ if authentication_status:
             ):
                 st.caption("Vérifiez et complétez les champs avant de valider l'importation.")
 
+                margin_default = float(st.session_state.get("invoice_margin_percent", 30.0))
+                margin_percent = st.slider(
+                    "Marge minimale cible (%)",
+                    min_value=0.0,
+                    max_value=200.0,
+                    value=margin_default,
+                    step=1.0,
+                    key="invoice_margin_slider_import",
+                )
+                st.session_state["invoice_margin_percent"] = margin_percent
+                margin_rate = margin_percent / 100.0
+
                 working_df = imported_df.copy()
                 if "quantite_recue" not in working_df.columns and "qte_init" in working_df.columns:
                     working_df["quantite_recue"] = working_df["qte_init"]
@@ -4171,6 +4299,8 @@ if authentication_status:
                                 working_df["catalogue_id"]
                             )
                     working_df.drop(columns=["_code_lower"], inplace=True, errors="ignore")
+
+                working_df = _prepare_invoice_dataframe(working_df, margin_rate)
 
                 editable_df = st.data_editor(
                     working_df,
@@ -4205,12 +4335,37 @@ if authentication_status:
                         "prix_vente_catalogue": st.column_config.NumberColumn(
                             "Prix vente catalogue (€)", format="%.2f", disabled=True
                         ),
+                        "tva_catalogue": st.column_config.NumberColumn(
+                            "TVA catalogue (%)", format="%.2f", disabled=True
+                        ),
+                        "prix_vente_minimum": st.column_config.NumberColumn(
+                            "Prix vente minimum (€)", format="%.2f", disabled=True
+                        ),
+                        "prix_vente_catalogue_ttc": st.column_config.NumberColumn(
+                            "PV TTC catalogue (€)", format="%.2f €", disabled=True
+                        ),
+                        "marge_catalogue_pct": st.column_config.NumberColumn(
+                            "Marge catalogue (%)", format="%.2f %%", disabled=True
+                        ),
+                        "montant_ht": st.column_config.NumberColumn(
+                            "Montant HT (€)", format="%.2f €", disabled=True
+                        ),
+                        "montant_tva": st.column_config.NumberColumn(
+                            "Montant TVA (€)", format="%.2f €", disabled=True
+                        ),
+                        "montant_ttc": st.column_config.NumberColumn(
+                            "Montant TTC (€)", format="%.2f €", disabled=True
+                        ),
+                        "alerte_marge": st.column_config.CheckboxColumn(
+                            "Marge insuffisante", disabled=True
+                        ),
                     },
                 )
                 editable_df = pd.DataFrame(editable_df)
                 for col in ("nom", "codes"):
                     if col in editable_df.columns:
                         editable_df[col] = editable_df[col].fillna("")
+                editable_df = _prepare_invoice_dataframe(editable_df, margin_rate)
                 st.session_state["invoice_products_df"] = editable_df
 
                 col_download, col_import = st.columns(2)
@@ -4251,23 +4406,21 @@ if authentication_status:
             if not isinstance(reconciliation_df, pd.DataFrame) or reconciliation_df.empty:
                 st.info("Chargez une facture et identifiez les produits pour accéder au rapprochement.")
             else:
-                working_df = reconciliation_df.copy()
-                working_df["quantite_recue"] = pd.to_numeric(
-                    working_df.get("quantite_recue", working_df.get("qte_init", 0)), errors="coerce"
-                ).fillna(0)
-                working_df["prix_achat_facture"] = pd.to_numeric(
-                    working_df.get("prix_achat", working_df.get("prix_vente", 0)), errors="coerce"
-                ).fillna(0)
-                working_df["prix_achat_catalogue"] = pd.to_numeric(
-                    working_df.get("prix_achat_catalogue", 0), errors="coerce"
-                ).fillna(0)
-                working_df["valeur_facturee"] = working_df["quantite_recue"] * working_df["prix_achat_facture"]
-                working_df["valeur_catalogue"] = working_df["quantite_recue"] * working_df["prix_achat_catalogue"]
-                working_df["ecart_prix_unitaire"] = (
-                    working_df["prix_achat_facture"] - working_df["prix_achat_catalogue"]
+                margin_percent = float(st.session_state.get("invoice_margin_percent", 30.0))
+                margin_rate = margin_percent / 100.0
+                working_df = _prepare_invoice_dataframe(reconciliation_df.copy(), margin_rate)
+                working_df["prix_achat_facture"] = working_df.get("prix_achat", 0.0)
+                working_df["valeur_facturee"] = working_df.get("montant_ht", 0.0)
+                working_df["valeur_catalogue"] = (
+                    working_df["quantite_recue"] * working_df.get("prix_achat_catalogue", 0.0)
                 )
+                working_df["ecart_prix_unitaire"] = (
+                    working_df["prix_achat_facture"] - working_df.get("prix_achat_catalogue", 0.0)
+                )
+                working_df["montant_tva_facture"] = working_df.get("montant_tva", 0.0)
+                working_df["montant_ttc_facture"] = working_df.get("montant_ttc", 0.0)
 
-                metrics_cols = st.columns(3)
+                metrics_cols = st.columns(4)
                 metrics_cols[0].metric("Lignes rapprochées", f"{len(working_df):,}".replace(",", " "))
                 metrics_cols[1].metric(
                     "Produits identifiés",
@@ -4280,6 +4433,12 @@ if authentication_status:
                     delta=f"{delta_total:,.2f} €".replace(",", " "),
                     delta_color="inverse" if delta_total > 0 else "normal",
                 )
+                total_tva = working_df["montant_tva_facture"].sum()
+                metrics_cols[3].metric(
+                    "TVA facturée",
+                    f"{total_tva:,.2f} €".replace(",", " "),
+                    delta=f"{total_tva:,.2f} €".replace(",", " "),
+                )
 
                 display_cols = [
                     "nom",
@@ -4287,9 +4446,16 @@ if authentication_status:
                     "quantite_recue",
                     "prix_achat_facture",
                     "prix_achat_catalogue",
+                    "prix_vente_catalogue",
+                    "prix_vente_minimum",
                     "ecart_prix_unitaire",
                     "valeur_facturee",
                     "valeur_catalogue",
+                    "montant_tva_facture",
+                    "montant_ttc_facture",
+                    "marge_catalogue_pct",
+                    "alerte_marge",
+                    "prix_vente_catalogue_ttc",
                     "catalogue_nom",
                     "catalogue_categorie",
                     "codes",
@@ -4307,12 +4473,31 @@ if authentication_status:
                         "prix_achat_catalogue": st.column_config.NumberColumn(
                             "Prix catalogue (€)", format="%.2f €"
                         ),
+                        "prix_vente_catalogue": st.column_config.NumberColumn(
+                            "PV catalogue (€)", format="%.2f €"
+                        ),
+                        "prix_vente_minimum": st.column_config.NumberColumn(
+                            "PV minimum (€)", format="%.2f €"
+                        ),
                         "ecart_prix_unitaire": st.column_config.NumberColumn(
                             "Écart unitaire (€)", format="%+.2f €"
                         ),
                         "valeur_facturee": st.column_config.NumberColumn("Montant facture (€)", format="%.2f €"),
                         "valeur_catalogue": st.column_config.NumberColumn(
                             "Montant catalogue (€)", format="%.2f €"
+                        ),
+                        "montant_tva_facture": st.column_config.NumberColumn(
+                            "TVA facturée (€)", format="%.2f €"
+                        ),
+                        "montant_ttc_facture": st.column_config.NumberColumn(
+                            "Montant TTC (€)", format="%.2f €"
+                        ),
+                        "marge_catalogue_pct": st.column_config.NumberColumn(
+                            "Marge catalogue (%)", format="%.2f %%"
+                        ),
+                        "alerte_marge": st.column_config.CheckboxColumn("Marge insuffisante"),
+                        "prix_vente_catalogue_ttc": st.column_config.NumberColumn(
+                            "PV TTC catalogue (€)", format="%.2f €"
                         ),
                         "catalogue_nom": st.column_config.TextColumn("Produit catalogue"),
                         "catalogue_categorie": st.column_config.TextColumn("Catégorie"),

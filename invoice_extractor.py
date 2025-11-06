@@ -268,7 +268,8 @@ def _join_designation(parts: Sequence[str]) -> str:
 def _ensure_margin(purchase: float | None, sale: float | None, margin: float) -> float | None:
     if purchase is None:
         return sale
-    baseline = round(float(purchase) * (1.0 + margin), 2)
+    safe_margin = max(0.0, float(margin))
+    baseline = round(float(purchase) * (1.0 + safe_margin), 2)
     if sale is None:
         return baseline
     return round(sale if sale >= baseline else baseline, 2)
@@ -279,6 +280,7 @@ def extract_products_from_metro_invoice(
     *,
     tva_map: Mapping[str, float] | None = None,
     default_tva: float = 20.0,
+    margin_rate: float = 0.0,
 ) -> pd.DataFrame:
     """ Analyse une facture METRO """
     overrides = {k.upper(): float(v) for k, v in (tva_map or {}).items()}
@@ -320,6 +322,7 @@ def extract_products_from_metro_invoice(
                 "numero_article": start_match.group("article"),
             }
             label = start_match.group("label").strip()
+<<<<<<< ours
             inline_detail = _parse_inline_summary(label)
             if inline_detail:
                 if "nom" in inline_detail:
@@ -328,6 +331,43 @@ def extract_products_from_metro_invoice(
                 designation_parts = []
             else:
                 designation_parts = [label] if label else []
+=======
+            fallback_detail: dict[str, object] | None = None
+            inline_tokens = _normalise_whitespace(label).split()
+            parsed_count = 0
+            if inline_tokens:
+                candidate_code = inline_tokens[-1]
+                has_code = bool(re.fullmatch(r"[A-Za-z]", candidate_code))
+                if has_code:
+                    parsed_count += 1
+                if len(inline_tokens) >= parsed_count + 3:
+                    total_raw = inline_tokens[-(parsed_count + 1)]
+                    qty_raw = inline_tokens[-(parsed_count + 2)]
+                    unit_raw = inline_tokens[-(parsed_count + 3)]
+                    unit_val = _parse_decimal(unit_raw)
+                    qty_val = _parse_int(qty_raw)
+                    total_val = _parse_decimal(total_raw)
+                    if unit_val is not None and qty_val is not None:
+                        fallback_detail = {
+                            "prix_unitaire": round(unit_val, 2),
+                            "quantite_colis": max(qty_val, 0),
+                            "colisage": 1,
+                            "montant_total": round(
+                                total_val if total_val is not None else unit_val * qty_val,
+                                2,
+                            ),
+                        }
+                        if has_code:
+                            fallback_detail["tva_code"] = inline_tokens[-1].upper()
+                        parsed_count += 3
+            if fallback_detail:
+                current.update(fallback_detail)
+                remaining_tokens = inline_tokens[:-parsed_count] if parsed_count else inline_tokens
+            else:
+                remaining_tokens = inline_tokens
+            designation_text = " ".join(remaining_tokens).strip()
+            designation_parts = [designation_text] if designation_text else []
+>>>>>>> theirs
             continue
 
         if current is None:
@@ -388,7 +428,10 @@ def extract_products_from_metro_invoice(
         if unit_price is None:
             continue
 
-        sale_price = _ensure_margin(unit_price, None, margin)
+        sale_price = _ensure_margin(unit_price, None, margin_rate)
+        montant_ht = round(unit_price * total_units, 2)
+        montant_tva = round(montant_ht * (tva_value / 100.0), 2)
+        montant_ttc = round(montant_ht + montant_tva, 2)
 
         normalised.append(
             {
@@ -404,8 +447,12 @@ def extract_products_from_metro_invoice(
                 "qte_init": total_units,
                 "prix_achat": round(unit_price, 2),
                 "prix_vente": sale_price if sale_price is not None else round(unit_price, 2),
+                "prix_vente_minimum": sale_price if sale_price is not None else round(unit_price, 2),
                 "tva": round(tva_value, 2),
                 "tva_code": tva_code,
+                "montant_ht": montant_ht,
+                "montant_tva": montant_tva,
+                "montant_ttc": montant_ttc,
                 "montant_total_facture": round(
                     amount if amount is not None else unit_price * total_units,
                     2,
@@ -430,8 +477,12 @@ def extract_products_from_metro_invoice(
         "qte_init",
         "prix_achat",
         "prix_vente",
+        "prix_vente_minimum",
         "tva",
         "tva_code",
+        "montant_ht",
+        "montant_tva",
+        "montant_ttc",
         "montant_total_facture",
     )
     available = [col for col in desired_order if col in df.columns]

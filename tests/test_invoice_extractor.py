@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
@@ -80,7 +81,19 @@ def test_extract_products_from_metro_invoice_builds_dataframe():
     df = invoice_extractor.extract_products_from_metro_invoice(raw_text)
 
     assert isinstance(df, pd.DataFrame)
-    assert {"nom", "prix_vente", "tva", "qte_init", "codes", "prix_achat", "tva_code"}.issubset(df.columns)
+    assert {
+        "nom",
+        "prix_vente",
+        "tva",
+        "qte_init",
+        "codes",
+        "prix_achat",
+        "tva_code",
+        "prix_vente_minimum",
+        "montant_ht",
+        "montant_tva",
+        "montant_ttc",
+    }.issubset(df.columns)
     assert list(df["nom"]) == [
         "Produit Test",
         "Produit Deux",
@@ -103,7 +116,11 @@ def test_extract_products_from_metro_invoice_builds_dataframe():
     assert list(df["tva"]) == [20.0, 5.5, 10.0, 2.1, 0.0, 0.0, 5.5]
     assert list(df["prix_vente"]) == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
     assert list(df["prix_achat"]) == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+    assert list(df["prix_vente_minimum"]) == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
     assert list(df["tva_code"]) == ["D", "P", "B", "M", "G", "X", "E"]
+    assert list(df["montant_ht"]) == [3.0, 2.0, 6.0, 20.0, 10.0, 6.0, 28.0]
+    assert list(df["montant_tva"]) == [0.6, 0.11, 0.6, 0.42, 0.0, 0.0, 1.54]
+    assert list(df["montant_ttc"]) == [3.6, 2.11, 6.6, 20.42, 10.0, 6.0, 29.54]
 
 
 def test_default_tva_code_map_covers_metro_reference():
@@ -146,6 +163,19 @@ def test_extract_products_with_custom_tva_map():
 
     assert df.loc[0, "tva"] == 2.1
     assert df.loc[0, "tva_code"] == "Z"
+
+
+def test_extract_products_applies_minimum_margin():
+    raw_text = """
+    1234567890123 123456 Produit Test 1.00 1 1.00 D
+    """
+
+    df = invoice_extractor.extract_products_from_metro_invoice(raw_text, margin_rate=0.25)
+
+    assert pytest.approx(df.loc[0, "prix_vente"], rel=1e-6) == 1.25
+    assert pytest.approx(df.loc[0, "prix_vente_minimum"], rel=1e-6) == 1.25
+    assert pytest.approx(df.loc[0, "montant_ht"], rel=1e-6) == 1.0
+    assert pytest.approx(df.loc[0, "montant_tva"], rel=1e-6) == 0.2
 
 
 def test_extract_text_from_unsupported_type():

@@ -364,7 +364,8 @@ def match_invoice_products(invoice_df: pd.DataFrame) -> pd.DataFrame:
             p.nom AS produit_nom,
             p.categorie,
             COALESCE(p.prix_achat, 0) AS prix_achat_catalogue,
-            COALESCE(p.prix_vente, 0) AS prix_vente_catalogue
+            COALESCE(p.prix_vente, 0) AS prix_vente_catalogue,
+            COALESCE(p.tva, 0) AS tva_catalogue
         FROM produits_barcodes pb
         JOIN produits p ON p.id = pb.produit_id
         WHERE LOWER(pb.code) IN ({placeholders})
