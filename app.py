@@ -17,7 +17,7 @@ from sqlalchemy import text
 from functools import lru_cache
 import streamlit_authenticator as stauth
 import plotly.express as px
-import invoice_extractor
+from invoice_extractor import *
 from urllib.error import URLError, HTTPError
 from backup_manager import (
     BackupError,
