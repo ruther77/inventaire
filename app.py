@@ -17,7 +17,7 @@ from sqlalchemy import text
 from functools import lru_cache
 import streamlit_authenticator as stauth
 import plotly.express as px
-from invoice_extractor import *
+import invoice_extractor
 from urllib.error import URLError, HTTPError
 from backup_manager import (
     BackupError,
@@ -147,6 +147,10 @@ if "invoice_raw_text" not in st.session_state:
     st.session_state["invoice_raw_text"] = ""
 if "invoice_text_input" not in st.session_state:
     st.session_state["invoice_text_input"] = ""
+if "extract_invoice_text_input" not in st.session_state:
+    st.session_state["extract_invoice_text_input"] = st.session_state["invoice_text_input"]
+if "import_invoice_text_input" not in st.session_state:
+    st.session_state["import_invoice_text_input"] = st.session_state["invoice_text_input"]
 if "invoice_products_df" not in st.session_state:
     st.session_state["invoice_products_df"] = None
 if "invoice_import_summary" not in st.session_state:
@@ -162,6 +166,18 @@ if "invoice_processed_signatures" not in st.session_state:
 st.session_state.setdefault("audit_assignments", {})
 st.session_state.setdefault("audit_resolution_log", [])
 st.session_state.setdefault("audit_count_tasks", {})
+
+_central_invoice_text = st.session_state.get("invoice_text_input", "")
+_extract_text_state = st.session_state.get("extract_invoice_text_input", "")
+_import_text_state = st.session_state.get("import_invoice_text_input", "")
+
+if _extract_text_state != _central_invoice_text:
+    st.session_state["invoice_text_input"] = _extract_text_state
+    st.session_state["import_invoice_text_input"] = _extract_text_state
+elif _import_text_state != _central_invoice_text:
+    st.session_state["invoice_text_input"] = _import_text_state
+    st.session_state["extract_invoice_text_input"] = _import_text_state
+
 
 MAX_INVOICE_UPLOADS = 20
 INVOICE_SELECTOR_KEYS = ("extract_invoice_selector", "import_invoice_selector")
@@ -3790,7 +3806,6 @@ if authentication_status:
             )
             if extract_invoice_text != st.session_state.get("invoice_text_input"):
                 st.session_state["invoice_text_input"] = extract_invoice_text
-                st.session_state["import_invoice_text_input"] = extract_invoice_text
 
             col_extract_btn, col_reset_btn = st.columns(2)
             with col_extract_btn:
@@ -4218,7 +4233,6 @@ if authentication_status:
             )
             if import_invoice_text != st.session_state.get("invoice_text_input"):
                 st.session_state["invoice_text_input"] = import_invoice_text
-                st.session_state["extract_invoice_text_input"] = import_invoice_text
 
             col_extract_btn, col_reset_btn = st.columns(2)
             with col_extract_btn:
