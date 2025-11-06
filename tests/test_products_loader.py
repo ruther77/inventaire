@@ -1,4 +1,5 @@
 import sys
+import types
 from pathlib import Path
 
 import pandas as pd
@@ -28,6 +29,9 @@ class DummyConnection:
     def __init__(self):
         self.executed = []
         self.barcode_map = {}
+        self.product_data = {}
+        self.product_by_name = {}
+        self.next_generic_id = 400
 
     def execute(self, statement, params=None):
         sql = str(statement)
@@ -40,18 +44,59 @@ class DummyConnection:
             if code in self.barcode_map:
                 return DummyResult(DummyRow(self.barcode_map[code]))
             return DummyResult(None)
+        
+        if "SELECT id, prix_achat, prix_vente, categorie" in sql and "FROM produits" in sql:
+            if "WHERE id = :pid" in sql:
+                pid = int(params.get("pid")) if params.get("pid") is not None else None
+                data = self.product_data.get(pid)
+                if not data:
+                    return DummyResult(None)
+                return DummyResult(types.SimpleNamespace(**data))
+            if "WHERE lower(nom) = lower(:nom)" in sql:
+                key = (params.get("nom") or "").lower()
+                pid = self.product_by_name.get(key)
+                if pid is None:
+                    return DummyResult(None)
+                data = self.product_data.get(pid, {"id": pid, "prix_achat": None, "prix_vente": None, "categorie": None})
+                return DummyResult(types.SimpleNamespace(**data))
+            return DummyResult(None)
 
         if "UPDATE produits" in sql:
-            if nom == "Bière artisanale":
-                return DummyResult(None)
-            if "WHERE id = :pid" in sql and params.get("pid") == 303:
-                return DummyResult(None)
-            return DummyResult((202,))
+            pid = params.get("pid")
+            if pid is not None:
+                pid_int = int(pid)
+                existing = self.product_data.setdefault(
+                    pid_int,
+                    {"id": pid_int, "prix_achat": None, "prix_vente": None, "categorie": None},
+                )
+                if "prix_achat" in params:
+                    existing["prix_achat"] = params.get("prix_achat")
+                if "prix_vente" in params:
+                    existing["prix_vente"] = params.get("prix_vente")
+                if "categorie" in params:
+                    existing["categorie"] = params.get("categorie")
+            if nom:
+                key = nom.lower()
+                if pid is not None:
+                    self.product_by_name[key] = int(pid)
+            return DummyResult(None)
 
         if "INSERT INTO produits (" in sql:
             if nom == "Bière artisanale":
-                return DummyResult((101,))
-            raise AssertionError("Unexpected insert for nom", nom)
+                new_id = 101
+            else:
+                new_id = self.next_generic_id
+                self.next_generic_id += 1
+
+            self.product_data[new_id] = {
+                "id": new_id,
+                "prix_achat": params.get("prix_achat"),
+                "prix_vente": params.get("prix_vente"),
+                "categorie": params.get("categorie"),
+            }
+            if nom:
+                self.product_by_name[nom.lower()] = new_id
+            return DummyResult(types.SimpleNamespace(id=new_id))
 
         if "INSERT INTO mouvements_stock" in sql:
             return DummyResult(None)
@@ -126,6 +171,8 @@ def test_load_products_from_df_summarises_results(monkeypatch):
     )
 
     connection = DummyConnection()
+    connection.product_data[202] = {"id": 202, "prix_achat": 1.2, "prix_vente": 2.5, "categorie": "Hygiene"}
+    connection.product_by_name["savon douceur"] = 202
     engine = DummyEngine(connection)
     monkeypatch.setattr(products_loader, "get_engine", lambda: engine)
 
@@ -171,6 +218,7 @@ def test_load_products_from_df_updates_existing_with_barcode(monkeypatch):
 
     connection = DummyConnection()
     connection.barcode_map["444"] = 303
+    connection.product_data[303] = {"id": 303, "prix_achat": 7.5, "prix_vente": 10.0, "categorie": "Boissons"}
     engine = DummyEngine(connection)
     monkeypatch.setattr(products_loader, "get_engine", lambda: engine)
 
@@ -187,7 +235,10 @@ def test_load_products_from_df_updates_existing_with_barcode(monkeypatch):
     executed_sql = [sql for sql, _ in connection.executed]
     assert not any("INSERT INTO produits (" in sql for sql in executed_sql)
     assert any("WHERE id = :pid" in sql for sql in executed_sql)
-
+    
+    update_params = next(params for sql, params in connection.executed if "UPDATE produits" in sql)
+    assert update_params["categorie"] == "Boissons"
+    
     movement_params = next(
         params for sql, params in connection.executed if "INSERT INTO mouvements_stock" in sql
     )
@@ -195,6 +246,32 @@ def test_load_products_from_df_updates_existing_with_barcode(monkeypatch):
     assert movement_params["quantite"] == 5.0
     assert movement_params["source"].startswith("Import facture")
 
+
+def test_load_products_respects_price_delta(monkeypatch):
+    df = pd.DataFrame(
+        [
+            {
+                "nom": "Produit stable",
+                "prix_vente": "16.20",
+                "tva": "20",
+                "prix_achat": "10.50",
+                "codes": "555",
+            }
+        ]
+    )
+
+    connection = DummyConnection()
+    connection.barcode_map["555"] = 909
+    connection.product_data[909] = {"id": 909, "prix_achat": 10.0, "prix_vente": 16.0, "categorie": "Général"}
+    engine = DummyEngine(connection)
+    monkeypatch.setattr(products_loader, "get_engine", lambda: engine)
+
+    summary = products_loader.load_products_from_df(df)
+
+    assert summary["updated"] == 1
+    update_params = next(params for sql, params in connection.executed if "UPDATE produits" in sql)
+    assert update_params["prix_achat"] == 10.0
+    assert update_params["prix_vente"] == 16.0
 
 def test_load_products_from_df_counts_conflict_on_integrity_error(monkeypatch):
     df = pd.DataFrame(

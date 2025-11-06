@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping, Sequence
 
 import math
 
@@ -28,6 +28,9 @@ ALCOHOL_KEYWORDS = [
     "armagnac",
     "porto",
 ]
+
+DEFAULT_MARGIN_RATE = 0.40
+PRICE_DELTA_THRESHOLD = 0.10
 
 
 def _empty_summary(rows_received: int = 0) -> Dict[str, Any]:
@@ -209,6 +212,133 @@ def _clean_codes(raw_codes: Any) -> List[str]:
                 cleaned.append(code)
     return cleaned
 
+def _row_as_dict(row: Any, columns: Sequence[str]) -> Dict[str, Any]:
+    if row is None:
+        return {}
+    if hasattr(row, "_mapping"):
+        return dict(row._mapping)
+    if isinstance(row, Mapping):
+        return dict(row)
+
+    result: Dict[str, Any] = {}
+    for index, column in enumerate(columns):
+        if hasattr(row, column):
+            result[column] = getattr(row, column)
+        else:
+            try:
+                result[column] = row[index]
+            except (IndexError, TypeError):
+                continue
+    return result
+
+
+def _fetch_product_snapshot(conn: Connection, produit_id: int | None) -> Dict[str, Any]:
+    if produit_id in (None, ""):
+        return {}
+    row = conn.execute(
+        text(
+            """
+            SELECT id, prix_achat, prix_vente, categorie
+            FROM produits
+            WHERE id = :pid
+            LIMIT 1
+            """
+        ),
+        {"pid": int(produit_id)},
+    ).fetchone()
+    return _row_as_dict(row, ["id", "prix_achat", "prix_vente", "categorie"])
+
+
+def _fetch_product_by_name(conn: Connection, nom: str) -> Dict[str, Any]:
+    cleaned = nom.strip()
+    if not cleaned:
+        return {}
+    row = conn.execute(
+        text(
+            """
+            SELECT id, prix_achat, prix_vente, categorie
+            FROM produits
+            WHERE lower(nom) = lower(:nom)
+            LIMIT 1
+            """
+        ),
+        {"nom": cleaned},
+    ).fetchone()
+    return _row_as_dict(row, ["id", "prix_achat", "prix_vente", "categorie"])
+
+
+def _apply_margin(purchase: float | None, sale_candidate: float | None, *, margin: float) -> float | None:
+    if purchase is None:
+        return sale_candidate
+    baseline = round(float(purchase) * (1.0 + margin), 2)
+    if sale_candidate is None:
+        return baseline
+    return round(sale_candidate if sale_candidate >= baseline else baseline, 2)
+
+
+def _has_significant_delta(old: Any, new: Any, *, threshold: float) -> bool:
+    new_value = _to_float(new, default=None)
+    if new_value is None:
+        return False
+    old_value = _to_float(old, default=None)
+    if old_value is None or abs(old_value) < 1e-9:
+        return True
+    diff = abs(new_value - old_value)
+    if diff < 0.01:
+        return False
+    return diff / abs(old_value) >= threshold
+
+
+def _resolve_purchase_price(candidate: float | None, existing: Any) -> float:
+    candidate_value = _to_float(candidate, default=None)
+    existing_value = _to_float(existing, default=None)
+
+    if candidate_value is None or candidate_value <= 0:
+        return existing_value or 0.0
+    if existing_value is None or existing_value <= 0:
+        return candidate_value
+    if _has_significant_delta(existing_value, candidate_value, threshold=PRICE_DELTA_THRESHOLD):
+        return candidate_value
+    return existing_value
+
+
+def _resolve_sale_price(
+    candidate_sale: float | None,
+    existing_sale: Any,
+    *,
+    purchase_price: float,
+    margin: float,
+    threshold: float,
+) -> float:
+    baseline = _apply_margin(purchase_price, None, margin=margin) or 0.0
+    target_sale = _apply_margin(purchase_price, candidate_sale, margin=margin) or baseline
+    existing_value = _to_float(existing_sale, default=None)
+
+    if existing_value is None or existing_value <= 0:
+        return target_sale
+
+    if existing_value < baseline:
+        return max(target_sale, baseline)
+
+    if _has_significant_delta(existing_value, target_sale, threshold=threshold):
+        return target_sale
+
+    return existing_value
+
+
+def _resolve_category(row: Mapping[str, Any], existing: Mapping[str, Any] | None, nom: str) -> str:
+    for key in ("categorie", "category", "Categorie", "CAT", "TYPE"):
+        value = row.get(key) if isinstance(row, Mapping) else None
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    if existing and existing.get("categorie"):
+        existing_value = existing.get("categorie")
+        if isinstance(existing_value, str) and existing_value.strip():
+            return existing_value.strip()
+
+    return determine_categorie(nom)
+
 
 def load_products_from_df(df: pd.DataFrame) -> Dict[str, Any]:
     """Charge les produits à partir d'un DataFrame et retourne un résumé détaillé."""
@@ -228,15 +358,13 @@ def load_products_from_df(df: pd.DataFrame) -> Dict[str, Any]:
                 if not nom:
                     raise ValueError("Nom du produit manquant")
 
-                prix_vente = _to_float(row.get("prix_vente"), default=None)
-                if prix_vente is None:
-                    raise ValueError("Prix de vente manquant ou invalide")
+                raw_purchase = _to_float(row.get("prix_achat"), default=None)
+                raw_sale = _to_float(row.get("prix_vente"), default=None)
 
                 tva = _to_float(row.get("tva"), default=None)
                 if tva is None:
                     raise ValueError("TVA manquante ou invalide")
-
-                prix_achat = _to_float(row.get("prix_achat"), default=0.0) or 0.0
+                    
                 seuil_alerte = _to_float(
                     row.get("seuil_alerte_defaut", row.get("seuil_alerte")),
                     default=0.0,
@@ -246,18 +374,42 @@ def load_products_from_df(df: pd.DataFrame) -> Dict[str, Any]:
                     default=0.0,
                 ) or 0.0
                 codes_list = _clean_codes(row.get("codes"))
-                categorie = determine_categorie(nom)
 
                 produit_id: int | None = None
                 matched_code: str | None = None
+                existing_snapshot: Dict[str, Any] | None = None
                 if codes_list:
                     produit_id, matched_code = _find_existing_product_by_barcode(
                         conn, codes_list
                     )
+                    existing_snapshot = _fetch_product_snapshot(conn, produit_id)
+
+                if produit_id is None:
+                    snapshot_by_name = _fetch_product_by_name(conn, nom)
+                    if snapshot_by_name.get("id") is not None:
+                        produit_id = int(snapshot_by_name.get("id"))
+                        existing_snapshot = snapshot_by_name
+
+                categorie = _resolve_category(row, existing_snapshot, nom)
+
+                purchase_price = _resolve_purchase_price(
+                    raw_purchase, (existing_snapshot or {}).get("prix_achat")
+                )
+                sale_price = _resolve_sale_price(
+                    raw_sale,
+                    (existing_snapshot or {}).get("prix_vente"),
+                    purchase_price=purchase_price,
+                    margin=DEFAULT_MARGIN_RATE,
+                    threshold=PRICE_DELTA_THRESHOLD,
+                )
+
+                purchase_price = round(float(purchase_price), 2) if purchase_price is not None else 0.0
+                sale_price = round(float(sale_price), 2) if sale_price is not None else 0.0
+
 
                 params_common = {
-                    "prix_achat": prix_achat,
-                    "prix_vente": prix_vente,
+                    "prix_achat": purchase_price,
+                    "prix_vente": sale_price,
                     "tva": tva,
                     "seuil_alerte": seuil_alerte,
                     "categorie": categorie,
@@ -284,44 +436,27 @@ def load_products_from_df(df: pd.DataFrame) -> Dict[str, Any]:
                     summary["updated"] += 1
                 else:
                     params_with_name = {"nom": nom, **params_common}
-                    update_result = conn.execute(
+                    insert_result = conn.execute(
                         text(
                             """
-                            UPDATE produits
-                            SET prix_achat = :prix_achat,
-                                prix_vente = :prix_vente,
-                                tva = :tva,
-                                seuil_alerte = :seuil_alerte,
-                                categorie = :categorie,
-                                updated_at = now()
-                            WHERE lower(nom) = lower(:nom)
+                            INSERT INTO produits (nom, prix_achat, prix_vente, tva, seuil_alerte, categorie)
+                            VALUES (:nom, :prix_achat, :prix_vente, :tva, :seuil_alerte, :categorie)
                             RETURNING id
                             """
                         ),
                         params_with_name,
                     )
 
-                    produit_row = update_result.fetchone()
-                    if produit_row:
-                        produit_id = int(produit_row[0])
-                        summary["updated"] += 1
-                    else:
-                        insert_result = conn.execute(
-                            text(
-                                """
-                                INSERT INTO produits (nom, prix_achat, prix_vente, tva, seuil_alerte, categorie)
-                                VALUES (:nom, :prix_achat, :prix_vente, :tva, :seuil_alerte, :categorie)
-                                RETURNING id
-                                """
-                            ),
-                            params_with_name,
-                        )
-                        inserted_row = insert_result.fetchone()
-                        if inserted_row is None:
-                            raise RuntimeError("Insertion du produit sans ID retourné")
-                        produit_id = int(inserted_row[0])
-                        summary["created"] += 1
-                        created_new = True
+                    inserted_row = insert_result.fetchone()
+                    if inserted_row is None:
+                        raise RuntimeError("Insertion du produit sans ID retourné")
+                    inserted_data = _row_as_dict(inserted_row, ["id"])
+                    inserted_id = inserted_data.get("id")
+                    if inserted_id is None:
+                        raise RuntimeError("Insertion du produit sans identifiant valide")
+                    produit_id = int(inserted_id)
+                    summary["created"] += 1
+                    created_new = True
 
                 movement_source = "Import facture"
                 if created_new:

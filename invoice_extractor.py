@@ -46,12 +46,14 @@ DEFAULT_TVA_CODE_MAP: dict[str, float] = {
     for code in codes
 }
 
+
 def clean_data(value):
     """Nettoie une valeur numérique (remplace la virgule par le point)."""
     if isinstance(value, str):
         # Remplace la virgule par le point et supprime tout caractère non numérique/point/espace
         return value.replace(',', '.').replace('-', '').strip()
     return value
+
 
 def extract_text_from_file(uploaded_file):
     """
@@ -108,78 +110,194 @@ def _resolve_tva_value(code: str | None, tva_lookup: Mapping[str, float], defaul
     return default_tva
 
 
+_IGNORED_DESIGNATION_KEYWORDS: tuple[str, ...] = (
+    "duplicata",
+    "prix au kg ou au litre",
+    "plus cotis",
+    "montant ttc",
+    "volume effectif",
+    "page",
+    "total",
+    "client",
+    "commande",
+)
+
+
+def _normalise_whitespace(value: str) -> str:
+    return re.sub(r"\s+", " ", value or "").strip()
+
+
+def _should_skip_line(line: str) -> bool:
+    lowered = line.lower()
+    return any(keyword in lowered for keyword in _IGNORED_DESIGNATION_KEYWORDS)
+
+
+def _parse_decimal(value: str | None) -> float | None:
+    if value is None:
+        return None
+    cleaned = (
+        str(value)
+        .replace("\u202f", "")
+        .replace("\xa0", "")
+        .replace(",", ".")
+        .strip()
+    )
+    cleaned = re.sub(r"[^0-9.\-]", "", cleaned)
+    if not cleaned:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _parse_int(value: str | None) -> int | None:
+    decimal = _parse_decimal(value)
+    if decimal is None:
+        return None
+    return int(round(decimal))
+
+
+def _parse_detail_line(line: str) -> dict[str, object] | None:
+    tokens = _normalise_whitespace(line).split()
+    if len(tokens) < 8:
+        return None
+
+    regie = tokens[0]
+    if not re.fullmatch(r"[A-Za-z]", regie):
+        return None
+
+    tva_code: str | None = None
+    if re.fullmatch(r"[A-Za-z]", tokens[-1]):
+        tva_code = tokens[-1].upper()
+        tokens = tokens[:-1]
+
+    if len(tokens) < 8:
+        return None
+
+    volume = _parse_decimal(tokens[1])
+    vap = _parse_decimal(tokens[2])
+    poids_unitaire = _parse_decimal(tokens[3])
+    unit_price = _parse_decimal(tokens[4])
+    quantity = _parse_int(tokens[5])
+    colisage = _parse_int(tokens[6])
+    total_amount = _parse_decimal(tokens[7])
+
+    if unit_price is None or quantity is None or total_amount is None:
+        return None
+
+    detail: dict[str, object] = {
+        "regie": regie.upper(),
+        "volume_litre": volume or 0.0,
+        "vap": vap or 0.0,
+        "poids_unitaire": poids_unitaire or 0.0,
+        "prix_unitaire": round(unit_price, 2),
+        "quantite_colis": max(quantity, 0),
+        "colisage": max(colisage or 1, 1),
+        "montant_total": round(total_amount, 2),
+    }
+
+    if tva_code:
+        detail["tva_code"] = tva_code
+
+    if len(tokens) > 8:
+        extras = tokens[8:]
+        if extras:
+            detail["extra"] = " ".join(extras)
+
+    return detail
+
+
+def _join_designation(parts: Sequence[str]) -> str:
+    cleaned: list[str] = []
+    for part in parts:
+        normalised = _normalise_whitespace(part)
+        if not normalised or _should_skip_line(normalised):
+            continue
+        cleaned.append(normalised)
+    return " ".join(cleaned).strip()
+
+
+def _ensure_margin(purchase: float | None, sale: float | None, margin: float) -> float | None:
+    if purchase is None:
+        return sale
+    baseline = round(float(purchase) * (1.0 + margin), 2)
+    if sale is None:
+        return baseline
+    return round(sale if sale >= baseline else baseline, 2)
+
+
 def extract_products_from_metro_invoice(
     raw_product_text: str,
     *,
     tva_map: Mapping[str, float] | None = None,
     default_tva: float = 20.0,
 ) -> pd.DataFrame:
-    """Analyse une facture METRO et renvoie un DataFrame exploitable.
-
-    Args:
-        raw_product_text: Texte brut de la facture (ou section produits).
-        tva_map: Dictionnaire optionnel pour surcharger le mapping TVA
-            (par exemple {"D": 20.0, "P": 5.5}).
-        default_tva: Valeur de TVA utilisée si le code n'est pas reconnu.
-
-    Returns:
-        DataFrame contenant au minimum les colonnes `nom`, `codes`,
-        `qte_init`, `prix_achat`, `prix_vente`, `tva` et `tva_code`.
-    """
-
-    # Étape 1: Nettoyage et simplification du texte
-    text = re.sub(r'["\s,]+', ' ', raw_product_text or "").strip()
-    text = text.replace('\n', '; ')
-
-    pattern = re.compile(
-        r'(\d{10,14})'  # EAN
-        r'\s*(\d{6,10})'  # Numéro article
-        r'\s*(.+?)'  # Désignation
-        r'([\d\.]+)'  # Prix unitaire
-        r'\s*(\d+)'  # Quantité
-        r'\s*([\d\.]+)'  # Montant total
-        r'\s*([A-Z])',  # Code TVA
-        re.IGNORECASE | re.DOTALL,
-    )
-
-    processed_text = text.replace(',', '.')
+    """ Analyse une facture METRO """
     overrides = {k.upper(): float(v) for k, v in (tva_map or {}).items()}
     lookup = {**DEFAULT_TVA_CODE_MAP, **overrides}
+    
+    lines = [
+        _normalise_whitespace(chunk)
+        for chunk in (raw_product_text or "").replace("\r", "").splitlines()
+    ]
+
+    start_pattern = re.compile(r"^(?P<ean>\d{10,14})\s+(?P<article>\d{4,10})\s*(?P<label>.*)")
 
     records: list[dict[str, object]] = []
-
-    for match in pattern.finditer(processed_text):
-        try:
-            ean = match.group(1).strip()
-            article = match.group(2).strip()
-            designation_raw = match.group(3).strip()
-            designation = re.sub(
-                r'(Duplicata|PRIX AU KG OU AU LITRE|Plus COTIS SECURITE SOCIALE|Total:.*|Volume effectif|Montant TTC|PAGE:.*|Numéro Article|VE unit. L.).*',
-                '',
-                designation_raw,
-            ).strip()
-
-            unit_price = float(match.group(4))
-            quantity = max(int(match.group(5)), 0)
-            total_amount = float(match.group(6))
-            tva_code = _normalise_tva_code(match.group(7))
-            tva_value = _resolve_tva_value(tva_code, lookup, default_tva)
-
-            records.append(
-                {
-                    'nom': designation,
-                    'codes': ean,
-                    'numero_article': article,
-                    'qte_init': quantity,
-                    'prix_achat': round(unit_price, 4),
-                    'prix_vente': round(unit_price, 4),
-                    'tva': round(tva_value, 4),
-                    'tva_code': tva_code,
-                    'montant_total_facture': round(total_amount, 4),
-                }
-            )
-        except Exception:
+    current: dict[str, object] | None = None
+    designation_parts: list[str] = []
+    
+    for line in lines:
+        if not line:
             continue
+
+        start_match = start_pattern.match(line)
+        if start_match:
+            if current and "prix_unitaire" in current:
+                designation = _join_designation(designation_parts)
+                if designation:
+                    current["nom"] = designation
+                if "montant_total" not in current:
+                    qty = int(current.get("quantite_colis", 0))
+                    colis = int(current.get("colisage", 1))
+                    current["montant_total"] = round(
+                        float(current["prix_unitaire"]) * max(qty, 0) * max(colis, 1),
+                        2,
+                    )
+                records.append(current)
+
+            current = {
+                "codes": start_match.group("ean"),
+                "numero_article": start_match.group("article"),
+            }
+            label = start_match.group("label").strip()
+            designation_parts = [label] if label else []
+            continue
+
+        if current is None:
+            continue
+
+        detail = _parse_detail_line(line)
+        if detail:
+            current.update(detail)
+            continue
+
+        if not _should_skip_line(line):
+            designation_parts.append(line)
+
+    if current and "prix_unitaire" in current:
+        designation = _join_designation(designation_parts)
+        if designation:
+            current["nom"] = designation
+        if "montant_total" not in current:
+            qty = int(current.get("quantite_colis", 0))
+            colis = int(current.get("colisage", 1))
+            current["montant_total"] = round(
+                float(current["prix_unitaire"]) * max(qty, 0) * max(colis, 1),
+                2,
+            )
+        records.append(current)
 
     if not records:
         return pd.DataFrame(columns=[
@@ -195,19 +313,88 @@ def extract_products_from_metro_invoice(
         ])
 
     df = pd.DataFrame(records)
+        return pd.DataFrame(
+            columns=[
+                "nom",
+                "codes",
+                "numero_article",
+                "qte_init",
+                "prix_achat",
+                "prix_vente",
+                "tva",
+                "tva_code",
+                "montant_total_facture",
+            ]
+        )
+
+    normalised: list[dict[str, object]] = []
+
+    for record in records:
+        designation = str(record.get("nom", "")).strip()
+        if not designation:
+            continue
+
+        ean = str(record.get("codes", "")).strip()
+        article = str(record.get("numero_article", "")).strip()
+        unit_price = _parse_decimal(record.get("prix_unitaire"))
+        qty = _parse_int(record.get("quantite_colis")) or 0
+        colis = _parse_int(record.get("colisage")) or 1
+        total_units = max(qty, 0) * max(colis, 1)
+        amount = _parse_decimal(record.get("montant_total"))
+        tva_code = _normalise_tva_code(record.get("tva_code"))
+        tva_value = _resolve_tva_value(tva_code, lookup, default_tva)
+
+        if unit_price is None:
+            continue
+
+        sale_price = _ensure_margin(unit_price, None, margin)
+
+        normalised.append(
+            {
+                "nom": designation,
+                "codes": ean,
+                "numero_article": article,
+                "regie": record.get("regie"),
+                "volume_litre": round(float(record.get("volume_litre", 0.0)), 3),
+                "vap": round(float(record.get("vap", 0.0)), 3),
+                "poids_unitaire": round(float(record.get("poids_unitaire", 0.0)), 3),
+                "quantite_colis": qty,
+                "colisage": colis,
+                "qte_init": total_units,
+                "prix_achat": round(unit_price, 2),
+                "prix_vente": sale_price if sale_price is not None else round(unit_price, 2),
+                "tva": round(tva_value, 2),
+                "tva_code": tva_code,
+                "montant_total_facture": round(
+                    amount if amount is not None else unit_price * total_units,
+                    2,
+                ),
+            }
+        )
+
+    df = pd.DataFrame(normalised)
+    if df.empty:
+        return df
+        
     desired_order: Iterable[str] = (
-        'nom',
-        'codes',
-        'numero_article',
-        'qte_init',
-        'prix_achat',
-        'prix_vente',
-        'tva',
-        'tva_code',
-        'montant_total_facture',
+        "nom",
+        "codes",
+        "numero_article",
+        "regie",
+        "volume_litre",
+        "vap",
+        "poids_unitaire",
+        "quantite_colis",
+        "colisage",
+        "qte_init",
+        "prix_achat",
+        "prix_vente",
+        "tva",
+        "tva_code",
+        "montant_total_facture",
     )
-    columns = [col for col in desired_order if col in df.columns]
-    return df.loc[:, columns]
+    available = [col for col in desired_order if col in df.columns]
+    return df.loc[:, available]
 
 # ... (le bloc if __name__ == '__main__': reste inchangé) ...
 if __name__ == '__main__':
