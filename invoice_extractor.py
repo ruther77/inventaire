@@ -322,9 +322,8 @@ def extract_products_from_metro_invoice(
                 "numero_article": start_match.group("article"),
             }
             label = start_match.group("label").strip()
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
+
+
             inline_detail = _parse_inline_summary(label)
             if inline_detail:
                 if "nom" in inline_detail:
@@ -333,11 +332,7 @@ def extract_products_from_metro_invoice(
                 designation_parts = []
             else:
                 designation_parts = [label] if label else []
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
+
             fallback_detail: dict[str, object] | None = None
             inline_tokens = _normalise_whitespace(label).split()
             parsed_count = 0
@@ -373,13 +368,7 @@ def extract_products_from_metro_invoice(
                 remaining_tokens = inline_tokens
             designation_text = " ".join(remaining_tokens).strip()
             designation_parts = [designation_text] if designation_text else []
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
+
             continue
 
         if current is None:

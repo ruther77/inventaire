@@ -1682,7 +1682,7 @@ if authentication_status:
             detail_popover = st.popover(
                 "🔍 Consulter une fiche produit",
                 use_container_width=True,
-                key="catalog_detail_popover",
+                ##key="catalog_detail_popover",
                 help="Ouvrez à tout moment une fiche produit détaillée dans une bulle flottante.",
             )
 
