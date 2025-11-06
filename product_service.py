@@ -27,13 +27,27 @@ _ALLOWED_NUMERIC_COLUMNS = {"prix_vente", "prix_achat", "tva", "seuil_alerte"}
 _ALLOWED_TEXT_COLUMNS = {"nom", "categorie"}
 _ALLOWED_BOOL_COLUMNS = {"actif"}
 _BARCODE_STATUS_MAP = {"added": "added", "skipped": "skipped", "conflict": "conflicts"}
+_MIN_GTIN_LENGTH = 3
+_MAX_GTIN_LENGTH = 14
 
 
 def _canonicalize_barcode(code: str | None) -> str | None:
     if code is None:
         return None
-    cleaned = re.sub(r"\s+", "", str(code)).strip()
-    return cleaned or None
+
+    raw_text = str(code).strip()
+    if not raw_text:
+        return None
+
+    digits_only = re.sub(r"\D", "", raw_text)
+    if not digits_only:
+        return None
+
+    length = len(digits_only)
+    if length < _MIN_GTIN_LENGTH or length > _MAX_GTIN_LENGTH:
+        return None
+
+    return digits_only
 
 
 def parse_barcode_input(raw_codes: str | Iterable[str] | None) -> list[str]:
@@ -188,7 +202,7 @@ def delete_product_by_barcode(raw_code: str | None) -> dict[str, Any]:
     """Supprime un code-barres (ou le produit entier s'il est unique)."""
 
     canonical = _canonicalize_barcode(raw_code)
-    if not canonical or len(canonical) < 8:
+    if not canonical:
         raise InvalidBarcodeError("Code-barres manquant ou trop court.")
 
     engine = get_engine()

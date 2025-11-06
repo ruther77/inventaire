@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import re
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, Sequence
 
 import pandas as pd
 
@@ -45,6 +45,8 @@ DEFAULT_TVA_CODE_MAP: dict[str, float] = {
     for rate, codes in _METRO_TVA_CODE_GROUPS
     for code in codes
 }
+
+DEFAULT_MARGIN_RATE = 0.0
 
 
 def clean_data(value):
@@ -208,6 +210,51 @@ def _parse_detail_line(line: str) -> dict[str, object] | None:
     return detail
 
 
+def _parse_inline_summary(label: str) -> dict[str, object] | None:
+    tokens = _normalise_whitespace(label).split()
+    if len(tokens) < 4:
+        return None
+
+    tva_candidate = tokens[-1]
+    total_candidate = tokens[-2] if len(tokens) >= 2 else None
+    qty_candidate = tokens[-3] if len(tokens) >= 3 else None
+    price_candidate = tokens[-4] if len(tokens) >= 4 else None
+    name_tokens = tokens[:-4]
+
+    price = _parse_decimal(price_candidate)
+    quantity = _parse_int(qty_candidate)
+    total = _parse_decimal(total_candidate)
+
+    if price is None or quantity is None:
+        return None
+
+    tva_code: str | None = None
+    if tva_candidate and re.fullmatch(r"[A-Za-z]", tva_candidate):
+        tva_code = tva_candidate.upper()
+    else:
+        name_tokens.append(tva_candidate)
+
+    designation = " ".join(name_tokens).strip()
+    if not designation:
+        return None
+
+    detail: dict[str, object] = {
+        "nom": designation,
+        "prix_unitaire": round(price, 2),
+        "quantite_colis": max(quantity, 0),
+        "colisage": 1,
+        "montant_total": round(
+            total if total is not None else price * max(quantity, 0),
+            2,
+        ),
+    }
+
+    if tva_code:
+        detail["tva_code"] = tva_code
+
+    return detail
+
+
 def _join_designation(parts: Sequence[str]) -> str:
     cleaned: list[str] = []
     for part in parts:
@@ -236,6 +283,7 @@ def extract_products_from_metro_invoice(
     """ Analyse une facture METRO """
     overrides = {k.upper(): float(v) for k, v in (tva_map or {}).items()}
     lookup = {**DEFAULT_TVA_CODE_MAP, **overrides}
+    margin = DEFAULT_MARGIN_RATE
     
     lines = [
         _normalise_whitespace(chunk)
@@ -272,7 +320,14 @@ def extract_products_from_metro_invoice(
                 "numero_article": start_match.group("article"),
             }
             label = start_match.group("label").strip()
-            designation_parts = [label] if label else []
+            inline_detail = _parse_inline_summary(label)
+            if inline_detail:
+                if "nom" in inline_detail:
+                    current["nom"] = inline_detail.pop("nom")
+                current.update(inline_detail)
+                designation_parts = []
+            else:
+                designation_parts = [label] if label else []
             continue
 
         if current is None:

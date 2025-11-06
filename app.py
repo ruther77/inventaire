@@ -77,6 +77,29 @@ def local_css(file_name):
 
 
 _THEME_LABELS = {"Thème clair": "light", "Thème sombre": "dark"}
+_MIN_GTIN_LENGTH = 3
+_MAX_GTIN_LENGTH = 14
+
+
+def _normalize_ean(value: str | int | float | None) -> str:
+    """Nettoie un code-barres en conservant uniquement les GTIN valides."""
+
+    if value is None:
+        return ""
+
+    text = str(value).strip()
+    if not text:
+        return ""
+
+    digits_only = re.sub(r"\D", "", text)
+    if not digits_only:
+        return ""
+
+    length = len(digits_only)
+    if length < _MIN_GTIN_LENGTH or length > _MAX_GTIN_LENGTH:
+        return ""
+
+    return digits_only
 
 
 def apply_ui_theme(theme_key: str) -> None:
@@ -288,10 +311,12 @@ def load_customer_catalog() -> pd.DataFrame:
     else:
         df["ean"] = ""
 
+    df["ean"] = df["ean"].map(_normalize_ean)
+
     unique_eans = {
-        ean.strip()
+        ean
         for ean in df["ean"].tolist()
-        if isinstance(ean, str) and ean.strip()
+        if isinstance(ean, str) and ean
     }
     image_map: dict[str, str | None] = {}
     if unique_eans:
@@ -382,8 +407,8 @@ def _fetch_product_image_url(ean: str | None) -> str | None:
     if not ean:
         return None
 
-    sanitized = re.sub(r"\D", "", str(ean)).strip()
-    if len(sanitized) < 8:
+    sanitized = _normalize_ean(ean)
+    if not sanitized:
         return None
 
     api_url = f"https://world.openfoodfacts.org/api/v0/product/{sanitized}.json"
@@ -1579,7 +1604,43 @@ if authentication_status:
                     },
                 )
 
-            with st.expander("Consulter une fiche produit détaillée"):
+            if not st.session_state.get("_catalog_detail_popover_style"):
+                st.markdown(
+                    """
+                    <style>
+                    div[data-testid="stPopover"] {
+                        position: fixed !important;
+                        bottom: 1.5rem;
+                        right: 1.5rem;
+                        z-index: 1000;
+                        max-width: min(420px, 90vw);
+                    }
+                    div[data-testid="stPopover"] button {
+                        border-radius: 999px !important;
+                        padding: 0.55rem 1.4rem;
+                        font-weight: 600;
+                        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.18);
+                    }
+                    div[data-testid="stPopoverContent"] {
+                        padding: 1.25rem;
+                        max-height: 80vh;
+                        overflow-y: auto;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.session_state["_catalog_detail_popover_style"] = True
+
+            detail_popover = st.popover(
+                "🔍 Consulter une fiche produit",
+                use_container_width=True,
+                key="catalog_detail_popover",
+                help="Ouvrez à tout moment une fiche produit détaillée dans une bulle flottante.",
+            )
+
+            with detail_popover:
+                st.markdown("### Fiche produit détaillée")
                 options = {
                     f"{row.nom} — {row.categorie}": int(row.id)
                     for row in catalog_df.itertuples()
@@ -1592,11 +1653,12 @@ if authentication_status:
                         "Produit",
                         options=list(options.keys()),
                         index=0,
+                        key="catalog_detail_select",
                     )
 
                     detail_id = options[selected_detail]
                     detail_row = catalog_df[catalog_df["id"] == detail_id].iloc[0]
-                    ean_value = str(detail_row.get("ean", "")).strip()
+                    ean_value = detail_row.get("ean") or ""
                     st.markdown(
                         f"**Nom :** {detail_row['nom']}  \n"
                         f"**Catégorie :** {detail_row['categorie']}  \n"
@@ -1605,6 +1667,7 @@ if authentication_status:
                         f"**Ventes (30 jours) :** {detail_row['ventes_30j']:.0f}  \n"
                         f"**EAN :** {ean_value or '—'}"
                     )
+
                     detail_image: str | None = None
                     raw_detail = detail_row.get("image_url")
                     if isinstance(raw_detail, str) and raw_detail.strip():
@@ -1617,7 +1680,11 @@ if authentication_status:
                         detail_image = _fetch_product_image_url(ean_value)
 
                     if detail_image:
-                        st.image(detail_image, caption=f"EAN {ean_value}" if ean_value else None, width=240)
+                        st.image(
+                            detail_image,
+                            caption=f"EAN {ean_value}" if ean_value else None,
+                            width=240,
+                        )
                     elif ean_value:
                         st.caption("Aucun visuel trouvé pour ce code-barres.")
 
