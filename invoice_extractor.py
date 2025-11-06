@@ -312,20 +312,6 @@ def extract_products_from_metro_invoice(
             'montant_total_facture',
         ])
 
-    df = pd.DataFrame(records)
-        return pd.DataFrame(
-            columns=[
-                "nom",
-                "codes",
-                "numero_article",
-                "qte_init",
-                "prix_achat",
-                "prix_vente",
-                "tva",
-                "tva_code",
-                "montant_total_facture",
-            ]
-        )
 
     normalised: list[dict[str, object]] = []
 
