@@ -6,17 +6,35 @@ import base64
 from functools import lru_cache
 from typing import Iterable, List
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 
-from data_repository import query_df
-from inventory_service import process_sale_transaction
-from product_service import (
+from core.data_repository import query_df
+from core.inventory_service import process_sale_transaction
+from core.product_service import (
     InvalidBarcodeError,
     ProductNotFoundError,
     update_catalog_entry,
 )
+from backend.dependencies.tenant import Tenant, get_current_tenant
+
+from backend.api import auth as auth_router
+from backend.api import catalog as catalog_router
+from backend.api import supply as supply_router
+from backend.api import audit as audit_router
+from backend.api import invoices as invoices_router
+from backend.api import stock as stock_router
+from backend.api import dashboard as dashboard_router
+from backend.api import prices as prices_router
+from backend.api import maintenance as maintenance_router
+from backend.api import finance as finance_router
+from backend.api import reports as reports_router
+from backend.api import admin as admin_router
+from backend.api import restaurant as restaurant_router
+from backend.api import capital as capital_router
+from backend.dependencies.auth import optional_api_key
+from backend.dependencies.security import enforce_default_rbac
 
 
 class ProductPayload(BaseModel):
@@ -80,8 +98,8 @@ class ProductUpdateRequest(BaseModel):
         return cleaned
 
 
-def _fetch_products() -> list[ProductPayload]:
-    """Retourne la liste des produits via la base de données."""
+def _fetch_products(tenant_id: int) -> list[ProductPayload]:
+    """Retourne la projection minimale des produits pour le catalogue SPA."""
 
     sql = """
         SELECT
@@ -93,22 +111,26 @@ def _fetch_products() -> list[ProductPayload]:
             p.stock_actuel,
             p.tva
         FROM produits p
+        WHERE tenant_id = :tenant_id
         ORDER BY p.nom ASC
     """
-    df = query_df(sql)
+    df = query_df(sql, params={"tenant_id": tenant_id})
     if df.empty:
         return []
     return [ProductPayload(**record) for record in df.to_dict("records")]
 
 
-def _compute_inventory_value() -> dict[str, float]:
+def _compute_inventory_value(tenant_id: int) -> dict[str, float]:
+    """Calcule la valorisation achat/vente du stock courant."""
+
     sql = """
         SELECT
             SUM(COALESCE(prix_achat, 0) * COALESCE(stock_actuel, 0)) AS total_achat,
             SUM(COALESCE(prix_vente, 0) * COALESCE(stock_actuel, 0)) AS total_vente
         FROM produits
+        WHERE tenant_id = :tenant_id
     """
-    df = query_df(sql)
+    df = query_df(sql, params={"tenant_id": tenant_id})
     if df.empty:
         return {"total_purchase_value": 0.0, "total_sale_value": 0.0}
     row = df.iloc[0]
@@ -120,6 +142,8 @@ def _compute_inventory_value() -> dict[str, float]:
 
 @lru_cache
 def create_app() -> FastAPI:
+    """Construit l'application FastAPI ainsi que tous les routeurs de domaine."""
+
     app = FastAPI(title="Inventaire Epicerie API", version="1.0.0")
 
     app.add_middleware(
@@ -130,23 +154,50 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    def _security_dependencies() -> list[Depends]:
+        # Force l'authentification + le rôle par défaut sur l'ensemble des routes métier.
+        return [Depends(optional_api_key), Depends(enforce_default_rbac)]
+
+    app.include_router(auth_router.router)
+
+    epicerie_router = APIRouter(tags=['epicerie'], dependencies=_security_dependencies())
+    epicerie_router.include_router(catalog_router.router)
+    epicerie_router.include_router(supply_router.router)
+    epicerie_router.include_router(audit_router.router)
+    epicerie_router.include_router(invoices_router.router)
+    epicerie_router.include_router(stock_router.router)
+    epicerie_router.include_router(dashboard_router.router)
+    epicerie_router.include_router(prices_router.router)
+    epicerie_router.include_router(maintenance_router.router)
+    epicerie_router.include_router(reports_router.router)
+    epicerie_router.include_router(admin_router.router)
+    epicerie_router.include_router(finance_router.router)
+    app.include_router(epicerie_router)
+
+    restaurant_domain_router = APIRouter(tags=['restaurant'], dependencies=_security_dependencies())
+    restaurant_domain_router.include_router(restaurant_router.router)
+    app.include_router(restaurant_domain_router)
+
+    app.include_router(capital_router.router, dependencies=_security_dependencies())
+
     @app.get("/health")
     def healthcheck() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/products", response_model=list[ProductPayload])
-    def list_products() -> list[ProductPayload]:
-        return _fetch_products()
+    @app.get("/products", response_model=list[ProductPayload], dependencies=_security_dependencies())
+    def list_products(tenant: Tenant = Depends(get_current_tenant)) -> list[ProductPayload]:
+        return _fetch_products(tenant.id)
 
-    @app.get("/inventory/summary")
-    def inventory_summary() -> dict[str, float]:
-        return _compute_inventory_value()
+    @app.get("/inventory/summary", dependencies=_security_dependencies())
+    def inventory_summary(tenant: Tenant = Depends(get_current_tenant)) -> dict[str, float]:
+        return _compute_inventory_value(tenant.id)
 
-    @app.post("/pos/checkout", response_model=CheckoutResponse)
-    def checkout(payload: CheckoutRequest) -> CheckoutResponse:
+    @app.post("/pos/checkout", response_model=CheckoutResponse, dependencies=_security_dependencies())
+    def checkout(payload: CheckoutRequest, tenant: Tenant = Depends(get_current_tenant)) -> CheckoutResponse:
         success, message, receipt = process_sale_transaction(
             [item.dict() for item in payload.cart],
             payload.username or "api_user",
+            tenant_id=tenant.id,
         )
 
         if not success:
@@ -158,6 +209,7 @@ def create_app() -> FastAPI:
             receipt_filename = receipt.get("filename")
             raw_content = receipt.get("content")
             if isinstance(raw_content, bytes):
+                # L'encodage Base64 permet de renvoyer le ticket directement dans la réponse JSON.
                 receipt_base64 = base64.b64encode(raw_content).decode("ascii")
 
         return CheckoutResponse(
@@ -167,8 +219,12 @@ def create_app() -> FastAPI:
             receipt_base64=receipt_base64,
         )
 
-    @app.patch("/products/{product_id}")
-    def update_product(product_id: int, payload: ProductUpdateRequest) -> dict[str, object]:
+    @app.patch("/products/{product_id}", dependencies=_security_dependencies())
+    def update_product(
+        product_id: int,
+        payload: ProductUpdateRequest,
+        tenant: Tenant = Depends(get_current_tenant),
+    ) -> dict[str, object]:
         try:
             result = update_catalog_entry(
                 product_id,
@@ -178,6 +234,7 @@ def create_app() -> FastAPI:
                     if value is not None
                 },
                 payload.barcodes,
+                tenant_id=tenant.id,
             )
         except ProductNotFoundError as exc:  # pragma: no cover - defensive
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

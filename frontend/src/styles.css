@@ -1,107 +1,104 @@
-:root {
-  color-scheme: light dark;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #f4f6fb;
-  color: #111827;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    background-color: #edf2f7;
+    color: #0f172a;
+  }
+
+  body {
+    @apply bg-slate-100 text-slate-950 antialiased;
+    margin: 0;
+  }
+
+  #root {
+    @apply min-h-screen bg-slate-100;
+  }
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+@layer components {
+  .glass-panel {
+    @apply rounded-3xl bg-white/90 shadow-soft ring-1 ring-slate-200 backdrop-blur;
+  }
 
-body {
-  margin: 0;
-}
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700;
+  }
 
-#root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
+  .metric {
+    @apply flex flex-col gap-1 rounded-2xl border border-slate-100 bg-white p-4 shadow;
+  }
 
-header {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  color: white;
-  padding: 1.5rem 2rem;
-}
+  .page-grid {
+    @apply grid gap-6;
+  }
 
-nav {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-  flex-wrap: wrap;
-}
+  .page-grid--two {
+    @apply grid gap-6 lg:grid-cols-2;
+  }
 
-nav a {
-  padding: 0.5rem 1rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.2);
-  transition: background 0.2s ease;
-}
+  .legacy-iframe {
+    @apply h-[75vh] w-full rounded-3xl border border-slate-200 shadow-soft;
+  }
 
-nav a.active,
-nav a:hover {
-  background: rgba(255, 255, 255, 0.4);
-}
+  .restaurant-shell {
+    @apply min-h-screen bg-slate-950 text-white;
+    background-image: radial-gradient(circle at top, rgba(255, 255, 255, 0.08), rgba(15, 23, 42, 0) 45%),
+      linear-gradient(120deg, #111c44 0%, #431b5d 55%, #fe8f73 120%);
+  }
 
-main {
-  flex: 1;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
+  .restaurant-hero {
+    @apply px-6 pb-8 pt-10 text-white shadow-lg ring-1 ring-white/10;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0));
+  }
 
-section.card {
-  background: white;
-  border-radius: 1rem;
-  padding: 1.5rem;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
-}
+  .restaurant-hero__content {
+    @apply flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between;
+  }
 
-.table-wrapper {
-  overflow-x: auto;
-}
+  .restaurant-hero__eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.4em] text-white/70;
+  }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
+  .restaurant-hero__subtitle {
+    @apply mt-3 text-base text-white/80;
+  }
 
-thead th {
-  text-align: left;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 0.75rem;
-}
+  .restaurant-tenant-picker {
+    @apply flex flex-col gap-2 rounded-2xl border border-white/20 bg-white/10 p-4;
+  }
 
-tbody td {
-  padding: 0.75rem;
-  border-bottom: 1px solid #f3f4f6;
-}
+  .restaurant-tenant-picker label {
+    @apply text-xs uppercase tracking-widest text-white/70;
+  }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.75rem;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.1);
-  color: #1d4ed8;
-}
+  .restaurant-tenant-picker select {
+    @apply rounded-xl border border-white/30 bg-white/20 px-3 py-2 text-sm font-medium text-white backdrop-blur;
+  }
 
-.grid {
-  display: grid;
-  gap: 1.5rem;
-}
+  .restaurant-nav {
+    @apply mt-8 flex flex-wrap gap-3;
+  }
 
-.grid.two-columns {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
+  .restaurant-nav a {
+    @apply rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white/80 transition hover:border-white/40 hover:text-white;
+  }
 
-iframe.legacy-app {
-  width: 100%;
-  min-height: 80vh;
-  border: 1px solid #e2e8f0;
-  border-radius: 1rem;
+  .restaurant-nav a.active {
+    @apply border-white bg-white text-slate-900 shadow;
+  }
+
+  .restaurant-main {
+    @apply mx-auto w-full max-w-6xl px-4 pb-12 pt-8;
+  }
+
+  .restaurant-panel {
+    @apply rounded-[32px] border border-white/10 bg-white/95 p-6 text-slate-900 shadow-2xl;
+  }
 }

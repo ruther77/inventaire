@@ -1,0 +1,116 @@
+-- ========================
+-- Dépenses & charges
+-- ========================
+
+-- Catégories (électricité, eau, loyer, télécom, consommables…)
+CREATE TABLE IF NOT EXISTS depense_categories (
+  id SERIAL PRIMARY KEY,
+  nom TEXT NOT NULL UNIQUE
+);
+
+-- Fournisseurs (optionnel mais utile pour règles d’auto-catégorisation)
+CREATE TABLE IF NOT EXISTS fournisseurs (
+  id SERIAL PRIMARY KEY,
+  nom TEXT NOT NULL UNIQUE,
+  iban TEXT,
+  siret TEXT
+);
+
+-- Centres de coûts (Cuisine, Bar, Admin…)
+CREATE TABLE IF NOT EXISTS cost_centers (
+  id SERIAL PRIMARY KEY,
+  nom TEXT NOT NULL UNIQUE
+);
+
+INSERT INTO cost_centers (nom) VALUES ('Cuisine'), ('Bar'), ('Admin')
+ON CONFLICT (nom) DO NOTHING;
+
+-- Dépenses récurrentes (modèles) : ex. loyer mensuel, abonnement internet
+CREATE TABLE IF NOT EXISTS depense_recurrente (
+  id SERIAL PRIMARY KEY,
+  categorie_id INT NOT NULL REFERENCES depense_categories(id),
+  fournisseur_id INT REFERENCES fournisseurs(id),
+  libelle TEXT NOT NULL,
+  montant_ht NUMERIC(12,2),           -- soit montant fixe...
+  tva_pct NUMERIC(5,2) DEFAULT 20.00,
+  unite TEXT,                          -- optionnel (ex. "mois")
+  frequence TEXT NOT NULL,             -- 'MONTHLY','WEEKLY','YEARLY'
+  actif BOOLEAN NOT NULL DEFAULT TRUE,
+  date_debut DATE NOT NULL DEFAULT CURRENT_DATE,
+  date_fin DATE
+);
+
+-- Dépenses réelles (saisies ou importées) : unitaires ou direct montant
+CREATE TABLE IF NOT EXISTS depense (
+  id SERIAL PRIMARY KEY,
+  categorie_id INT NOT NULL REFERENCES depense_categories(id),
+  fournisseur_id INT REFERENCES fournisseurs(id),
+  cost_center_id INT REFERENCES cost_centers(id),  -- si imputable (élec: Cuisine/Bar)
+  libelle TEXT NOT NULL,
+  -- Modèle 1 : quantité * prix_unitaire (électricité, eau)
+  unite TEXT,                          -- 'kWh','m3','mois','forfait', etc.
+  quantite NUMERIC(14,4),
+  prix_unitaire NUMERIC(12,4),
+  -- Modèle 2 : montant direct (si renseigné on ignore quantité*PU)
+  montant_ht NUMERIC(12,2),
+  tva_pct NUMERIC(5,2) DEFAULT 20.00,
+  date_operation DATE NOT NULL,
+  periode_debut DATE,                  -- pour factures couvrant un intervalle
+  periode_fin DATE,
+  source TEXT,                         -- 'manuel','import_releve'
+  ref_externe TEXT                     -- n° facture ou id banque
+);
+
+-- Vue: montant HT choisi (priorité au montant direct sinon qté*PU)
+CREATE OR REPLACE VIEW v_depense_montant AS
+SELECT
+  d.*,
+  COALESCE(d.montant_ht, d.quantite * d.prix_unitaire) AS montant_ht_calc,
+  COALESCE(d.montant_ht, d.quantite * d.prix_unitaire) * (1 + COALESCE(d.tva_pct,0)/100.0) AS montant_ttc_calc
+FROM depense d;
+
+-- Aggrégats par mois & centre de coûts
+CREATE OR REPLACE VIEW v_depense_mensuelle AS
+SELECT
+  DATE_TRUNC('month', COALESCE(periode_debut, date_operation))::date AS mois,
+  dc.nom AS categorie,
+  cc.nom AS cost_center,
+  SUM(v.montant_ht_calc) AS total_ht,
+  SUM(v.montant_ttc_calc) AS total_ttc
+FROM v_depense_montant v
+LEFT JOIN depense_categories dc ON dc.id = v.categorie_id
+LEFT JOIN cost_centers cc ON cc.id = v.cost_center_id
+GROUP BY 1,2,3
+ORDER BY 1,2,3;
+
+-- Vue hebdomadaire (ISO week)
+CREATE OR REPLACE VIEW v_depense_hebdo AS
+SELECT
+  DATE_TRUNC('week', COALESCE(periode_debut, date_operation))::date AS semaine,
+  dc.nom AS categorie,
+  cc.nom AS cost_center,
+  SUM(v.montant_ht_calc) AS total_ht,
+  SUM(v.montant_ttc_calc) AS total_ttc
+FROM v_depense_montant v
+LEFT JOIN depense_categories dc ON dc.id = v.categorie_id
+LEFT JOIN cost_centers cc ON cc.id = v.cost_center_id
+GROUP BY 1,2,3
+ORDER BY 1,2,3;
+
+-- Règles d’auto-catégorisation simples (optionnel)
+CREATE TABLE IF NOT EXISTS depense_rules (
+  id SERIAL PRIMARY KEY,
+  contains TEXT NOT NULL,                  -- motif à chercher dans libellé/tiers
+  categorie_id INT REFERENCES depense_categories(id),
+  fournisseur_id INT REFERENCES fournisseurs(id),
+  cost_center_id INT REFERENCES cost_centers(id),
+  tva_pct NUMERIC(5,2),
+  unite TEXT
+);
+
+-- Exemple de catégories utiles
+INSERT INTO depense_categories (nom) VALUES
+ ('Electricité'), ('Eau'), ('Loyer'), ('Télécom'), ('Abonnements SaaS'),
+ ('Frais bancaires'), ('Marketing'), ('Consumables'), ('Réparations')
+ON CONFLICT (nom) DO NOTHING;
+

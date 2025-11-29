@@ -1,0 +1,232 @@
+@startuml
+title Modèle conceptuel consolidé – Épicerie + Restaurant
+
+' Epicerie
+package "Epicerie / catalogue produits" {
+  class Tenant {
+    +id : int
+    +code : string
+    +name : string
+  }
+
+  class Produit {
+    +id : int
+    +tenant_id : int
+    +nom, categorie, seuil_alerte, tva
+    +prix_achat, prix_vente, stock_actuel, actif
+  }
+
+  class ProduitBarcode {
+    +code : string
+    +produit_id : int
+    +tenant_id : int
+    +is_principal : bool
+  }
+
+  class MouvementStock {
+    +id : int
+    +produit_id : int
+    +tenant_id : int
+    +type, quantite, source, username, date_mvt
+  }
+
+  Produit --> ProduitBarcode
+  Produit --> MouvementStock
+  Tenant --> Produit
+}
+
+' Restaurant
+package "Restaurant (plats & charges)" {
+  class PlatIngredient {
+    +plat_id : int
+    +ingredient_id : int
+    +quantite, unite
+  }
+
+  class RestaurantPlat {
+    +id : int
+    +tenant_id : int
+    +nom, categorie
+    +prix_vente_ttc, actif
+  }
+
+  class RestaurantIngredient {
+    +id : int
+    +tenant_id : int
+    +nom, unite_base, cout_unitaire, stock_actuel
+  }
+
+  class RestaurantExpense {
+    +id : int
+    +tenant_id : int
+    +categorie_id, cost_center_id
+    +libelle, montant_ht, tva_pct, date_operation
+  }
+
+  class RestaurantBankStatement {
+    +id : int
+    +tenant_id : int
+    +account, date, libelle, montant, type
+    +categorie, fournisseur, depense_id
+  }
+
+  RestaurantPlat --> PlatIngredient
+  RestaurantIngredient --> PlatIngredient
+}
+
+' Import / historique
+package "Factures & historiques" {
+  class InvoiceLine {
+    +codes, nom, quantite_recue, prix_achat, tva, supplier, facture_date
+    +tenant_id : int
+  }
+
+  class PriceHistory {
+    +id : int
+    +tenant_id : int
+    +code, fournisseur, prix_achat, quantite, facture_date
+    +source_context
+  }
+
+  InvoiceLine --> PriceHistory
+}
+
+' Vues consolidées
+package "Vues & dashboards" {
+  class CapitalSnapshot {
+    +date, tenant_id
+    +stock_value, bank_balance, cash_balance, total_assets
+  }
+
+  class AuditAction {
+    +id, produit_id, tenant_id
+    +responsable, statut, note, due_date
+  }
+
+  class SupplyPlanItem {
+    +produit_id, tenant_id
+    +ventes_jour, couverture, quantite_a_commander, niveau_priorite
+  }
+
+  PriceHistory --> CapitalSnapshot : value source
+  MouvementStock --> CapitalSnapshot : stock_value
+  InvoiceLine --> AuditAction : détecte écarts
+}
+
+' Portefeuille global
+CapitalSnapshot ..> Tenant : agrégations
+RestaurantExpense ..> CapitalSnapshot
+RestaurantBankStatement ..> RestaurantExpense
+
+note right of CapitalSnapshot
+  Vues sommentales : stock + trésorerie + marges
+  Permettent d'afficher “mon capital” par tenant
+end note
+
+note left of InvoiceLine
+  Sert uniquement à l'extraction : pas de prix de vente
+  -> alimenter PriceHistory et mouvements stock
+end note
+
+note right of RestaurantPlat
+  L'équivalent produit pour Restaurant HQ
+  Peut être lié à PriceHistory spécifique ou charges
+end note
+
+@enduml
+entity "fact_transactions" as FactTransactions {
+  * id : integer
+  --
+  + tenant_id : integer <<FK dim_tenant>>
+  + date_id : integer <<FK dim_date>>
+  + supplier_id : integer <<FK dim_supplier>>
+  + category_id : integer <<FK dim_category>>
+  amount : numeric(18,2)
+  currency : char(3)
+  source_account : text
+  direction : text <<+/- >>
+  metadata : jsonb
+}
+
+entity "fact_invoices" as FactInvoices {
+  * id : integer
+  --
+  + tenant_id : integer <<FK dim_tenant>>
+  + date_id : integer <<FK dim_date>>
+  + supplier_id : integer <<FK dim_supplier>>
+  + product_id : integer <<FK dim_product>>
+  + category_id : integer <<FK dim_category>>
+  invoice_number : text
+  sku : text
+  quantity : numeric(14,3)
+  unit_cost_excl_tax : numeric(14,4)
+  vat_rate : numeric(5,2)
+  currency : char(3)
+}
+
+entity "fact_sales" as FactSales {
+  * id : integer
+  --
+  + tenant_id : integer <<FK dim_tenant>>
+  + date_id : integer <<FK dim_date>>
+  + product_id : integer <<FK dim_product>>
+  + category_id : integer <<FK dim_category>>
+  channel : text
+  quantity : numeric(14,3)
+  net_amount : numeric(18,2)
+  vat_amount : numeric(18,2)
+  metadata : jsonb
+}
+
+entity "dim_date" as DimDate {
+  * id : integer
+  date_value : date
+  year : int
+  quarter : int
+  month : int
+  day : int
+  week : int
+}
+
+entity "dim_tenant" as DimTenant {
+  * id : integer
+  code : text
+  name : text
+}
+
+entity "dim_category" as DimCategory {
+  * id : integer
+  code : text
+  label : text
+}
+
+entity "dim_supplier" as DimSupplier {
+  * id : integer
+  code : text
+  name : text
+  iban : text
+}
+
+entity "dim_product" as DimProduct {
+  * id : integer
+  sku : text
+  name : text
+  barcode : text
+  default_category_id : integer
+}
+
+FactTransactions::tenant_id --> DimTenant::id
+FactTransactions::date_id --> DimDate::id
+FactTransactions::supplier_id --> DimSupplier::id
+FactTransactions::category_id --> DimCategory::id
+
+FactInvoices::tenant_id --> DimTenant::id
+FactInvoices::date_id --> DimDate::id
+FactInvoices::supplier_id --> DimSupplier::id
+FactInvoices::product_id --> DimProduct::id
+FactInvoices::category_id --> DimCategory::id
+
+FactSales::tenant_id --> DimTenant::id
+FactSales::date_id --> DimDate::id
+FactSales::product_id --> DimProduct::id
+FactSales::category_id --> DimCategory::id

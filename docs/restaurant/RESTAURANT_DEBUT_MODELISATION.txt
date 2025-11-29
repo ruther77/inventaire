@@ -1,0 +1,126 @@
+-- Type de plat
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'plat_type') THEN
+    CREATE TYPE plat_type AS ENUM ('dish','beverage','bundle');
+  END IF;
+END $$;
+
+-- Ajout des colonnes sur plats
+ALTER TABLE plats
+  ADD COLUMN IF NOT EXISTS type plat_type NOT NULL DEFAULT 'dish',
+  ADD COLUMN IF NOT EXISTS tva_pct NUMERIC(5,2) DEFAULT 10.00;  -- ex.: 10% Restauration
+
+-- Historique des prix de vente (si prix variables)
+CREATE TABLE IF NOT EXISTS plat_tarifs (
+  id              SERIAL PRIMARY KEY,
+  plat_id         INT NOT NULL REFERENCES plats(id) ON DELETE CASCADE,
+  prix_ttc        NUMERIC(12,2) NOT NULL,
+  date_debut      DATE NOT NULL,
+  date_fin        DATE,
+  devise          TEXT NOT NULL DEFAULT 'EUR',
+  UNIQUE(plat_id, date_debut)
+);
+
+-- Vue: tarif courant (dernier sans date_fin)
+CREATE OR REPLACE VIEW v_plat_tarif_actuel AS
+SELECT t.*
+FROM plat_tarifs t
+JOIN (
+  SELECT plat_id, MAX(date_debut) AS max_debut
+  FROM plat_tarifs
+  WHERE date_fin IS NULL
+  GROUP BY plat_id
+) x ON x.plat_id = t.plat_id AND x.max_debut = t.date_debut;
+
+-- Un "bundle" est un plat (type='bundle') composé d'autres PLATS (boissons, plats…)
+CREATE TABLE IF NOT EXISTS bundle_items (
+  id           SERIAL PRIMARY KEY,
+  bundle_id    INT NOT NULL REFERENCES plats(id) ON DELETE CASCADE,  -- le plat "formule"
+  item_plat_id INT NOT NULL REFERENCES plats(id) ON DELETE RESTRICT, -- composant: un autre plat
+  quantite     NUMERIC(12,4) NOT NULL DEFAULT 1.0,
+  UNIQUE (bundle_id, item_plat_id)
+);
+
+-- Vue : explosion d’un bundle en lignes (utile pour coût, équivalents)
+CREATE OR REPLACE VIEW v_bundle_explode AS
+SELECT bi.bundle_id, b.nom AS bundle_nom,
+       bi.item_plat_id, pi.nom AS item_nom, bi.quantite
+FROM bundle_items bi
+JOIN plats b  ON b.id  = bi.bundle_id   AND b.type = 'bundle'
+JOIN plats pi ON pi.id = bi.item_plat_id;
+
+-- L’équivalence relie un PLAT (ou bundle) à un INGREDIENT de référence
+-- Exemple : une "Bière Heineken 33cl (plat)" équivaut à 1.00 "Heineken_bottle" (ingredient pièce)
+CREATE TABLE IF NOT EXISTS plat_equivalences (
+  id               SERIAL PRIMARY KEY,
+  plat_id          INT NOT NULL REFERENCES plats(id) ON DELETE CASCADE,
+  ingredient_id    INT NOT NULL REFERENCES ingredients(id) ON DELETE RESTRICT,
+  qte_ingredient   NUMERIC(12,4) NOT NULL,  -- combien d’ingrédient pour 1 plat
+  UNIQUE (plat_id, ingredient_id)
+);
+
+-- Vue: équivalents d’un bundle → somme des équivalences de ses composants
+CREATE OR REPLACE VIEW v_bundle_equivalents AS
+SELECT bi.bundle_id,
+       e.ingredient_id,
+       SUM(bi.quantite * e.qte_ingredient) AS qte_ingredient_total
+FROM bundle_items bi
+JOIN plats b ON b.id = bi.bundle_id
+JOIN plat_equivalences e ON e.plat_id = bi.item_plat_id
+GROUP BY bi.bundle_id, e.ingredient_id;
+
+CREATE TABLE IF NOT EXISTS ingredient_conditionnements (
+  id                SERIAL PRIMARY KEY,
+  ingredient_id     INT NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+  libelle           TEXT NOT NULL,   -- ex.: "colis 12×33cl", "sac 25kg"
+  qte_base          NUMERIC(12,4) NOT NULL, -- quantité exprimée en unite_base de l’ingrédient
+  prix_pack         NUMERIC(12,4),   -- si tu veux saisir prix pack
+  actif             BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- Vue: prix unitaire alternatif via conditionnement
+CREATE OR REPLACE VIEW v_prix_par_conditionnement AS
+SELECT c.id, c.ingredient_id, c.libelle, c.qte_base,
+       CASE WHEN c.prix_pack IS NULL OR c.qte_base = 0 THEN NULL
+            ELSE c.prix_pack / c.qte_base
+       END AS prix_par_unite_pack
+FROM ingredient_conditionnements c;
+
+CREATE TABLE IF NOT EXISTS categories (
+  id   SERIAL PRIMARY KEY,
+  nom  TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS plat_categories (
+  plat_id     INT NOT NULL REFERENCES plats(id) ON DELETE CASCADE,
+  categorie_id INT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  PRIMARY KEY (plat_id, categorie_id)
+);
+-- Ex. catégories: "Plat en sauce", "Boisson", "Formule", "Traiteur"
+
+CREATE TABLE IF NOT EXISTS productions (
+  id              SERIAL PRIMARY KEY,
+  plat_id         INT NOT NULL REFERENCES plats(id) ON DELETE CASCADE,
+  date_prod       TIMESTAMP NOT NULL DEFAULT NOW(),
+  qte_batch_cible INT NOT NULL DEFAULT 30,  -- portions ciblées
+  qte_batch_reel  INT,                      -- portions obtenues
+  perte_pct       NUMERIC(5,2),             -- perdu en %
+  commentaire     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS production_lots (
+  id             SERIAL PRIMARY KEY,
+  production_id  INT NOT NULL REFERENCES productions(id) ON DELETE CASCADE,
+  lot_code       TEXT,
+  portions_creees INT NOT NULL
+);
+
+ALTER TABLE ingredients
+  ADD COLUMN IF NOT EXISTS tva_pct NUMERIC(5,2);
+
+-- Vue coût TTC ingrédient (optionnelle)
+CREATE OR REPLACE VIEW v_prix_unitaire_ttc AS
+SELECT pu.ingredient_id,
+       pu.prix_par_unite * (1 + COALESCE(i.tva_pct,0)/100.0) AS prix_par_unite_ttc
+FROM v_prix_unitaire_normalise pu
+JOIN ingredients i ON i.id = pu.ingredient_id;

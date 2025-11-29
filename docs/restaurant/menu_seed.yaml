@@ -1,0 +1,345 @@
+# Jeux de données de démarrage pour Restaurant HQ
+# Inclut ingrédients, plats/BOM et charges fixes pour l'environnement "restaurant".
+ingredients:
+  - nom: Riz basmati cuit
+    unite_base: kg
+    cout_unitaire: 4.2
+    stock_actuel: 18
+  - nom: Poulet fermier désossé
+    unite_base: kg
+    cout_unitaire: 9.8
+    stock_actuel: 12
+  - nom: Oignons caramélisés
+    unite_base: kg
+    cout_unitaire: 3.6
+    stock_actuel: 6
+  - nom: Sauce yassa maison
+    unite_base: kg
+    cout_unitaire: 5.4
+    stock_actuel: 8
+  - nom: Lait de coco
+    unite_base: L
+    cout_unitaire: 2.3
+    stock_actuel: 10
+  - nom: Gambas décortiquées
+    unite_base: kg
+    cout_unitaire: 19.0
+    stock_actuel: 4
+  - nom: Piments antillais
+    unite_base: kg
+    cout_unitaire: 12.5
+    stock_actuel: 2
+  - nom: Bâtonnets de manioc frits
+    unite_base: kg
+    cout_unitaire: 6.0
+    stock_actuel: 5
+  - nom: Feuilles Eru
+    unite_base: kg
+    cout_unitaire: 4.0
+    stock_actuel: 10
+  - nom: Feuilles Ndole
+    unite_base: kg
+    cout_unitaire: 5.2
+    stock_actuel: 8
+  - nom: Gombo
+    unite_base: kg
+    cout_unitaire: 3.8
+    stock_actuel: 6
+  - nom: Champignons africains
+    unite_base: kg
+    cout_unitaire: 6.5
+    stock_actuel: 5
+  - nom: Poisson fume
+    unite_base: kg
+    cout_unitaire: 21.5
+    stock_actuel: 4
+  - nom: Bouillon cube
+    unite_base: piece
+    cout_unitaire: 0.50
+    stock_actuel: 30
+  - nom: Huile de palme
+    unite_base: L
+    cout_unitaire: 4.8
+    stock_actuel: 8
+  - nom: Huile vegetale
+    unite_base: L
+    cout_unitaire: 3.9
+    stock_actuel: 6
+  - nom: Peau de boeuf
+    unite_base: kg
+    cout_unitaire: 3.9
+    stock_actuel: 3
+  - nom: Boeuf (morceaux)
+    unite_base: kg
+    cout_unitaire: 12.5
+    stock_actuel: 6
+  - nom: Arachides grillees
+    unite_base: kg
+    cout_unitaire: 7.4
+    stock_actuel: 6
+  - nom: Tomates
+    unite_base: kg
+    cout_unitaire: 2.8
+    stock_actuel: 12
+  - nom: Oignons
+    unite_base: kg
+    cout_unitaire: 1.8
+    stock_actuel: 14
+  - nom: Ail
+    unite_base: kg
+    cout_unitaire: 4.5
+    stock_actuel: 6
+  - nom: Gingembre
+    unite_base: kg
+    cout_unitaire: 3.5
+    stock_actuel: 4
+  - nom: Piment jaune
+    unite_base: kg
+    cout_unitaire: 13
+    stock_actuel: 3
+  - nom: Waterleaf/Epinards
+    unite_base: kg
+    cout_unitaire: 3.2
+    stock_actuel: 9
+  - nom: Ecrevisses sechees
+    unite_base: kg
+    cout_unitaire: 18.0
+    stock_actuel: 4
+  - nom: Pistache pilee
+    unite_base: kg
+    cout_unitaire: 14.0
+    stock_actuel: 2
+  - nom: Djansan (njansang)
+    unite_base: kg
+    cout_unitaire: 13.5
+    stock_actuel: 2
+  - nom: Sel gemme
+    unite_base: kg
+    cout_unitaire: 0.9
+    stock_actuel: 5
+
+plats:
+  - nom: Heru (Eru)
+    categorie: Plats en sauce
+    prix_vente_ttc: 14.9
+    actif: true
+    ingredients:
+      - ingredient: Feuilles Eru
+        quantite: 0.06
+        unite: kg
+      - ingredient: Waterleaf/Epinards
+        quantite: 0.14
+        unite: kg
+      - ingredient: Boeuf (morceaux)
+        quantite: 0.15
+        unite: kg
+      - ingredient: Peau de boeuf
+        quantite: 0.07
+        unite: kg
+      - ingredient: Poisson fume
+        quantite: 0.04
+        unite: kg
+      - ingredient: Ecrevisses sechees
+        quantite: 0.018
+        unite: kg
+      - ingredient: Huile de palme
+        quantite: 0.033
+        unite: L
+
+  - nom: Ndole
+    categorie: Plats en sauce
+    prix_vente_ttc: 15.9
+    actif: true
+    ingredients:
+      - ingredient: Feuilles Ndole
+        quantite: 0.1
+        unite: kg
+      - ingredient: Arachides grillees
+        quantite: 0.023
+        unite: kg
+      - ingredient: Boeuf (morceaux)
+        quantite: 0.115
+        unite: kg
+      - ingredient: Peau de boeuf
+        quantite: 0.058
+        unite: kg
+      - ingredient: Poisson fume
+        quantite: 0.044
+        unite: kg
+      - ingredient: Ecrevisses sechees
+        quantite: 0.004
+        unite: kg
+      - ingredient: Oignons
+        quantite: 0.011
+        unite: kg
+      - ingredient: Huile vegetale
+        quantite: 0.0067
+        unite: L
+      - ingredient: Huile de palme
+        quantite: 0.0033
+        unite: L
+
+  - nom: Sauce Gombo
+    categorie: Plats en sauce
+    prix_vente_ttc: 14.9
+    actif: true
+    ingredients:
+      - ingredient: Gombo
+        quantite: 0.1
+        unite: kg
+      - ingredient: Tomates
+        quantite: 0.03
+        unite: kg
+      - ingredient: Oignons
+        quantite: 0.011
+        unite: kg
+      - ingredient: Huile de palme
+        quantite: 0.0167
+        unite: L
+      - ingredient: Boeuf (morceaux)
+        quantite: 0.133
+        unite: kg
+      - ingredient: Peau de boeuf
+        quantite: 0.077
+        unite: kg
+      - ingredient: Poisson fume
+        quantite: 0.043
+        unite: kg
+      - ingredient: Ecrevisses sechees
+        quantite: 0.004
+        unite: kg
+
+  - nom: Sauce Jaune
+    categorie: Plats en sauce
+    prix_vente_ttc: 15.9
+    actif: true
+    ingredients:
+      - ingredient: Arachides grillees
+        quantite: 0.04
+        unite: kg
+      - ingredient: Huile de palme
+        quantite: 0.02
+        unite: L
+      - ingredient: Poisson fume
+        quantite: 0.029
+        unite: kg
+      - ingredient: Boeuf (morceaux)
+        quantite: 0.21
+        unite: kg
+      - ingredient: Gingembre
+        quantite: 0.0033
+        unite: kg
+      - ingredient: Piment jaune
+        quantite: 0.0033
+        unite: kg
+      - ingredient: Oignons
+        quantite: 0.011
+        unite: kg
+      - ingredient: Ail
+        quantite: 0.0007
+        unite: kg
+
+  - nom: Sauce Pistache
+    categorie: Plats en sauce
+    prix_vente_ttc: 15.9
+    actif: true
+    ingredients:
+      - ingredient: Pistache pilee
+        quantite: 0.04
+        unite: kg
+      - ingredient: Boeuf (morceaux)
+        quantite: 0.21
+        unite: kg
+      - ingredient: Huile de palme
+        quantite: 0.01
+        unite: L
+      - ingredient: Oignons
+        quantite: 0.011
+        unite: kg
+
+  - nom: Sauce Arachide
+    categorie: Plats en sauce
+    prix_vente_ttc: 14.9
+    actif: true
+    ingredients:
+      - ingredient: Arachides grillees
+        quantite: 0.05
+        unite: kg
+      - ingredient: Tomates
+        quantite: 0.0183
+        unite: kg
+      - ingredient: Oignons
+        quantite: 0.011
+        unite: kg
+      - ingredient: Ail
+        quantite: 0.0007
+        unite: kg
+      - ingredient: Gingembre
+        quantite: 0.001
+        unite: kg
+      - ingredient: Huile de palme
+        quantite: 0.0133
+        unite: L
+      - ingredient: Boeuf (morceaux)
+        quantite: 0.23
+        unite: kg
+
+  - nom: Sauce Taro (jaune au djansan)
+    categorie: Plats en sauce
+    prix_vente_ttc: 15.9
+    actif: true
+    ingredients:
+      - ingredient: Huile de palme
+        quantite: 0.045
+        unite: L
+      - ingredient: Peau de boeuf
+        quantite: 0.15
+        unite: kg
+      - ingredient: Champignons africains
+        quantite: 0.04
+        unite: kg
+      - ingredient: Djansan (njansang)
+        quantite: 0.01
+        unite: kg
+      - ingredient: Sel gemme
+        quantite: 0.001
+        unite: kg
+      - ingredient: Ail
+        quantite: 0.002
+        unite: kg
+      - ingredient: Gingembre
+        quantite: 0.001
+        unite: kg
+      - ingredient: Piment jaune
+        quantite: 0.002
+        unite: kg
+      - ingredient: Bouillon cube
+        quantite: 0.25
+        unite: piece
+
+charges:
+  - libelle: Loyer cuisine
+    montant_ht: 1800
+    categorie: Loyer
+    cost_center: Cuisine
+    tva_pct: 20
+  - libelle: Électricité cuisine
+    montant_ht: 620
+    categorie: Electricité
+    cost_center: Cuisine
+    tva_pct: 20
+  - libelle: Gestion bar/restauration
+    montant_ht: 350
+    categorie: Administratif
+    cost_center: Bar
+    tva_pct: 20
+  - libelle: Licence musicale
+    montant_ht: 120
+    categorie: Abonnements SaaS
+    cost_center: Administratif
+    tva_pct: 20
+  - libelle: Nettoyage chambre froide
+    montant_ht: 260
+    categorie: Maintenance
+    cost_center: Cuisine
+    tva_pct: 10

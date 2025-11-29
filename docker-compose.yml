@@ -22,6 +22,28 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+  db-test:
+    image: public.ecr.aws/docker/library/postgres:16
+    container_name: inventaire-db-test
+    restart: unless-stopped
+    env_file:
+      - .env.test
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db_test_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "55432:5432"
+    networks:
+      - inventaire-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   adminer:
     image: public.ecr.aws/docker/library/adminer:latest
@@ -77,9 +99,45 @@ services:
       - inventaire-net
     command: /bin/bash -c "while true; do /usr/local/bin/backup.sh; sleep 21600; done"
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: inventaire-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - inventaire-net
+    ports:
+      - "8000:8000"
+    volumes:
+      - backup_data:/backups
+      - .:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: inventaire-frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "5175:80"
+    networks:
+      - inventaire-net
+
 volumes:
   db_data:
   backup_data:
+  db_test_data:
 networks:
   inventaire-net:
     driver: bridge

@@ -37,3 +37,13 @@ CREATE TABLE IF NOT EXISTS mouvements_stock (
   source TEXT,
   date_mvt TIMESTAMP NOT NULL DEFAULT now()
 );
+
+-- Utilisateurs applicatifs
+CREATE TABLE IF NOT EXISTS app_users (
+  id SERIAL PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'standard',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

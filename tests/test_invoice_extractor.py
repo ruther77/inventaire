@@ -10,7 +10,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-import invoice_extractor  # noqa: E402
+from core import invoice_extractor  # noqa: E402
 
 
 class DummyPage:
@@ -40,6 +40,15 @@ class DummyUpload:
     def getvalue(self):
         return self._content
 
+    def read(self):
+        return self._content
+
+    def seek(self, _pos):
+        return None
+
+    def tell(self):
+        return 0
+
 
 def test_clean_data_strips_and_normalises():
     assert invoice_extractor.clean_data(" 12,5- ") == "12.5"
@@ -49,6 +58,14 @@ def test_clean_data_strips_and_normalises():
 def test_extract_text_from_pdf(monkeypatch):
     monkeypatch.setattr(invoice_extractor, "PdfReader", DummyPdfReader)
     uploaded = DummyUpload("application/pdf")
+
+    text = invoice_extractor.extract_text_from_file(uploaded)
+    assert text == "Page 1Page 2"
+
+
+def test_extract_text_from_pdf_without_explicit_type(monkeypatch):
+    monkeypatch.setattr(invoice_extractor, "PdfReader", DummyPdfReader)
+    uploaded = DummyUpload("application/octet-stream", name="FACTURE.PDF", content=b"%PDF-1.4 fake")
 
     text = invoice_extractor.extract_text_from_file(uploaded)
     assert text == "Page 1Page 2"
@@ -93,6 +110,8 @@ def test_extract_products_from_metro_invoice_builds_dataframe():
         "montant_ht",
         "montant_tva",
         "montant_ttc",
+        "facture_date",
+        "invoice_id",
     }.issubset(df.columns)
     assert list(df["nom"]) == [
         "Produit Test",
@@ -121,6 +140,21 @@ def test_extract_products_from_metro_invoice_builds_dataframe():
     assert list(df["montant_ht"]) == [3.0, 2.0, 6.0, 20.0, 10.0, 6.0, 28.0]
     assert list(df["montant_tva"]) == [0.6, 0.11, 0.6, 0.42, 0.0, 0.0, 1.54]
     assert list(df["montant_ttc"]) == [3.6, 2.11, 6.6, 20.42, 10.0, 6.0, 29.54]
+    assert df["invoice_id"].notna().all()
+
+
+def test_extract_products_assigns_invoice_ids():
+    raw_text = """
+    Date facture : 01-01-2024
+    1234567890123 123456 Produit Alpha 1.00 1 1.00 D
+    FIN DE LA FACTURE
+    Date facture : 02-01-2024
+    9876543210987 987654 Produit Beta 2.00 1 2.00 C
+    """
+
+    df = invoice_extractor.extract_products_from_metro_invoice(raw_text)
+    assert set(df["invoice_id"]) == {"INV-001", "INV-002"}
+    assert list(df.sort_values("invoice_id")["facture_date"]) == ["01-01-2024", "02-01-2024"]
 
 
 def test_default_tva_code_map_covers_metro_reference():
@@ -183,6 +217,37 @@ def test_extract_text_from_unsupported_type():
     assert invoice_extractor.extract_text_from_file(uploaded) == ""
 
 
+def test_extract_products_handles_section_headers_and_inline_tail():
+    raw_text = """
+*** SPIRITUEUX Total : 120
+3279912345678 54321 RHUM VIEUX AGRICOLE 70CL B 5,5 0,041 0,750 1,685 6 5 50,55 D
+*** BRASSERIE Total : 90
+9876543210987 67890 GIN PREMIUM SIGNATURE
+B 5,5 0,050 1,000 2,345 3 4 28,14 C
+"""
+
+    df = invoice_extractor.extract_products_from_metro_invoice(raw_text)
+
+    assert len(df) == 2
+    assert list(df["codes"]) == ["3279912345678", "9876543210987"]
+    assert list(df["quantite_colis"]) == [6, 3]
+    assert list(df["colisage"]) == [5, 4]
+    assert list(df["section"]) == ["SPIRITUEUX", "BRASSERIE"]
+    assert list(df["tva_code"]) == ["D", "C"]
+
+
+def test_extract_products_assigns_facture_dates():
+    raw_text = """
+    Date facture : 05-10-2024 08:00
+    1234567890123 123456 Produit Test 1.00 1 1.00 D
+    Date facture : 06-10-2024 09:30
+    9876543210987 765432 Produit Deux 2.00 1 2.00 S
+    """
+
+    df = invoice_extractor.extract_products_from_metro_invoice(raw_text)
+    assert list(df["facture_date"]) == ["05-10-2024 08:00", "06-10-2024 09:30"]
+
+
 def test_invoice_extractor_source_has_no_merge_conflicts():
-    source = Path("invoice_extractor.py").read_text(encoding="utf-8")
+    source = (_ROOT / "core" / "invoice_extractor.py").read_text(encoding="utf-8")
     assert "<<<<<<<" not in source

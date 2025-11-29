@@ -1,0 +1,183 @@
+-- ===================================================================
+-- PLATS EN SAUCE — MODÉLISATION PAR PORTION (1 portion = 600 g)
+-- Ce script suppose que le schéma de base est déjà créé (restaurants,
+-- ingredients, ingredient_prix, plats, plat_ingredients, etc.)
+-- Restaurant utilisé : id = 1 ("Chez Incontournable")
+-- ===================================================================
+
+-- 0) Ingrédients manquants / normalisations
+INSERT INTO ingredients (nom, unite_base, etat)
+VALUES
+  ('Pistache pilee', 'kg', 'sec'),
+  ('Djansan (njansang)', 'kg', 'sec'),
+  ('Champignons africains', 'kg', 'sec'),
+  ('Sel gemme', 'kg', 'autre'),
+  ('Bouillon cube', 'piece', 'autre')
+ON CONFLICT (nom) DO NOTHING;
+
+-- (Si pas déjà là)
+INSERT INTO ingredients (nom, unite_base, etat)
+VALUES
+  ('Feuilles Eru', 'kg', 'congele'),
+  ('Waterleaf/Epinards', 'kg', 'congele'),
+  ('Boeuf (morceaux)', 'kg', 'congele'),
+  ('Peau de boeuf', 'kg', 'congele'),
+  ('Poisson fume', 'kg', 'fume'),
+  ('Ecrevisses sechees', 'kg', 'sec'),
+  ('Huile de palme', 'l',  'autre'),
+  ('Huile vegetale', 'l',  'autre'),
+  ('Arachides grillees', 'kg', 'sec'),
+  ('Feuilles Ndole', 'kg', 'congele'),
+  ('Gombo', 'kg', 'congele'),
+  ('Tomates', 'kg', 'congele'),
+  ('Oignons', 'kg', 'congele'),
+  ('Ail', 'kg', 'sec'),
+  ('Gingembre', 'kg', 'sec'),
+  ('Piment jaune', 'kg', 'sec')
+ON CONFLICT (nom) DO NOTHING;
+
+-- 1) Créer/assurer les plats (tous “dish”) ET passer en "par portion"
+--    portions_par_batch = 1, poids_portion_g = 600
+INSERT INTO plats (restaurant_id, nom, type, portions_par_batch, poids_portion_g, prix_vente_ttc)
+VALUES
+  (1, 'Heru (Eru)',     'dish', 1, 600, 14.90),
+  (1, 'Ndole',          'dish', 1, 600, 15.90),
+  (1, 'Sauce Gombo',    'dish', 1, 600, 14.90),
+  (1, 'Sauce Jaune',    'dish', 1, 600, 15.90),
+  (1, 'Sauce Pistache', 'dish', 1, 600, 15.90),
+  (1, 'Sauce Arachide', 'dish', 1, 600, 14.90),
+  (1, 'Sauce Taro (jaune au djansan)', 'dish', 1, 600, 15.90)
+ON CONFLICT (restaurant_id, nom) DO UPDATE
+SET type='dish', portions_par_batch=1, poids_portion_g=EXCLUDED.poids_portion_g, prix_vente_ttc=EXCLUDED.prix_vente_ttc, actif=TRUE;
+
+-- 2) RECETTES “PAR PORTION” (quantités exprimées dans l’unité de l’ingrédient)
+--    NB: ce sont les équivalents par portion (division des anciens batchs x30),
+--        arrondis au millième (kg/L) quand pertinent.
+
+-- 2.1 HERU (ERU) — par portion
+INSERT INTO plat_ingredients (plat_id, ingredient_id, quantite_batch)
+SELECT p.id, i.id, q.q
+FROM plats p
+JOIN LATERAL (VALUES
+  ('Feuilles Eru',        0.060),
+  ('Waterleaf/Epinards',  0.143),
+  ('Boeuf (morceaux)',    0.153),
+  ('Peau de boeuf',       0.070),
+  ('Poisson fume',        0.043),
+  ('Ecrevisses sechees',  0.018),
+  ('Huile de palme',      0.033)  -- L
+) AS q(nom,q) ON TRUE
+JOIN ingredients i ON i.nom=q.nom
+WHERE p.nom='Heru (Eru)'
+ON CONFLICT (plat_id, ingredient_id) DO UPDATE SET quantite_batch = EXCLUDED.quantite_batch;
+
+-- 2.2 NDOLE BAMILEKE — par portion
+INSERT INTO plat_ingredients (plat_id, ingredient_id, quantite_batch)
+SELECT p.id, i.id, q.q
+FROM plats p
+JOIN LATERAL (VALUES
+  ('Feuilles Ndole',       0.100),
+  ('Arachides grillees',   0.023),
+  ('Boeuf (morceaux)',     0.115),
+  ('Peau de boeuf',        0.058),
+  ('Poisson fume',         0.044),
+  ('Ecrevisses sechees',   0.004),
+  ('Oignons',              0.011),
+  ('Huile vegetale',       0.0067),   -- L
+  ('Huile de palme',       0.0033)    -- L
+) AS q(nom,q) ON TRUE
+JOIN ingredients i ON i.nom=q.nom
+WHERE p.nom='Ndole'
+ON CONFLICT (plat_id, ingredient_id) DO UPDATE SET quantite_batch = EXCLUDED.quantite_batch;
+
+-- 2.3 SAUCE GOMBO — par portion
+INSERT INTO plat_ingredients (plat_id, ingredient_id, quantite_batch)
+SELECT p.id, i.id, q.q
+FROM plats p
+JOIN LATERAL (VALUES
+  ('Gombo',                0.100),
+  ('Tomates',              0.030),
+  ('Oignons',              0.011),
+  ('Huile de palme',       0.0167),  -- L
+  ('Boeuf (morceaux)',     0.133),
+  ('Peau de boeuf',        0.077),
+  ('Poisson fume',         0.043),
+  ('Ecrevisses sechees',   0.004)
+) AS q(nom,q) ON TRUE
+JOIN ingredients i ON i.nom=q.nom
+WHERE p.nom='Sauce Gombo'
+ON CONFLICT (plat_id, ingredient_id) DO UPDATE SET quantite_batch = EXCLUDED.quantite_batch;
+
+-- 2.4 SAUCE JAUNE (version riche en viande/poisson) — par portion
+INSERT INTO plat_ingredients (plat_id, ingredient_id, quantite_batch)
+SELECT p.id, i.id, q.q
+FROM plats p
+JOIN LATERAL (VALUES
+  ('Arachides grillees',   0.040),
+  ('Huile de palme',       0.020),   -- L
+  ('Poisson fume',         0.029),
+  ('Boeuf (morceaux)',     0.210),
+  ('Gingembre',            0.0033),
+  ('Piment jaune',         0.0033),
+  ('Oignons',              0.011),
+  ('Ail',                  0.0007)
+) AS q(nom,q) ON TRUE
+JOIN ingredients i ON i.nom=q.nom
+WHERE p.nom='Sauce Jaune'
+ON CONFLICT (plat_id, ingredient_id) DO UPDATE SET quantite_batch = EXCLUDED.quantite_batch;
+
+-- 2.5 SAUCE PISTACHE (Egoussi) — par portion
+INSERT INTO plat_ingredients (plat_id, ingredient_id, quantite_batch)
+SELECT p.id, i.id, q.q
+FROM plats p
+JOIN LATERAL (VALUES
+  ('Pistache pilee',       0.040),
+  ('Boeuf (morceaux)',     0.210),
+  ('Huile de palme',       0.010),  -- L
+  ('Oignons',              0.011)
+) AS q(nom,q) ON TRUE
+JOIN ingredients i ON i.nom=q.nom
+WHERE p.nom='Sauce Pistache'
+ON CONFLICT (plat_id, ingredient_id) DO UPDATE SET quantite_batch = EXCLUDED.quantite_batch;
+
+-- 2.6 SAUCE ARACHIDE — par portion
+INSERT INTO plat_ingredients (plat_id, ingredient_id, quantite_batch)
+SELECT p.id, i.id, q.q
+FROM plats p
+JOIN LATERAL (VALUES
+  ('Arachides grillees',   0.050),
+  ('Tomates',              0.0183),
+  ('Oignons',              0.011),
+  ('Ail',                  0.0007),
+  ('Gingembre',            0.0010),
+  ('Huile de palme',       0.0133),  -- L
+  ('Boeuf (morceaux)',     0.230)
+) AS q(nom,q) ON TRUE
+JOIN ingredients i ON i.nom=q.nom
+WHERE p.nom='Sauce Arachide'
+ON CONFLICT (plat_id, ingredient_id) DO UPDATE SET quantite_batch = EXCLUDED.quantite_batch;
+
+-- 2.7 SAUCE TARO (jaune au DJANSAN) — par portion (authentique)
+--     NB: ici pas de feuilles vertes. Sauce épaisse : huile rouge + djansan + champignons + peau/tripes
+INSERT INTO plat_ingredients (plat_id, ingredient_id, quantite_batch)
+SELECT p.id, i.id, q.q
+FROM plats p
+JOIN LATERAL (VALUES
+  ('Huile de palme',        0.045),  -- L (moyenne 40–50 ml)
+  ('Peau de boeuf',         0.150),  -- kg
+  ('Champignons africains', 0.040),  -- kg
+  ('Djansan (njansang)',    0.010),  -- kg
+  ('Sel gemme',             0.001),  -- kg
+  ('Ail',                   0.002),  -- kg (optionnel)
+  ('Gingembre',             0.001),  -- kg (optionnel)
+  ('Piment jaune',          0.002),  -- kg (optionnel)
+  ('Bouillon cube',         0.25)    -- piece (1/4 cube)
+) AS q(nom,q) ON TRUE
+JOIN ingredients i ON i.nom=q.nom
+WHERE p.nom='Sauce Taro (jaune au djansan)'
+ON CONFLICT (plat_id, ingredient_id) DO UPDATE SET quantite_batch = EXCLUDED.quantite_batch;
+
+-- ===================================================================
+-- FIN
+-- ===================================================================
+

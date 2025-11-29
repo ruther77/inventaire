@@ -1,8 +1,7 @@
 import pytest
 from sqlalchemy import create_engine, text
 
-import product_service
-import products_loader
+from core import product_service, products_loader
 
 
 @pytest.fixture()

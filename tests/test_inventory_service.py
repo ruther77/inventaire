@@ -6,7 +6,7 @@ import sys
 import pytest
 
 
-_MODULE_PATH = Path(__file__).resolve().parents[1] / "inventory_service.py"
+_MODULE_PATH = Path(__file__).resolve().parents[1] / "core" / "inventory_service.py"
 _ROOT = _MODULE_PATH.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
@@ -16,7 +16,7 @@ if _SPEC is None or _SPEC.loader is None:
 inventory_service = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(inventory_service)
 
-import cart_normalizer
+from core import cart_normalizer
 
 
 class DummyScalarResult:

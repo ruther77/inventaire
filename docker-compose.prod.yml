@@ -26,7 +26,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/epicerie
     volumes:
-      - ./Produit.csv:/app/Produit.csv
+      - ./docs/invoices:/app/docs/invoices:ro
     depends_on:
       - db
 

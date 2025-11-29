@@ -9,7 +9,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-import products_loader  # noqa: E402
+from core import products_loader  # noqa: E402
 
 
 class DummyRow:
@@ -149,6 +149,12 @@ def test_clean_codes_and_determine_categorie():
     assert products_loader.determine_categorie("Plat Afrique") == "Afrique"
 
 
+def test_to_float_handles_currency_and_percent():
+    assert products_loader._to_float("5,00 EUR") == 5.0
+    assert products_loader._to_float("20.00%") == 20.0
+    assert products_loader._to_float("   12 % ") == 12.0
+
+
 def test_load_products_from_df_summarises_results(monkeypatch):
     df = pd.DataFrame(
         [
@@ -247,7 +253,7 @@ def test_load_products_from_df_updates_existing_with_barcode(monkeypatch):
     assert movement_params["source"].startswith("Import facture")
 
 
-def test_load_products_respects_price_delta(monkeypatch):
+def test_load_products_updates_price_on_small_increase(monkeypatch):
     df = pd.DataFrame(
         [
             {
@@ -270,6 +276,34 @@ def test_load_products_respects_price_delta(monkeypatch):
 
     assert summary["updated"] == 1
     update_params = next(params for sql, params in connection.executed if "UPDATE produits" in sql)
+    assert update_params["prix_achat"] == 10.5
+    assert update_params["prix_vente"] == 16.2
+
+
+def test_load_products_ignores_minor_price_drop(monkeypatch):
+    df = pd.DataFrame(
+        [
+            {
+                "nom": "Produit stable",
+                "prix_vente": "15.80",
+                "tva": "20",
+                "prix_achat": "9.60",
+                "codes": "555",
+            }
+        ]
+    )
+
+    connection = DummyConnection()
+    connection.barcode_map["555"] = 909
+    connection.product_data[909] = {"id": 909, "prix_achat": 10.0, "prix_vente": 16.0, "categorie": "Général"}
+    engine = DummyEngine(connection)
+    monkeypatch.setattr(products_loader, "get_engine", lambda: engine)
+
+    summary = products_loader.load_products_from_df(df)
+
+    assert summary["updated"] == 1
+    update_params = next(params for sql, params in connection.executed if "UPDATE produits" in sql)
+    # La légère baisse de prix d'achat est ignorée, le prix de vente reste inchangé.
     assert update_params["prix_achat"] == 10.0
     assert update_params["prix_vente"] == 16.0
 
@@ -315,6 +349,8 @@ def test_load_products_from_df_records_errors(monkeypatch):
     error = summary["errors"][0]
     assert error["ligne"] == 2
     assert "Nom du produit manquant" in error["erreur"]
+    assert len(summary["rejected_rows"]) == 1
+    assert "nom" in (summary["rejected_csv"] or "")
 
 
 def test_process_products_file_missing_file(tmp_path):
@@ -324,3 +360,47 @@ def test_process_products_file_missing_file(tmp_path):
     assert summary["rows_received"] == 0
     assert summary["errors"]
     assert "Fichier introuvable" in summary["errors"][0]["erreur"]
+
+
+def test_load_products_from_df_can_skip_stock_initialization(monkeypatch):
+    df = pd.DataFrame(
+        [
+            {"nom": "Produit sans stock", "prix_vente": "2", "tva": "20", "prix_achat": "1", "qte_init": "5"},
+        ]
+    )
+    connection = DummyConnection()
+    engine = DummyEngine(connection)
+    monkeypatch.setattr(products_loader, "get_engine", lambda: engine)
+
+    called = []
+
+    def fake_initial_stock(conn, produit_id, quantite, source, tenant_id):
+        called.append((produit_id, quantite, source, tenant_id))
+        return True
+
+    monkeypatch.setattr(products_loader, "create_initial_stock", fake_initial_stock)
+
+    summary = products_loader.load_products_from_df(df, initialize_stock=False)
+
+    assert called == []
+    assert summary["stock_initialized"] == 0
+
+
+def test_load_products_from_df_initializes_stock_when_requested(monkeypatch):
+    df = pd.DataFrame(
+        [
+            {"nom": "Produit avec stock", "prix_vente": "2", "tva": "20", "prix_achat": "1", "qte_init": "3"},
+        ]
+    )
+    connection = DummyConnection()
+    engine = DummyEngine(connection)
+    monkeypatch.setattr(products_loader, "get_engine", lambda: engine)
+
+    def fake_initial_stock(conn, produit_id, quantite, source, tenant_id):
+        return True
+
+    monkeypatch.setattr(products_loader, "create_initial_stock", fake_initial_stock)
+
+    summary = products_loader.load_products_from_df(df, initialize_stock=True)
+
+    assert summary["stock_initialized"] == 1

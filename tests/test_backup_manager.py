@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
 
 import pytest
 
-from backup_manager import (
+from core.backup_manager import (
     BackupError,
     BinaryStatus,
     check_backup_tools,
@@ -119,7 +119,7 @@ def test_check_backup_tools_reports_resolution(monkeypatch):
     def fake_which(command: str) -> str | None:
         return f"/usr/bin/{command}"
 
-    monkeypatch.setattr("backup_manager.shutil.which", fake_which)
+    monkeypatch.setattr("core.backup_manager.shutil.which", fake_which)
 
     pg_status, psql_status = check_backup_tools()
 
@@ -170,7 +170,7 @@ def test_get_backup_directory_prefers_default_location(monkeypatch, tmp_path):
     primary = tmp_path / "primary"
     secondary = tmp_path / "secondary"
     monkeypatch.setattr(
-        "backup_manager._DEFAULT_BACKUP_LOCATIONS",
+        "core.backup_manager._DEFAULT_BACKUP_LOCATIONS",
         (primary, secondary),
     )
 
@@ -185,7 +185,7 @@ def test_get_backup_directory_falls_back_on_permission_error(monkeypatch, tmp_pa
     primary = tmp_path / "locked"
     secondary = tmp_path / "usable"
     monkeypatch.setattr(
-        "backup_manager._DEFAULT_BACKUP_LOCATIONS",
+        "core.backup_manager._DEFAULT_BACKUP_LOCATIONS",
         (primary, secondary),
     )
 

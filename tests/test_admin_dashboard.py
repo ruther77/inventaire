@@ -6,14 +6,17 @@ import pandas as pd
 import pandas.testing as pd_testing
 
 
+APP_PATH = Path("legacy/streamlit/app.py")
+
+
 def _load_function(name, extra_globals=None):
-    source = Path("app.py").read_text(encoding="utf-8")
-    module = ast.parse(source, filename="app.py")
+    source = APP_PATH.read_text(encoding="utf-8")
+    module = ast.parse(source, filename=str(APP_PATH))
 
     for node in module.body:
         if isinstance(node, ast.FunctionDef) and node.name == name:
             func_module = ast.Module(body=[node], type_ignores=[])
-            code = compile(func_module, filename="app.py", mode="exec")
+            code = compile(func_module, filename=str(APP_PATH), mode="exec")
 
             globals_dict = {"pd": pd}
             if extra_globals:
@@ -22,7 +25,7 @@ def _load_function(name, extra_globals=None):
             exec(code, globals_dict)
             return globals_dict[name]
 
-    raise RuntimeError(f"Function {name} not found in app.py")
+    raise RuntimeError(f"Function {name} not found in {APP_PATH}")
 
 
 def _build_streamlit_stub(warning_collector=None, error_collector=None):

@@ -1,0 +1,158 @@
+-- ============================================
+-- 1) Emplacements & Mouvements de stock
+-- ============================================
+CREATE TABLE IF NOT EXISTS stock_emplacements (
+  id SERIAL PRIMARY KEY,
+  nom TEXT NOT NULL UNIQUE  -- ex.: 'Cuisine', 'Bar'
+);
+
+INSERT INTO stock_emplacements (nom) VALUES ('Cuisine'), ('Bar')
+ON CONFLICT (nom) DO NOTHING;
+
+-- Mouvement signé: qte > 0 = entrée, qte < 0 = sortie
+CREATE TABLE IF NOT EXISTS stock_mouvements (
+  id SERIAL PRIMARY KEY,
+  ingredient_id INT NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+  emplacement_id INT NOT NULL REFERENCES stock_emplacements(id) ON DELETE CASCADE,
+  qte NUMERIC(14,4) NOT NULL,          -- exprimée en unite_base de l’ingrédient (kg, l, piece…)
+  ref_type TEXT,                       -- ex.: 'achat','prod','vente','casse','inventaire'
+  ref_doc TEXT,                        -- n° facture, prod, inventaire…
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Stock courant par ingrédient & emplacement
+CREATE OR REPLACE VIEW v_stock_ingredient_emplacement AS
+SELECT
+  sm.emplacement_id,
+  se.nom AS emplacement_nom,
+  sm.ingredient_id,
+  SUM(sm.qte) AS qte_dispo
+FROM stock_mouvements sm
+JOIN stock_emplacements se ON se.id = sm.emplacement_id
+GROUP BY sm.emplacement_id, se.nom, sm.ingredient_id;
+
+-- ============================================
+-- 2) BOM unifié “par portion”
+--    - dish: plat_ingredients (déjà par portion dans ta BDD)
+--    - beverage: plat_equivalences (pièces, fractions)
+--    - bundle: via v_bundle_equivalents (somme des composants)
+-- ============================================
+
+-- a) BOM pour plats (dish) via plat_ingredients  (par portion)
+CREATE OR REPLACE VIEW v_bom_dish AS
+SELECT
+  p.id AS plat_id,
+  p.nom AS plat_nom,
+  pi.ingredient_id,
+  pi.quantite_batch AS qte_par_portion
+FROM plats p
+JOIN plat_ingredients pi ON pi.plat_id = p.id
+WHERE p.type = 'dish';  -- :contentReference[oaicite:2]{index=2}
+
+-- b) BOM pour boissons (beverage) via équivalences (ex.: 1/2 bouteille = 0.5 piece)
+CREATE OR REPLACE VIEW v_bom_beverage AS
+SELECT
+  p.id AS plat_id,
+  p.nom AS plat_nom,
+  pe.ingredient_id,
+  pe.qte_ingredient AS qte_par_portion
+FROM plats p
+JOIN plat_equivalences pe ON pe.plat_id = p.id
+WHERE p.type = 'beverage';  -- :contentReference[oaicite:3]{index=3}
+
+-- c) BOM pour bundles (formules) via équivalences cumulées des composants
+--    Nécessite v_bundle_explode et v_bundle_equivalents (cf. ton modèle) :contentReference[oaicite:4]{index=4}
+CREATE OR REPLACE VIEW v_bom_bundle AS
+SELECT
+  be.bundle_id AS plat_id,
+  p.nom       AS plat_nom,
+  be.ingredient_id,
+  be.qte_ingredient_total AS qte_par_portion
+FROM v_bundle_equivalents be
+JOIN plats p       ON p.id = be.bundle_id
+JOIN plats bundlep ON bundlep.id = be.bundle_id AND bundlep.type = 'bundle';  -- sécurité
+
+-- d) BOM unifié
+CREATE OR REPLACE VIEW v_bom_unifie AS
+SELECT * FROM v_bom_dish
+UNION ALL
+SELECT * FROM v_bom_beverage
+UNION ALL
+SELECT * FROM v_bom_bundle;
+
+-- ============================================
+-- 3) Portions vendables par PLAT et EMPLACEMENT
+--    portions_disponibles = MIN( floor(stock_ing / qte_par_portion) )
+-- ============================================
+
+-- Helper: stock par ingrédient & emplacement, avec 0 par défaut
+CREATE OR REPLACE VIEW v_stock_ingredient_emplacement_zero AS
+SELECT
+  e.id   AS emplacement_id,
+  e.nom  AS emplacement_nom,
+  i.id   AS ingredient_id,
+  COALESCE(s.qte_dispo, 0) AS qte_dispo
+FROM stock_emplacements e
+CROSS JOIN ingredients i
+LEFT JOIN v_stock_ingredient_emplacement s
+  ON s.emplacement_id = e.id AND s.ingredient_id = i.id;
+
+-- Calcul des portions vendables (théoriques) par plat & emplacement
+CREATE OR REPLACE VIEW v_portions_vendables AS
+WITH need AS (
+  SELECT
+    b.plat_id,
+    b.ingredient_id,
+    b.qte_par_portion
+  FROM v_bom_unifie b
+),
+join_stock AS (
+  SELECT
+    n.plat_id,
+    se.emplacement_id,
+    se.emplacement_nom,
+    n.ingredient_id,
+    n.qte_par_portion,
+    se.qte_dispo
+  FROM need n
+  JOIN v_stock_ingredient_emplacement_zero se
+    ON se.ingredient_id = n.ingredient_id
+)
+SELECT
+  js.plat_id,
+  p.nom AS plat_nom,
+  js.emplacement_id,
+  js.emplacement_nom,
+  /* portions théoriques = minimum des planchers par ingrédient requis */
+  MIN( CASE
+          WHEN js.qte_par_portion IS NULL OR js.qte_par_portion = 0 THEN NULL
+          ELSE FLOOR(js.qte_dispo / js.qte_par_portion)
+       END
+     )::bigint AS portions_disponibles
+FROM join_stock js
+JOIN plats p ON p.id = js.plat_id
+GROUP BY js.plat_id, p.nom, js.emplacement_id, js.emplacement_nom;
+
+-- ============================================
+-- 4) Vues “FRIGO CUISINE” et “FRIGO BAR”
+-- ============================================
+
+CREATE OR REPLACE VIEW v_frigo_cuisine AS
+SELECT
+  v.plat_id,
+  v.plat_nom,
+  v.portions_disponibles
+FROM v_portions_vendables v
+JOIN stock_emplacements e ON e.id = v.emplacement_id
+WHERE e.nom = 'Cuisine'
+ORDER BY v.plat_nom;
+
+CREATE OR REPLACE VIEW v_frigo_bar AS
+SELECT
+  v.plat_id,
+  v.plat_nom,
+  v.portions_disponibles
+FROM v_portions_vendables v
+JOIN stock_emplacements e ON e.id = v.emplacement_id
+WHERE e.nom = 'Bar'
+ORDER BY v.plat_nom;

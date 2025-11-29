@@ -18,9 +18,9 @@ from PIL import Image
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, WebRtcMode, RTCConfiguration
 
 # Importation des fonctions de gestion de la BDD et du chargeur 
-from data_repository import query_df, exec_sql, exec_sql_return_id, get_engine # NOUVEAU: exec_sql n'est plus appelé ici
-from inventory_service import * # NOUVEAU: Import du service 
-import products_loader
+from core.data_repository import query_df, exec_sql, exec_sql_return_id, get_engine # NOUVEAU: exec_sql n'est plus appelé ici
+from core.inventory_service import * # NOUVEAU: Import du service 
+from core import products_loader
 
 # --- FONCTION POUR CHARGER LE CSS EXTERNE (style.css) ---
 def local_css(file_name):
