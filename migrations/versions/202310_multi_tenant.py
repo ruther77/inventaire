@@ -13,12 +13,16 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "tenants",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("code", sa.Text(), nullable=False, unique=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    # Crée la table tenants seulement si elle n'existe pas déjà (idempotence)
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tenants (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            code TEXT NOT NULL UNIQUE,
+            created_at TIMESTAMPTZ DEFAULT now()
+        )
+        """
     )
     op.execute(
         """

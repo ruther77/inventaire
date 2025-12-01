@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
+import Input from '../../components/ui/Input.jsx';
+import Input from '../../components/ui/Input.jsx';
+import Select from '../../components/ui/Select.jsx';
 import {
   useRestaurantIngredients,
   useCreateRestaurantIngredient,
@@ -11,6 +14,8 @@ import {
   useUpdateRestaurantPlatPrice,
   useRestaurantIngredientPriceHistory,
   useRestaurantPlatPriceHistory,
+  useRestaurantPlatMappings,
+  useSyncRestaurantIngredients,
 } from '../../hooks/useRestaurant.js';
 
 export default function RestaurantMenuPage() {
@@ -47,12 +52,17 @@ export default function RestaurantMenuPage() {
   const [platUpdate, setPlatUpdate] = useState({ platId: '', price: '' });
   const [historyIngredientId, setHistoryIngredientId] = useState(null);
   const [historyPlatId, setHistoryPlatId] = useState(null);
+  const [tab, setTab] = useState('plats');
+  const [platFilter, setPlatFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [ingredientFilter, setIngredientFilter] = useState('');
 
   const updateIngredientPrice = useUpdateRestaurantIngredientPrice();
   const updatePlatPrice = useUpdateRestaurantPlatPrice();
   const ingredientHistory = useRestaurantIngredientPriceHistory(historyIngredientId);
   const platHistory = useRestaurantPlatPriceHistory(historyPlatId);
 
+  const syncIngredients = useSyncRestaurantIngredients();
   const selectedPlat = platUpdate.platId
     ? (plats.data ?? []).find((plat) => plat.id === Number(platUpdate.platId))
     : null;
@@ -62,6 +72,20 @@ export default function RestaurantMenuPage() {
 
   const ingredientHistoryEntries = ingredientHistory.data ?? [];
   const platHistoryEntries = platHistory.data ?? [];
+  const platsByCategory = menuList.reduce((acc, plat) => {
+    const key = plat.categorie || 'Divers';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(plat);
+    return acc;
+  }, {});
+  const sortedCategories = Object.keys(platsByCategory).sort((a, b) => a.localeCompare(b));
+  const filteredPlats = menuList
+    .filter((plat) => plat.nom.toLowerCase().includes(platFilter.toLowerCase()))
+    .filter((plat) => (categoryFilter === 'all' ? true : (plat.categorie || 'Divers') === categoryFilter));
+  const ingredientList = ingredients.data ?? [];
+  const filteredIngredients = ingredientList.filter((ing) =>
+    ing.nom.toLowerCase().includes(ingredientFilter.toLowerCase()),
+  );
 
   const formatDate = (value) => {
     if (!value) return '-';
@@ -155,6 +179,10 @@ export default function RestaurantMenuPage() {
       },
     );
   };
+
+  const mappings = useRestaurantPlatMappings();
+  const platLinks = mappings.data ?? [];
+  const syncIngredients = useSyncRestaurantIngredients();
 
   return (
     <div className="flex flex-col gap-6">
@@ -460,39 +488,157 @@ export default function RestaurantMenuPage() {
           </div>
         </form>
 
-        <div className="grid gap-3">
-          {menuList.map((plat) => (
-            <div key={plat.id} className="rounded-2xl border border-slate-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-lg font-semibold text-slate-900">{plat.nom}</p>
-                  <p className="text-sm text-slate-500">{plat.categorie ?? 'Non classé'}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-slate-900">{plat.prix_vente_ttc.toFixed(2)} €</p>
-                  <p className="text-xs text-slate-500">
-                    Coût : {plat.cout_matiere.toFixed(2)} € · Marge {plat.marge_pct.toFixed(1)} %
-                  </p>
-                </div>
-              </div>
-              <table className="mt-3 w-full divide-y divide-slate-100 text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
-                    <th className="py-1">Ingrédient</th>
-                    <th className="py-1">Quantité</th>
-                    <th className="py-1">Unité</th>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            placeholder="Rechercher un plat"
+            className="w-full max-w-xs rounded-2xl border border-slate-200 px-4 py-2 text-sm"
+            value={platFilter}
+            onChange={(event) => setPlatFilter(event.target.value)}
+          />
+          <select
+            className="w-full max-w-xs rounded-2xl border border-slate-200 px-4 py-2 text-sm"
+            value={categoryFilter}
+            onChange={(event) => setCategoryFilter(event.target.value)}
+          >
+            <option value="all">Toutes les catégories</option>
+            {sortedCategories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+          <Input
+            placeholder="Filtrer les ingrédients (optionnel)"
+            value={ingredientFilter}
+            onChange={(event) => setIngredientFilter(event.target.value)}
+            className="w-full max-w-xs rounded-2xl border border-slate-200 px-4 py-2 text-sm"
+          />
+        </div>
+
+        <Card className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">liens épicerie</p>
+            <h2 className="text-lg font-semibold text-slate-900">Produits associés</h2>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncIngredients.mutate()}
+            disabled={syncIngredients.isLoading}
+          >
+            {syncIngredients.isLoading ? 'Synchronisation…' : 'Synchro auto'}
+          </Button>
+        </div>
+          {!platLinks.length && !mappings.isLoading ? (
+            <p className="text-sm text-slate-500">Aucune correspondance Epicerie définie pour les plats.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm text-slate-700">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2">Plat</th>
+                    <th className="px-3 py-2">Produit Épicerie</th>
+                    <th className="px-3 py-2 text-right">Ratio</th>
+                    <th className="px-3 py-2 text-right">Prix achat</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {(plat.ingredients ?? []).map((item) => (
-                    <tr key={item.id}>
-                      <td className="py-1 text-slate-900">{item.nom}</td>
-                      <td className="py-1 text-slate-600">{Number(item.quantite).toFixed(3)}</td>
-                      <td className="py-1 text-slate-600">{item.unite || '-'}</td>
+                <tbody className="divide-y divide-slate-100">
+                  {platLinks.map((link) => (
+                    <tr key={`${link.plat_id}-${link.produit_epicerie_id}`}>
+                      <td className="px-3 py-2">
+                        <p className="font-semibold text-slate-900">{link.plat_nom}</p>
+                        <p className="text-xs text-slate-400">{link.plat_categorie ?? 'Divers'}</p>
+                      </td>
+                      <td className="px-3 py-2">
+                        {link.epicerie_nom ?? '—'}
+                        <div className="text-xs text-slate-400">{link.produit_epicerie_id ?? '—'}</div>
+                      </td>
+                      <td className="px-3 py-2 text-right">{link.ratio ?? '—'}</td>
+                      <td className="px-3 py-2 text-right">{link.prix_achat != null ? Number(link.prix_achat).toFixed(2) : '—'} €</td>
                     </tr>
                   ))}
+          {mappings.isLoading && (
+            <tr>
+              <td colSpan={4} className="px-3 py-2 text-sm text-slate-500">
+                Chargement des prix Épicerie…
+              </td>
+            </tr>
+          )}
                 </tbody>
               </table>
+            </div>
+          )}
+        </Card>
+
+        <div className="grid gap-4">
+          {visibleCategories.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-500">
+              Aucun plat ne correspond aux filtres. Supprime la recherche ou change de catégorie.
+            </div>
+          ) : (
+            visibleCategories.map((category) => (
+              <div key={category} className="space-y-3 rounded-2xl border border-slate-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Catégorie</p>
+                    <h3 className="text-lg font-semibold text-slate-900">{category}</h3>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  {platsByCategory[category].length} plat(s)
+                </span>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                {filteredPlats
+                  .filter((plat) => (plat.categorie || 'Divers') === category)
+                  .sort((a, b) => a.nom.localeCompare(b.nom))
+                  .map((plat) => (
+                    <div key={plat.id} className="rounded-2xl border border-slate-100 p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-lg font-semibold text-slate-900">{plat.nom}</p>
+                          <p className="text-xs text-slate-500">
+                            Marge {plat.marge_pct?.toFixed(1) ?? 'N/C'} % · Coût {plat.cout_matiere?.toFixed(2) ?? '0'} €
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-slate-900">{plat.prix_vente_ttc.toFixed(2)} €</p>
+                          <div className="mt-1 flex gap-2 text-xs text-brand-700">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setPlatUpdate({ platId: plat.id, price: plat.prix_vente_ttc })}
+                            >
+                              MAJ prix
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setHistoryPlatId(plat.id)}>
+                              Historique
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      <table className="mt-3 w-full divide-y divide-slate-100 text-sm">
+                        <thead>
+                          <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
+                            <th className="py-1">Ingrédient</th>
+                            <th className="py-1">Quantité</th>
+                            <th className="py-1">Unité</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(plat.ingredients ?? []).map((item) => (
+                            <tr key={item.id}>
+                              <td className="py-1 text-slate-900">{item.nom}</td>
+                              <td className="py-1 text-slate-600">{Number(item.quantite).toFixed(3)}</td>
+                              <td className="py-1 text-slate-600">{item.unite || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+              </div>
             </div>
           ))}
         </div>

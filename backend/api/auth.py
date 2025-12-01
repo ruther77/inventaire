@@ -18,7 +18,7 @@ class OAuth2TenantRequestForm:
 
     def __init__(
         self,
-        grant_type: str | None = Form(default=None, regex="password"),
+        grant_type: str | None = Form(default=None, pattern="password"),
         username: str = Form(...),
         password: str = Form(...),
         scope: str = Form(default=""),
@@ -76,4 +76,3 @@ def issue_token(form_data: OAuth2TenantRequestForm = Depends()) -> TokenResponse
             tenant_name=tenant.name,
         ),
     )
-

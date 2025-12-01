@@ -16,8 +16,14 @@ logs: ## suivre les logs de l'app
 psql: ## console postgres
 	docker compose exec db psql -U postgres -d epicerie
 
+update-epicerie-costs: ## met à jour les prix d’achat Epicerie liés à la carte restaurant
+	@bash scripts/run_epicerie_cost_updates.sh
+
 shell: ## shell dans le conteneur app
 	docker compose exec app bash || docker compose exec app sh
+
+sync-restaurant-ingredients: ## synchronise les ingrédients plats ↔ Epicerie (sans ventes)
+	docker compose exec api env PYTHONPATH=/app python scripts/generate_restaurant_ingredients.py
 
 fmt: ## format (black + ruff --fix)
 	docker compose run --rm app bash -lc "python -m pip install -q black ruff && black . && ruff check . --fix || true"

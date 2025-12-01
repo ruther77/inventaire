@@ -1,4 +1,4 @@
-import { Menu, Bell, Search, Sparkles, LogOut } from 'lucide-react';
+import { Menu, Bell, Search, Sparkles, LogOut, ShieldAlert } from 'lucide-react';
 import Button from '../components/ui/Button.jsx';
 import { useTenant, tenants } from '../context/TenantContext.jsx';
 import { useAuth } from '../hooks/useAuth.js';
@@ -6,6 +6,10 @@ import { useAuth } from '../hooks/useAuth.js';
 export default function TopBar({ onMenuToggle }) {
   const { tenant, setTenant, isTenantLocked } = useTenant();
   const { user, logout } = useAuth();
+  const appEnv = (import.meta.env.VITE_APP_ENV || 'dev').toLowerCase();
+  const envLabel = appEnv === 'production' || appEnv === 'prod' ? 'PROD' : appEnv === 'staging' ? 'STAGING' : 'DEV';
+  const envTone =
+    envLabel === 'PROD' ? 'bg-red-100 text-red-700 border-red-200' : envLabel === 'STAGING' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200';
 
   const handleTenantChange = (event) => {
     const next = tenants.find((entry) => entry.code === event.target.value);
@@ -35,6 +39,11 @@ export default function TopBar({ onMenuToggle }) {
           />
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-3">
+          <div className={`flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold uppercase tracking-wide ${envTone}`}>
+            <ShieldAlert className="h-4 w-4" />
+            <span>{envLabel}</span>
+            <span className="rounded-lg bg-white/60 px-2 py-0.5 text-[11px] text-slate-700">{tenant.label}</span>
+          </div>
           <Button variant="ghost" iconOnly>
             <Sparkles className="h-5 w-5 text-brand-500" />
           </Button>

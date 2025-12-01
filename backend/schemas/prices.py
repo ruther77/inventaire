@@ -13,8 +13,22 @@ class PriceHistoryItem(BaseModel):
     produit_id: Optional[int] = None
     code: Optional[str] = None
     nom: Optional[str] = None
+    ean: Optional[str] = None
     fournisseur: Optional[str] = None
     prix_achat: float
+    prev_prix_achat: Optional[float] = None
+    prev_facture_date: Optional[datetime] = None
+    delta_prix: Optional[float] = None
+    delta_pct: Optional[float] = None
+    prix_vente: Optional[float] = None
+    marge_unitaire: Optional[float] = None
+    marge_pct: Optional[float] = None
+    margin_alert: Optional[bool] = None
+    stock_alert: Optional[bool] = None
+    stockout_repeated: Optional[bool] = None
+    stockout_events: Optional[int] = None
+    stock_actuel: Optional[float] = None
+    seuil_alerte: Optional[float] = None
     quantite: Optional[float] = None
     montant: Optional[float] = None
     facture_date: datetime

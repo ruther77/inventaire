@@ -44,7 +44,14 @@ const downloadCsv = (rows) => {
     'Produit',
     'Code',
     'Fournisseur',
+    'Prix vente',
     'Prix achat',
+    'Delta prix',
+    'Delta %',
+    'Marge %',
+    'Alerte marge',
+    'Stock alerte',
+    'Ruptures récentes',
     'Quantité',
     'Montant',
     'Contexte',
@@ -54,7 +61,14 @@ const downloadCsv = (rows) => {
     row.nom ?? '',
     row.code ?? '',
     row.fournisseur ?? '',
+    row.prix_vente ?? '',
     row.prix_achat,
+    row.delta_prix ?? '',
+    row.delta_pct ?? '',
+    row.marge_pct ?? '',
+    row.margin_alert ?? '',
+    row.stockout_repeated ?? row.stock_alert ?? '',
+    row.stockout_events ?? '',
     row.quantite ?? '',
     row.montant ?? '',
     row.source_context ?? '',
@@ -169,7 +183,7 @@ export default function PricesPage() {
     if (!sortedHistory.length) return [];
     const groups = new Map();
     sortedHistory.forEach((entry) => {
-      const key = entry.product_id || entry.code || entry.nom || 'Produit';
+      const key = entry.produit_id || entry.code || entry.nom || 'Produit';
       const list = groups.get(key) || [];
       list.push(entry);
       groups.set(key, list);
@@ -205,6 +219,14 @@ export default function PricesPage() {
   const topDrops = useMemo(
     () => [...productVariations].filter((entry) => entry.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 5),
     [productVariations],
+  );
+
+  const alertItems = useMemo(
+    () =>
+      items.filter(
+        (entry) => entry.margin_alert || entry.stock_alert || entry.stockout_repeated,
+      ),
+    [items],
   );
 
   return (
@@ -314,6 +336,77 @@ export default function PricesPage() {
         />
       </Card>
 
+      <Card className="flex flex-col gap-3 border-amber-200 bg-amber-50">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-amber-600">alertes prix/stock</p>
+            <h3 className="text-lg font-semibold text-amber-900">
+              {alertItems.length} alerte{alertItems.length > 1 ? 's' : ''}
+            </h3>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700 shadow-sm">
+            Marges <span className="font-bold">{alertItems.filter((a) => a.margin_alert).length}</span> · Ruptures{' '}
+            <span className="font-bold">{alertItems.filter((a) => a.stock_alert || a.stockout_repeated).length}</span>
+          </span>
+        </div>
+        {alertItems.length ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-amber-100 text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-widest text-amber-700">
+                  <th className="px-3 py-2">Produit</th>
+                  <th className="px-3 py-2">Prix achat</th>
+                  <th className="px-3 py-2">Marge</th>
+                  <th className="px-3 py-2">Rupture</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-100">
+                {alertItems.slice(0, 6).map((item) => (
+                  <tr key={`${item.id ?? item.code}-${item.facture_date}`}>
+                    <td className="px-3 py-2">
+                      <p className="font-semibold text-amber-900">{item.nom ?? '—'}</p>
+                      <p className="text-xs text-amber-700">{item.code ?? '—'}</p>
+                    </td>
+                    <td className="px-3 py-2 text-amber-900">{formatCurrency(item.prix_achat)}</td>
+                    <td className="px-3 py-2">
+                      {item.marge_pct !== null && item.marge_pct !== undefined ? (
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            item.margin_alert
+                              ? 'bg-rose-100 text-rose-700'
+                              : 'bg-emerald-100 text-emerald-700'
+                          }`}
+                        >
+                          {formatPercentage(item.marge_pct)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-amber-700">N/C</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 space-x-2">
+                      {item.stock_alert && (
+                        <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+                          Stock critique
+                        </span>
+                      )}
+                      {item.stockout_repeated && (
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                          Ruptures ({item.stockout_events || 0})
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-amber-800">
+            Aucune alerte active sur les marges ou les ruptures répétées pour ces filtres.
+          </p>
+        )}
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
         <Card className="flex flex-col gap-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -391,22 +484,24 @@ export default function PricesPage() {
         </div>
         {items.length ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100 text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Produit</th>
-                  <th className="px-3 py-2">Code</th>
-                  <th className="px-3 py-2">Fournisseur</th>
-                  <th className="px-3 py-2">Prix achat</th>
-                  <th className="px-3 py-2">Quantité</th>
-                  <th className="px-3 py-2">Montant</th>
-                  <th className="px-3 py-2">Contexte</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {items.map((item) => (
-                  <tr key={item.id ?? `${item.code}-${item.facture_date}`}>
+              <table className="min-w-full divide-y divide-slate-100 text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
+                    <th className="px-3 py-2">Date</th>
+                    <th className="px-3 py-2">Produit</th>
+                    <th className="px-3 py-2">Code</th>
+                    <th className="px-3 py-2">Fournisseur</th>
+                    <th className="px-3 py-2">Prix achat</th>
+                    <th className="px-3 py-2">Δ prix</th>
+                    <th className="px-3 py-2">Marge</th>
+                    <th className="px-3 py-2">Quantité</th>
+                    <th className="px-3 py-2">Montant</th>
+                    <th className="px-3 py-2">Contexte</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {items.map((item) => (
+                    <tr key={item.id ?? `${item.code}-${item.facture_date}`}>
                     <td className="px-3 py-2 text-slate-500">
                       {item.facture_date ? dateFormatter.format(new Date(item.facture_date)) : '—'}
                     </td>
@@ -414,6 +509,48 @@ export default function PricesPage() {
                     <td className="px-3 py-2 text-slate-600">{item.code ?? '—'}</td>
                     <td className="px-3 py-2 text-slate-600">{item.fournisseur ?? '—'}</td>
                     <td className="px-3 py-2">{numberFormatter.format(item.prix_achat ?? 0)} €</td>
+                    <td className="px-3 py-2">
+                      {item.delta_prix !== null && item.delta_prix !== undefined ? (
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            item.delta_prix > 0 ? 'bg-rose-50 text-rose-700' : item.delta_prix < 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {formatDelta(item.delta_prix)} ({formatPercentage(item.delta_pct)})
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {item.marge_pct !== null && item.marge_pct !== undefined ? (
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            item.margin_alert
+                              ? 'bg-rose-100 text-rose-700'
+                              : 'bg-emerald-100 text-emerald-700'
+                          }`}
+                        >
+                          {formatPercentage(item.marge_pct)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-500">N/C</span>
+                      )}
+                      {(item.stock_alert || item.stockout_repeated) && (
+                        <div className="mt-1 space-x-1">
+                          {item.stock_alert && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                              Stock critique
+                            </span>
+                          )}
+                          {item.stockout_repeated && (
+                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                              Ruptures {item.stockout_events ?? 0}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 py-2">{item.quantite ?? '—'}</td>
                     <td className="px-3 py-2">{item.montant ? `${numberFormatter.format(item.montant)} €` : '—'}</td>
                     <td className="px-3 py-2 text-slate-500">{item.source_context ?? '—'}</td>

@@ -1,6 +1,7 @@
 from __future__ import annotations  # Active l'évaluation différée des annotations
 
 import logging  # Gestion du logging applicatif
+import os  # Lecture des variables d'environnement
 import re  # Expressions régulières pour nettoyage de texte
 from datetime import datetime, timedelta, timezone  # Manipulation des dates et fuseaux
 from typing import Iterable  # Typage pour les collections de codes
@@ -13,6 +14,9 @@ from .data_repository import exec_sql, query_df  # Fonctions d'accès base pour 
 LOGGER = logging.getLogger(__name__)  # Logger du module
 _TABLE_READY = False  # Flag interne indiquant si la table a été initialisée
 _MARGIN_MULTIPLIER = 1.4  # Multiplicateur pour proposer un prix de vente
+_MARGIN_ALERT_MIN = float(os.getenv("MARGIN_ALERT_MIN", "0.2"))  # Seuil de marge mini pour alerte (20% par défaut)
+_STOCKOUT_REPEAT_MIN = int(os.getenv("STOCKOUT_REPEAT_MIN", "3"))  # Nb de mouvements sortie pour considérer une rupture répétée
+_STOCKOUT_WINDOW_DAYS = int(os.getenv("STOCKOUT_WINDOW_DAYS", "45"))  # Fenêtre de détection des ruptures répétées
 
 
 def _normalize_column_name(raw: str) -> str:
@@ -287,6 +291,9 @@ def fetch_price_history(
 
     filters: list[str] = []  # Liste des prédicats dynamiques
     params: dict[str, object] = {"limit": int(max(1, limit)), "tenant_id": int(tenant_id)}  # Paramètres de base
+    params["margin_floor"] = float(max(0.0, _MARGIN_ALERT_MIN))
+    params["stockout_repeat_min"] = int(max(1, _STOCKOUT_REPEAT_MIN))
+    params["recent_window_start"] = datetime.utcnow() - timedelta(days=max(1, _STOCKOUT_WINDOW_DAYS))
 
     if produit_id:  # Filtre par produit
         filters.append(
@@ -314,31 +321,96 @@ def fetch_price_history(
     predicates.extend(filters)  # Ajoute les filtres dynamiques
     where_clause = " AND ".join(predicates)  # Construit la clause WHERE complète
     sql = f"""
+        WITH filtered AS (
+            SELECT
+                ph.*,
+                LAG(ph.prix_achat) OVER (
+                    PARTITION BY ph.code
+                    ORDER BY ph.facture_date, ph.created_at
+                ) AS prev_prix_achat,
+                LAG(ph.facture_date) OVER (
+                    PARTITION BY ph.code
+                    ORDER BY ph.facture_date, ph.created_at
+                ) AS prev_facture_date
+            FROM produits_price_history ph
+            WHERE {where_clause}
+        ),
+        sorties_recentes AS (
+            SELECT produit_id, COUNT(*) AS sorties_recent
+            FROM mouvements_stock
+            WHERE tenant_id = :tenant_id
+              AND date_mvt >= :recent_window_start
+              AND type = 'SORTIE'
+            GROUP BY produit_id
+        )
         SELECT
-            ph.id,
-            ph.code,
-            ph.fournisseur,
-            ph.prix_achat,
-            ph.quantite,
-            ph.facture_date,
-            ph.source_context,
-            ph.created_at,
+            f.id,
+            f.code,
+            f.fournisseur,
+            f.prix_achat,
+            f.prev_prix_achat AS prev_prix_achat,
+            f.prev_facture_date,
+            (f.prix_achat - f.prev_prix_achat) AS delta_prix,
+            CASE
+                WHEN f.prev_prix_achat IS NOT NULL AND f.prev_prix_achat <> 0
+                    THEN ((f.prix_achat - f.prev_prix_achat) / f.prev_prix_achat) * 100
+                ELSE NULL
+            END AS delta_pct,
+            f.quantite,
+            f.facture_date,
+            f.source_context,
+            f.created_at,
             prod_data.produit_id,
             prod_data.nom,
-            prod_data.tva
-        FROM produits_price_history ph
+            prod_data.tva,
+            prod_data.prix_vente,
+            prod_data.stock_actuel,
+            prod_data.seuil_alerte,
+            prod_data.ean,
+            prod_data.marge_unitaire,
+            prod_data.marge_pct,
+            prod_data.margin_alert,
+            prod_data.stock_alert,
+            prod_data.stockout_repeated,
+            prod_data.stockout_events
+        FROM filtered f
         LEFT JOIN LATERAL (
-            SELECT p.id AS produit_id, p.nom, p.tva
+            SELECT
+                p.id AS produit_id,
+                p.nom,
+                p.tva,
+                p.prix_vente,
+                p.stock_actuel,
+                p.seuil_alerte,
+                p.ean,
+                CASE
+                    WHEN p.prix_vente > 0 THEN (p.prix_vente - f.prix_achat)
+                    ELSE NULL
+                END AS marge_unitaire,
+                CASE
+                    WHEN p.prix_vente > 0 THEN ((p.prix_vente - f.prix_achat) / p.prix_vente) * 100
+                    ELSE NULL
+                END AS marge_pct,
+                CASE
+                    WHEN p.prix_vente > 0 AND ((p.prix_vente - f.prix_achat) / p.prix_vente) < :margin_floor
+                        THEN TRUE ELSE FALSE END AS margin_alert,
+                CASE WHEN p.stock_actuel <= COALESCE(p.seuil_alerte, 0) THEN TRUE ELSE FALSE END AS stock_alert,
+                COALESCE(sr.sorties_recent, 0) AS stockout_events,
+                CASE
+                    WHEN p.stock_actuel <= COALESCE(p.seuil_alerte, 0)
+                         AND COALESCE(sr.sorties_recent, 0) >= :stockout_repeat_min
+                        THEN TRUE ELSE FALSE
+                END AS stockout_repeated
             FROM produits_barcodes pb
             JOIN produits p ON p.id = pb.produit_id
-        WHERE pb.code = ph.code AND pb.tenant_id = :tenant_id
-        ORDER BY pb.is_principal DESC NULLS LAST, pb.created_at ASC
-        LIMIT 1
+            LEFT JOIN sorties_recentes sr ON sr.produit_id = p.id
+            WHERE pb.code = f.code AND pb.tenant_id = :tenant_id
+            ORDER BY pb.is_principal DESC NULLS LAST, pb.created_at ASC
+            LIMIT 1
         ) AS prod_data ON TRUE
-        WHERE {where_clause}
-        ORDER BY ph.facture_date DESC
+        ORDER BY f.facture_date DESC
         LIMIT :limit
-    """  # Requête principale avec jointure latérale pour récupérer le produit
+    """  # Requête principale enrichie (deltas + marges + alertes)
 
     try:
         df = query_df(text(sql), params=params)  # Exécute la requête et retourne un DataFrame
@@ -366,6 +438,19 @@ def fetch_price_history(
         df["quantite"] = pd.NA  # Valeur manquante
 
     df["montant"] = df["prix_achat"] * df["quantite"].fillna(1)  # Calcule le montant total avec fallback quantité=1
+    numeric_candidates = ["delta_prix", "delta_pct", "prev_prix_achat", "marge_unitaire", "marge_pct", "prix_vente", "stock_actuel", "seuil_alerte"]
+    for col in numeric_candidates:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    bool_cols = ["margin_alert", "stock_alert", "stockout_repeated"]
+    for col in bool_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna(False).astype(bool)
+
+    if "stockout_events" in df.columns:
+        df["stockout_events"] = pd.to_numeric(df["stockout_events"], errors="coerce").fillna(0).astype(int)
+
     df["facture_date"] = pd.to_datetime(df["facture_date"])  # Convertit en datetime
     return df  # Retourne le DataFrame enrichi
 

@@ -3,6 +3,7 @@ import hmac  # Comparaison sécurisée des hash
 import hashlib  # Fonctions de hachage (PBKDF2)
 import secrets  # Génération de secrets cryptographiques
 import string  # Ensembles de caractères pour mots de passe
+import logging  # Journalisation
 from typing import Optional  # Typage optionnel
 
 from sqlalchemy import text  # Construction de requêtes SQL textuelles
@@ -26,12 +27,15 @@ CREATE TABLE IF NOT EXISTS app_users (
 """  # SQL de création de la table des utilisateurs
 
 
+logger = logging.getLogger(__name__)
+
+
 def ensure_user_table() -> None:
     """Crée la table des utilisateurs si nécessaire."""  # Docstring création table
 
     # Les endpoints admin repose sur cette table (liste, création, rôles, reset password).
 
-    if os.getenv("SKIP_TENANT_INIT"):  # Permet de sauter l'init via variable d'env
+    if os.getenv("SKIP_TENANT_INIT") or os.getenv("SKIP_USER_INIT") or (os.getenv("APP_ENV", "").lower() == "test"):
         return  # Sort si demandé
 
     exec_sql(text(_USER_TABLE_SQL))  # Exécute le SQL de création idempotente
@@ -270,7 +274,7 @@ def bootstrap_default_admin() -> None:
 
     # Permet de lancer le système avec un utilisateur admin connu (utile en dev/CI).
 
-    if os.getenv("SKIP_USER_BOOTSTRAP"):  # Permet de désactiver la création automatique
+    if os.getenv("SKIP_USER_BOOTSTRAP") or os.getenv("SKIP_USER_INIT") or os.getenv("APP_ENV", "").lower() == "test":  # Permet de désactiver la création automatique
         return  # Sort si demandé
 
     df = query_df(text("SELECT COUNT(*) AS total FROM app_users"))  # Vérifie le nombre d'utilisateurs
@@ -284,5 +288,17 @@ def bootstrap_default_admin() -> None:
     create_user(default_username, default_email, default_password, role="admin")  # Crée l'utilisateur admin
 
 
-ensure_user_table()  # Initialise la table utilisateurs au chargement du module
-bootstrap_default_admin()  # Assure la présence d'un admin par défaut
+def bootstrap_users_if_enabled() -> None:
+    """Initialise la table utilisateurs et l'admin par défaut si autorisé."""
+
+    if os.getenv("SKIP_USER_INIT") or os.getenv("APP_ENV", "").lower() == "test":
+        return
+
+    try:
+        ensure_user_table()
+        bootstrap_default_admin()
+    except Exception as exc:  # pragma: no cover - on journalise pour éviter de bloquer un import
+        logger.warning("Bootstrap utilisateurs ignoré (erreur DB): %s", exc)
+
+
+# Le bootstrap est déclenché explicitement depuis l'application (backend/main.py) pour éviter les écritures à l'import.

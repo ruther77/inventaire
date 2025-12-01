@@ -2,6 +2,8 @@ from __future__ import annotations  # Active les annotations différées
 
 from io import BytesIO  # Flux mémoire pour manipuler les PDF en bytes
 from typing import List  # Typage optionnel (non utilisé mais importé)
+import unicodedata
+from decimal import Decimal, ROUND_HALF_UP
 
 try:  # Tente d'utiliser pypdf (plus léger) en priorité
     from pypdf import PdfReader, PdfWriter  # type: ignore[import]
@@ -76,3 +78,124 @@ def split_pdf_into_invoices(pdf_bytes: bytes) -> list[dict[str, object]]:
 
 
 __all__ = ["split_pdf_into_invoices"]  # Exporte la fonction publique
+
+
+def sanitize_receipt_text(value: object) -> str:
+    """Convertit un contenu en chaîne ASCII sans caractères spéciaux."""
+
+    if value is None:
+        return ""
+
+    text = str(value)
+    if not text:
+        return ""
+
+    text = text.replace("€", " EUR ")
+    normalized = unicodedata.normalize("NFKD", text)
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    cleaned = " ".join(ascii_text.split())
+    return cleaned.strip()
+
+
+def format_currency_line(label: str, amount: Decimal) -> str:
+    safe_amount = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return sanitize_receipt_text(f"{label}: {safe_amount:.2f} EUR")
+
+
+def format_quantity(qty: Decimal) -> str:
+    normalized = qty.normalize() if isinstance(qty, Decimal) else Decimal(str(qty or "0")).normalize()
+    text = format(normalized, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def render_receipt_pdf(lines: list[str]) -> bytes:
+    """Encode les lignes du ticket dans un PDF minimaliste."""
+
+    def _escape(value: str) -> str:
+        return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+    text_commands = [
+        "q",
+        "1 w",
+        "0 0 0 RG",
+        "45 420 m",
+        "105 420 l",
+        "105 370 l",
+        "45 370 l",
+        "h",
+        "S",
+        "45 420 m",
+        "75 450 l",
+        "135 450 l",
+        "105 420 l",
+        "S",
+        "105 420 m",
+        "135 450 l",
+        "135 400 l",
+        "105 370 l",
+        "S",
+        "Q",
+        "BT",
+        "/F1 10 Tf",
+        "40 340 Td",
+    ]
+    for line in lines:
+        text_commands.append(f"({_escape(line)}) Tj")
+        text_commands.append("0 -12 Td")
+    text_commands.append("ET")
+    content_stream = "\n".join(text_commands)
+    content_bytes = content_stream.encode("utf-8")
+
+    objects: list[str] = []
+    objects.append("<< /Type /Catalog /Pages 2 0 R >>")
+    objects.append("<< /Type /Pages /Count 1 /Kids [3 0 R] >>")
+    objects.append(
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 500] "
+        "/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"
+    )
+    objects.append(f"<< /Length {len(content_bytes)} >>\nstream\n{content_stream}\nendstream")
+    objects.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+
+    pdf_parts: list[str] = []
+    offsets: list[int] = []
+    current_length = 0
+
+    def _append(part: str) -> None:
+        nonlocal current_length
+        pdf_parts.append(part)
+        current_length += len(part)
+
+    def _add_object(obj_number: int, body: str) -> None:
+        offsets.append(current_length)
+        obj_repr = f"{obj_number} 0 obj\n{body}\nendobj\n"
+        _append(obj_repr)
+
+    _append("%PDF-1.4\n")
+    for index, body in enumerate(objects, start=1):
+        _add_object(index, body)
+
+    xref_offset = current_length
+    total_objects = len(objects) + 1
+    _append(f"xref\n0 {total_objects}\n")
+    _append("0000000000 65535 f \n")
+    for offset in offsets:
+        _append(f"{offset:010d} 00000 n \n")
+
+    _append("trailer\n")
+    _append(f"<< /Size {total_objects} /Root 1 0 R >>\n")
+    _append("startxref\n")
+    _append(f"{xref_offset}\n")
+    _append("%%EOF")
+
+    return "".join(pdf_parts).encode("utf-8")
+
+
+__all__ = [
+    "split_pdf_into_invoices",
+    "sanitize_receipt_text",
+    "format_currency_line",
+    "format_quantity",
+    "render_receipt_pdf",
+]

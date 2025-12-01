@@ -9,10 +9,10 @@ DATABASE_URL = get_database_url()
 
 def norm_cols(df):
     cols_map = {
-        "nom":"nom", "nom":"nom",
+        "nom":"nom",
         "prix_vente":"prix_vente", "prix_vente":"prix_vente", "prix": "prix_vente",
         "Tva":"tva", "tva":"tva",
-        "Code-barres":"code", "codes":"code", "code_barres":"code", "barcode":"code", "ean":"codes,
+        "Code-barres":"code", "codes":"code", "code_barres":"code", "barcode":"code", "ean":"code",
         "qte_init":"qte_init", "Quantité disponible":"qte_init", "stock_initial":"qte_init"
     }
     return df.rename(columns={c: cols_map.get(c,c) for c in df.columns})
@@ -66,33 +66,45 @@ def main():
                              {"pv": pv, "tva": tva, "id": pid})
                 updated += 1
             else:
-                r = conn.execute(text(\"\"\"\
-                    INSERT INTO produits(nom, prix_vente, tva, actif) 
-                    VALUES (:n, :pv, :tva, TRUE) RETURNING id
-                \"\"\"), {"n": nom, "pv": pv, "tva": tva})
+                r = conn.execute(
+                    text(
+                        """
+                        INSERT INTO produits(nom, prix_vente, tva, actif) 
+                        VALUES (:n, :pv, :tva, TRUE) RETURNING id
+                        """
+                    ),
+                    {"n": nom, "pv": pv, "tva": tva},
+                )
                 pid = r.scalar()
                 created += 1
 
             if qte and qte != 0:
-                conn.execute(text(\"\"\"\
-                    INSERT INTO mouvements_stock(produit_id, type, quantite, source) 
-                    VALUES (:pid, 'ENTREE', :qte, 'SEED_INITIAL')
-                \"\"\"), {"pid": pid, "qte": qte})
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO mouvements_stock(produit_id, type, quantite, source) 
+                        VALUES (:pid, 'ENTREE', :qte, 'SEED_INITIAL')
+                        """
+                    ),
+                    {"pid": pid, "qte": qte},
+                )
                 stocked += 1
 
             codes = str(row.get("codes","")).strip()
             if codes and codes.lower() != "nan":
-                parts = [c.strip() for c in re.split(r"[;,\\s]+", codes) if c.strip()]
+                parts = [c.strip() for c in re.split(r"[;,\s]+", codes) if c.strip()]
                 for code in parts:
                     try:
-                        conn.execute(text(\"\"\"\
-                            INSERT INTO produits_barcodes(produit_id, code) VALUES (:pid, :code)
-                        \"\"\"), {"pid": pid, "code": code})
+                        conn.execute(
+                            text("INSERT INTO produits_barcodes(produit_id, code) VALUES (:pid, :code)"),
+                            {"pid": pid, "code": code},
+                        )
                         codes_added += 1
                     except Exception:
                         pass
+                        pass
 
-    print(f\"Import terminé — créés: {created}, maj: {updated}, stocks: {stocked}, codes: {codes_added}\")
+    print(f"Import terminé — créés: {created}, maj: {updated}, stocks: {stocked}, codes: {codes_added}")
 
 if __name__ == "__main__":
     main()

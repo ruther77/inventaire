@@ -185,6 +185,34 @@ def determine_categorie(nom_produit: Any) -> str:
     return "Autre"  # Catégorie par défaut
 
 
+
+def ensure_barcode_constraints() -> None:
+    """Crée un index d'unicité sur (tenant_id, lower(code)) pour sécuriser les codes-barres."""
+
+    eng = get_engine()
+    dialect = eng.url.get_backend_name()
+    if dialect == "sqlite":
+        index_sql = (
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_produits_barcodes_code_tenant\n"
+            "ON produits_barcodes (tenant_id, lower(code));"
+        )
+    else:
+        index_sql = (
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_produits_barcodes_code_tenant\n"
+            "ON produits_barcodes (tenant_id, lower(code));"
+        )
+
+    try:
+        with eng.begin() as conn:
+            conn.exec_driver_sql(index_sql)
+    except Exception as exc:  # pragma: no cover - best effort
+        import logging
+        logging.getLogger(__name__).warning(
+            "Impossible de créer l'index unique sur produits_barcodes: %s", exc
+        )
+
+
+
 def create_initial_stock(
     conn: Connection,
     produit_id: int,

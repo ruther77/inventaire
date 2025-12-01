@@ -15,6 +15,9 @@ import api, {
   createRestaurantBankStatement,
   updateRestaurantBankStatement,
   importRestaurantBankStatementsPdf,
+  fetchRestaurantConsumptions,
+  fetchRestaurantPriceHistoryComparison,
+  fetchRestaurantPlatMappings,
 } from '../api/client.js';
 
 export const useRestaurantCategories = () =>
@@ -189,6 +192,34 @@ export const useRestaurantTvaSummary = (months = 6) =>
     queryKey: ['restaurant', 'tva-summary', months],
     queryFn: () => fetchRestaurantTvaSummary(months),
   });
+
+export const useRestaurantConsumptions = () =>
+  useQuery({
+    queryKey: ['restaurant', 'consumptions'],
+    queryFn: fetchRestaurantConsumptions,
+  });
+
+export const useRestaurantPriceHistoryComparison = () =>
+  useQuery({
+    queryKey: ['restaurant', 'price-history-comparison'],
+    queryFn: fetchRestaurantPriceHistoryComparison,
+  });
+
+export const useRestaurantPlatMappings = () =>
+  useQuery({
+    queryKey: ['restaurant', 'plat-mappings'],
+    queryFn: fetchRestaurantPlatMappings,
+  });
+
+export const useSyncRestaurantIngredients = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: syncRestaurantIngredients,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'plat-mappings'] });
+    },
+  });
+};
 
 export const useCreateRestaurantBankStatement = () => {
   const queryClient = useQueryClient();

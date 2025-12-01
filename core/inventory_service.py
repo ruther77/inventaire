@@ -3,12 +3,17 @@ from collections import defaultdict  # Fournit un dict avec valeurs par défaut
 from datetime import datetime  # Gestion des horodatages
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP  # Décimaux précis et arrondis
 from typing import Iterable  # Typage des collections
-import unicodedata  # Normalisation Unicode pour les tickets
 
 import pandas as pd  # Manipulation de DataFrames pour les factures
 
 from .data_repository import get_engine, query_df  # Accès au moteur et requêtes SQL
 from . import inventory_costing  # Gestion des couches de coûts
+from .pdf_utils import (
+    render_receipt_pdf,
+    sanitize_receipt_text,
+    format_currency_line,
+    format_quantity,
+)
 from sqlalchemy import text, exc as sa_exc  # Requêtes SQL textuelles et exceptions SQLAlchemy
 
 
@@ -91,19 +96,6 @@ def process_sale_transaction(
 
     try:  # Transaction de vente
         with eng.begin() as conn:  # Démarre une transaction
-            has_stock_trigger = conn.execute(
-                text(
-                    """
-                    SELECT EXISTS (
-                        SELECT 1
-                        FROM pg_trigger
-                        WHERE tgname = 'trg_update_stock_actuel'
-                          AND tgrelid = 'mouvements_stock'::regclass
-                    )
-                    """
-                )
-            ).scalar()  # Vérifie la présence du trigger de stock
-
             # On liste les produits introuvables ou à stock insuffisant avant toute insertion.
             missing_products: list[int] = []  # Produits absents
             insufficient: list[str] = []  # Produits à stock insuffisant
@@ -156,25 +148,25 @@ def process_sale_transaction(
                 ),
                 movements_payload,
             )  # Insère les mouvements de sortie
-            result.fetchall()  # consume to satisfy DB-API  # Consomme le curseur pour DB-API
+            result.fetchall()  # consume to satisfy DB-API
 
-            if not has_stock_trigger:  # Si le trigger stock_actuel n'est pas présent
-                for payload in movements_payload:  # Mise à jour manuelle du stock
-                    conn.execute(
-                        text(
-                            """
-                            UPDATE produits
-                            SET stock_actuel = stock_actuel - :qty,
-                                updated_at = now()
-                            WHERE id = :pid AND tenant_id = :tenant_id
-                            """
-                        ),
-                        {
-                            "pid": payload["pid"],
-                            "qty": payload["qty"],
-                            "tenant_id": payload["tenant_id"],
-                        },
-                    )  # Décrémente le stock
+            # Mise à jour explicite du stock (sous verrou) pour chaque mouvement.
+            for payload in movements_payload:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE produits
+                        SET stock_actuel = stock_actuel - :qty,
+                            updated_at = now()
+                        WHERE id = :pid AND tenant_id = :tenant_id
+                        """
+                    ),
+                    {
+                        "pid": payload["pid"],
+                        "qty": payload["qty"],
+                        "tenant_id": payload["tenant_id"],
+                    },
+                )  # Décrémente le stock
 
             for pid, item in ordered_items:  # Consume les couches de coût FIFO
                 inventory_costing.consume_layers(
@@ -224,7 +216,7 @@ def _build_sale_receipt(aggregated: dict[int, dict[str, Decimal | str]], usernam
         if qty <= 0:  # Ignore quantités nulles
             continue  # Poursuit
 
-        label = _sanitize_receipt_text(item.get("label") or "Produit")  # Libellé nettoyé
+        label = sanitize_receipt_text(item.get("label") or "Produit")  # Libellé nettoyé
         unit_price = _as_decimal(item.get("unit_price"), "0")  # Prix unitaire
         tva_rate = _as_decimal(item.get("tva_rate"), "0")  # Taux de TVA
 
@@ -241,140 +233,29 @@ def _build_sale_receipt(aggregated: dict[int, dict[str, Decimal | str]], usernam
         total_ttc += line_total  # Cumul TTC
 
         unit_display = (line_total / qty).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) if qty else Decimal("0")  # Prix unitaire affiché
-        qty_display = _format_quantity(qty)  # Quantité formatée
+        qty_display = format_quantity(qty)  # Quantité formatée
         detail_lines.append(
-            _sanitize_receipt_text(
+            sanitize_receipt_text(
                 f"- {label} x {qty_display} = {line_total:.2f} EUR (PU {unit_display:.2f} EUR)"
             )
         )  # Ajoute la ligne de ticket
 
     footer_lines = [
         "",
-        _format_currency_line("Total HT", total_ht),
-        _format_currency_line("TVA", total_tva),
-        _format_currency_line("Total TTC", total_ttc),
+        format_currency_line("Total HT", total_ht),
+        format_currency_line("TVA", total_tva),
+        format_currency_line("Total TTC", total_ttc),
         "",
         "Merci pour votre achat !",
     ]  # Pied de ticket
 
-    sanitized_lines = [_sanitize_receipt_text(line) for line in header_lines + detail_lines + footer_lines]  # Nettoie toutes les lignes
-    pdf_bytes = _render_receipt_pdf(sanitized_lines)  # Génère le PDF
+    sanitized_lines = [sanitize_receipt_text(line) for line in header_lines + detail_lines + footer_lines]  # Nettoie toutes les lignes
+    pdf_bytes = render_receipt_pdf(sanitized_lines)  # Génère le PDF
 
     filename = f"ticket_{timestamp.strftime('%Y%m%d_%H%M%S')}.pdf"  # Nom de fichier
     return {"filename": filename, "content": pdf_bytes}  # Retourne le fichier et le contenu binaire
 
 
-def _render_receipt_pdf(lines: list[str]) -> bytes:
-    """Encode les lignes du ticket dans un PDF minimaliste."""  # Docstring rendu PDF
-
-    def _escape(value: str) -> str:
-        return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")  # Échappe les caractères PDF
-
-    text_commands = [
-        "q",
-        "1 w",
-        "0 0 0 RG",
-        "45 420 m",
-        "105 420 l",
-        "105 370 l",
-        "45 370 l",
-        "h",
-        "S",
-        "45 420 m",
-        "75 450 l",
-        "135 450 l",
-        "105 420 l",
-        "S",
-        "105 420 m",
-        "135 450 l",
-        "135 400 l",
-        "105 370 l",
-        "S",
-        "Q",
-        "BT",
-        "/F1 10 Tf",
-        "40 340 Td",
-    ]  # Commandes graphiques simples pour dessin + texte
-    for line in lines:  # Ajoute chaque ligne de texte
-        text_commands.append(f"({_escape(line)}) Tj")  # Affiche la ligne
-        text_commands.append("0 -12 Td")  # Décale vers le bas
-    text_commands.append("ET")  # Fin du bloc de texte
-    content_stream = "\n".join(text_commands)  # Flux de contenu texte
-    content_bytes = content_stream.encode("utf-8")  # Encodage en bytes
-
-    objects: list[str] = []  # Liste des objets PDF
-    objects.append("<< /Type /Catalog /Pages 2 0 R >>")  # Objet catalogue
-    objects.append("<< /Type /Pages /Count 1 /Kids [3 0 R] >>")  # Objet pages
-    objects.append(
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 500] "
-        "/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"
-    )  # Objet page
-    objects.append(f"<< /Length {len(content_bytes)} >>\nstream\n{content_stream}\nendstream")  # Objet contenu
-    objects.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")  # Objet police
-
-    pdf_parts: list[str] = []  # Fragments PDF assemblés
-    offsets: list[int] = []  # Offsets des objets
-    current_length = 0  # Longueur accumulée
-
-    def _append(part: str) -> None:
-        nonlocal current_length
-        pdf_parts.append(part)  # Ajoute un fragment
-        current_length += len(part)  # Met à jour la longueur
-
-    def _add_object(obj_number: int, body: str) -> None:
-        offsets.append(current_length)  # Enregistre l'offset courant
-        obj_repr = f"{obj_number} 0 obj\n{body}\nendobj\n"  # Représentation de l'objet
-        _append(obj_repr)  # Ajoute l'objet
-
-    _append("%PDF-1.4\n")  # En-tête du PDF
-    for index, body in enumerate(objects, start=1):  # Ajoute chaque objet
-        _add_object(index, body)  # Insère l'objet
-
-    xref_offset = current_length  # Position de la table xref
-    total_objects = len(objects) + 1  # Nombre total d'objets + objet zéro
-    _append(f"xref\n0 {total_objects}\n")  # Début xref
-    _append("0000000000 65535 f \n")  # Objet nul
-    for offset in offsets:  # Écrit chaque offset
-        _append(f"{offset:010d} 00000 n \n")  # Ligne xref
-
-    _append("trailer\n")  # Début trailer
-    _append(f"<< /Size {total_objects} /Root 1 0 R >>\n")  # Trailer avec racine
-    _append("startxref\n")  # Indique début xref
-    _append(f"{xref_offset}\n")  # Offset du xref
-    _append("%%EOF")  # Fin du fichier
-
-    return "".join(pdf_parts).encode("utf-8")  # Retourne le PDF en bytes
-
-
-def _sanitize_receipt_text(value: object) -> str:
-    """Convertit un contenu en chaîne ASCII sans caractères spéciaux."""  # Docstring nettoyage ticket
-
-    if value is None:  # Valeur nulle
-        return ""  # Retourne chaîne vide
-
-    text = str(value)  # Conversion en chaîne
-    if not text:  # Chaîne vide
-        return ""  # Retourne vide
-
-    text = text.replace("€", " EUR ")  # Remplace le symbole euro
-    normalized = unicodedata.normalize("NFKD", text)  # Décompose les accents
-    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")  # Supprime les caractères non ASCII
-    cleaned = ascii_text  # Texte nettoyé
-    cleaned = " ".join(cleaned.split())  # Compacte les espaces
-    return cleaned.strip()  # Retourne la chaîne épurée
-
-
-def _format_currency_line(label: str, amount: Decimal) -> str:
-    safe_amount = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)  # Arrondit à 2 décimales
-    return _sanitize_receipt_text(f"{label}: {safe_amount:.2f} EUR")  # Formate la ligne monétaire
-
-
-def _format_quantity(qty: Decimal) -> str:
-    normalized = qty.normalize() if isinstance(qty, Decimal) else Decimal(str(qty or "0")).normalize()  # Normalise le Decimal
-    text = format(normalized, "f")  # Convertit en chaîne sans notation scientifique
-    if "." in text:  # Si décimales présentes
-        text = text.rstrip("0").rstrip(".")  # Supprime les zéros et point superflus
-    return text or "0"  # Retourne la quantité formatée
 
 # ---------------------------------------------------------------------------
 #  Pipelines de factures → commandes
@@ -505,42 +386,55 @@ def register_invoice_reception(
         label_parts.append(f"traité par {username}")  # Ajoute le nom
     source_label = " · ".join(label_parts) or "Réception facture"  # Libellé source final
 
-    payloads: list[dict[str, object]] = []  # Liste des mouvements à insérer
-    cost_entries: list[dict[str, object]] = []  # Entrées pour couches de coût
 
-    # Chaque ligne valide devient un payload mouvement qui sera inséré en bloc.
-    for row in invoice_df.itertuples():  # Itère sur chaque ligne de facture
-        product_id = getattr(row, "produit_id", None)  # ID produit
-        quantity = getattr(row, "quantite_recue", None)  # Quantité reçue
-        if quantity is None:  # Fallback sur qte_init
-            quantity = getattr(row, "qte_init", None)  # Quantité initiale
+    working_df = invoice_df.copy()
+    # Prépare les quantités (fallback sur qte_init)
+    if "quantite_recue" not in working_df.columns and "qte_init" in working_df.columns:
+        working_df["quantite_recue"] = working_df["qte_init"]
+    elif "quantite_recue" in working_df.columns and "qte_init" in working_df.columns:
+        mask_missing = working_df["quantite_recue"].isna()
+        if mask_missing.any():
+            working_df.loc[mask_missing, "quantite_recue"] = working_df.loc[mask_missing, "qte_init"]
 
-        normalised_qty = _normalise_quantity(quantity)  # Normalise la quantité
-        if product_id in (None, "") or normalised_qty <= 0:  # Validation de la ligne
+    # Filtre set-based: produit_id valide + quantité > 0
+    working_df["produit_id_num"] = pd.to_numeric(working_df.get("produit_id"), errors="coerce")
+    working_df["qty_norm"] = working_df.get("quantite_recue", pd.Series([], dtype="float")).apply(_normalise_quantity)
+    valid_mask = working_df["produit_id_num"].notna() & (working_df["produit_id_num"] > 0) & (working_df["qty_norm"] > 0)
+    invalid_rows = working_df[~valid_mask]
+    if not invalid_rows.empty:
+        for row in invalid_rows.itertuples():
             summary["errors"].append(
-                f"Ligne {getattr(row, 'Index', '?') + 1 if hasattr(row, 'Index') else '?'} invalide (produit ou quantité)"
-            )  # Ajoute une erreur
-            continue  # Ignore la ligne
+                f"Ligne ignorée (produit_id invalide ou quantité nulle): produit_id={getattr(row, 'produit_id', None)}, qty={getattr(row, 'quantite_recue', None)}"
+            )
+    valid_df = working_df[valid_mask]
+    if valid_df.empty:
+        return summary
 
-        movement_dt = reception_date or datetime.utcnow()  # Date du mouvement
-        payloads.append(
-            {
-                "pid": int(product_id),
-                "qty": float(normalised_qty),
-                "source": source_label,
-                "type": safe_type,
-                "date_mvt": movement_dt,
-                "tenant_id": int(tenant_id),
-            }
-        )  # Prépare l'insertion mouvement
+    payloads: list[dict[str, object]] = [
+        {
+            "pid": int(row.produit_id_num),
+            "qty": row.qty_norm,
+            "source": source_label,
+            "tenant_id": int(tenant_id),
+            "date_mvt": reception_date,
+        }
+        for row in valid_df.itertuples()
+    ]
+    summary["movements_created"] = len(payloads)
+    summary["quantity_total"] = float(valid_df["qty_norm"].sum())
+
+    cost_entries: list[dict[str, object]] = []
+    for row in valid_df.itertuples():
+        price_achat = getattr(row, "prix_achat", None)
+        unit_cost = _as_decimal(price_achat) if price_achat is not None else None
         cost_entries.append(
             {
-                "pid": int(product_id),
-                "qty": normalised_qty,
-                "unit_cost": _as_decimal(getattr(row, "prix_achat", None)),
-                "received_at": movement_dt,
+                "product_id": int(row.produit_id_num),
+                "quantity": row.qty_norm,
+                "unit_cost": unit_cost,
+                "tenant_id": int(tenant_id),
             }
-        )  # Prépare la couche de coût associée
+        )
 
     if not payloads:  # Si aucune ligne valide
         return summary  # Retourne le bilan

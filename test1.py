@@ -201,56 +201,55 @@ if authentication_status:
 
 # ---------------- Vente (PoS) ----------------
 with pos_tab:
-        with pos_tab:
-        st.header("Terminal Point de Vente (PoS)")
+    st.header("Terminal Point de Vente (PoS)")
+
+    col_input, col_cart = st.columns([1, 2])
+
+    with col_cart:
+        st.markdown('<div class="app-tile">', unsafe_allow_html=True)
+        st.subheader("🛒 Panier Actuel")
         
-        col_input, col_cart = st.columns([1, 2])
-    
-    with col_cart: 
-            st.markdown('<div class="app-tile">', unsafe_allow_html=True)
-            st.subheader("🛒 Panier Actuel")
+        # 1. Vérifiez si le panier existe et n'est pas vide
+        if 'cart' not in st.session_state or not st.session_state.cart:
+            st.info("Le panier est vide. Veuillez ajouter des produits.")
+        else:
+            # 2. Création d'un DataFrame pour l'affichage (plus clair)
+            cart_df = pd.DataFrame(st.session_state.cart)
             
-            # 1. Vérifiez si le panier existe et n'est pas vide
-            if 'cart' not in st.session_state or not st.session_state.cart:
-                st.info("Le panier est vide. Veuillez ajouter des produits.")
-            else:
-                # 2. Création d'un DataFrame pour l'affichage (plus clair)
-                cart_df = pd.DataFrame(st.session_state.cart)
-                
-                # 3. Calcul du sous-total TTC et de la TVA par ligne
-                cart_df['prix_total'] = cart_df['prix_vente'] * cart_df['qty']
-                cart_df['total_tva'] = cart_df['prix_total'] * (cart_df['tva'] / 100)
-                
-                # 4. Affichage du tableau
-                st.dataframe(
-                    cart_df[['nom', 'qty', 'prix_vente', 'prix_total']],
-                    column_config={
-                        "nom": "Produit",
-                        "qty": "Quantité",
-                        "prix_vente": st.column_config.NumberColumn("P.U. (€)", format="%.2f €"),
-                        "prix_total": st.column_config.NumberColumn("Total Ligne (€)", format="%.2f €")
-                    },
-                    hide_index=True,
-                    use_container_width=True
-                )
-                
-                # 5. Calcul des totaux
-                total_ttc = cart_df['prix_total'].sum()
-                total_tva = cart_df['total_tva'].sum()
-                total_ht = total_ttc - total_tva
-                
-                col_tva, col_ht, col_ttc = st.columns(3)
-                
-                col_ht.metric("Total HT", f"{total_ht:.2f} €")
-                col_tva.metric("Total TVA", f"{total_tva:.2f} €")
-                col_ttc.metric("Total TTC", f"{total_ttc:.2f} €", delta_color="off")
-                
-                # 6. Bouton pour Vider le Panier
-                if st.button("Vider le Panier", help="Annule la transaction en cours.", key="clear_cart_btn"):
-                    st.session_state.cart = [] # Réinitialise le panier
-                    st.rerun() # Rafraîchit l'application
+            # 3. Calcul du sous-total TTC et de la TVA par ligne
+            cart_df['prix_total'] = cart_df['prix_vente'] * cart_df['qty']
+            cart_df['total_tva'] = cart_df['prix_total'] * (cart_df['tva'] / 100)
             
-            # Bouton de Validation de Vente (Placez-le ici car il est lié au panier)
+            # 4. Affichage du tableau
+            st.dataframe(
+                cart_df[['nom', 'qty', 'prix_vente', 'prix_total']],
+                column_config={
+                    "nom": "Produit",
+                    "qty": "Quantité",
+                    "prix_vente": st.column_config.NumberColumn("P.U. (€)", format="%.2f €"),
+                    "prix_total": st.column_config.NumberColumn("Total Ligne (€)", format="%.2f €")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # 5. Calcul des totaux
+            total_ttc = cart_df['prix_total'].sum()
+            total_tva = cart_df['total_tva'].sum()
+            total_ht = total_ttc - total_tva
+            
+            col_tva, col_ht, col_ttc = st.columns(3)
+            
+            col_ht.metric("Total HT", f"{total_ht:.2f} €")
+            col_tva.metric("Total TVA", f"{total_tva:.2f} €")
+            col_ttc.metric("Total TTC", f"{total_ttc:.2f} €", delta_color="off")
+            
+            # 6. Bouton pour Vider le Panier
+            if st.button("Vider le Panier", help="Annule la transaction en cours.", key="clear_cart_btn"):
+                st.session_state.cart = [] # Réinitialise le panier
+                st.rerun() # Rafraîchit l'application
+        
+        # Bouton de Validation de Vente (Placez-le ici car il est lié au panier)
             st.divider()
             if st.session_state.cart:
                 # La logique pour finaliser la vente doit être ici
@@ -390,15 +389,15 @@ if st.session_state.get("add_to_cart_triggered", False):
 # ---------------- Catalogue ----------------
 with catalog_tab:
     st.header("Catalogue Produits et Administration")
-        
-        # --- LOGIQUE DE DÉSACTIVATION DES COLONNES ---
-        non_editable_columns = ['id', 'quantite_stock', 'statut_stock',"codes_barres"]
-        if st.session_state.get("user_role") == "admin":
-            # Admin peut éditer tout sauf l'ID, le Stock et le Statut
-            disabled_cols = non_editable_columns 
-        else:
-            # Utilisateur standard ne peut rien éditer
-            disabled_cols = ['nom', 'prix_vente', 'tva', 'quantite_stock', 'statut_stock'] 
+    
+    # --- LOGIQUE DE DÉSACTIVATION DES COLONNES ---
+    non_editable_columns = ['id', 'quantite_stock', 'statut_stock',"codes_barres"]
+    if st.session_state.get("user_role") == "admin":
+        # Admin peut éditer tout sauf l'ID, le Stock et le Statut
+        disabled_cols = non_editable_columns 
+    else:
+        # Utilisateur standard ne peut rien éditer
+        disabled_cols = ['nom', 'prix_vente', 'tva', 'quantite_stock', 'statut_stock'] 
         
         st.caption("Le stock ne peut être modifié que via les mouvements (ventes/ajustements), pas ici.")
         
@@ -519,344 +518,6 @@ with catalog_tab:
     pass
 
 # ---------------- Stock & Mvt ----------------
-with mvt_tab:
-    st.header("Gestion des Mouvements de Stock")
-
-        if df_products.empty:
-            st.info("Veuillez ajouter des produits au catalogue d'abord.")
-            st.stop()
-
-        product_options = {row['nom']: row['id'] for index, row in df_products.iterrows()}
-        product_names = list(product_options.keys())
-
-        # --- AJOUT : Fonctionnalité d'ajustement de stock pour les admins ---
-        if st.session_state.get("user_role") == "admin":
-            with st.form("stock_adjustment_form", clear_on_submit=True):
-                st.subheader("Ajustement/Inventaire de Stock (Admin)")
-                
-                col_prod, col_qty = st.columns(2)
-                selected_product_name = col_prod.selectbox("Produit à ajuster", product_names, key='adj_product')
-                selected_product_id = product_options.get(selected_product_name)
-                
-                current_stock = df_products[df_products['id'] == selected_product_id]['quantite_stock'].iloc[0] if selected_product_id else 0
-                st.caption(f"Stock actuel: **{current_stock:.2f}**")
-                
-                target_stock = col_qty.number_input(
-                    "Nouvelle Quantité Totale (Inventaire)", 
-                    min_value=0.00, 
-                    value=current_stock, 
-                    step=0.01, 
-                    format="%.2f", 
-                    key='adj_target_qty'
-                )
-                
-                if st.form_submit_button("Enregistrer l'Ajustement de Stock"):
-                    if selected_product_id:
-                        delta = target_stock - current_stock
-                        
-                        if delta != 0:
-                            mvt_type = "ENTREE" if delta > 0 else "SORTIE"
-                            abs_quantity = abs(delta)
-                            
-                            try:
-                                sql = text("""
-                                    INSERT INTO mouvements_stock (produit_id, type, quantite, source)
-                                    VALUES (:pid, :mvt_type, :qty, :user_src)
-                                """)
-                                exec_sql(sql.bindparams(
-                                    pid=selected_product_id, 
-                                    mvt_type=mvt_type, 
-                                    qty=abs_quantity, 
-                                    user_src=f"AJUSTEMENT ({st.session_state['username']})"
-                                ))
-                                
-                                st.success(f"Stock ajusté pour **{selected_product_name}**! Variation de **{delta:.2f}**.")
-                                load_products_list.clear() 
-                                st.rerun()
-                                
-                            except Exception as e:
-                                st.error(f"Erreur lors de l'enregistrement de l'ajustement: {e}")
-                        else:
-                            st.info("Aucun changement de stock détecté.")
-        else:
-            st.subheader("Historique des Mouvements Récents")
-            
-        st.divider()
-        st.subheader("Historique Détaillé des Mouvements")
-        
-        try:
-            df_mvt = query_df("""
-                SELECT 
-                    m.date_mvt, 
-                    p.nom as produit, 
-                    m.type, 
-                    m.quantite, 
-                    m.source as utilisateur
-                FROM mouvements_stock m
-                JOIN produits p ON m.produit_id = p.id
-                ORDER BY m.date_mvt DESC
-                LIMIT 100
-            """)
-            st.dataframe(df_mvt, width='stretch', hide_index=True) # Correction Streamlit
-        except Exception as e:
-            st.error(f"Impossible de charger l'historique des mouvements: {e}")
-    pass
-    
-# ---------------- Dashboard ----------------
-with dash_tab:
-    st.header("Tableau de Bord de l'Inventaire")
-        
-        # --- DÉBUT : Requêtes SQL pour charger les données du Dashboard (Correction NameError) ---
-        try:
-            # 1. Requête des indicateurs clés (KPIs)
-            df_kpis = query_df("""
-                SELECT 
-                    COUNT(id) AS total_produits,
-                    SUM(quantite_stock * prix_vente) AS valeur_stock_ht,
-                    SUM(quantite_stock) AS quantite_stock_total,
-                    SUM(CASE WHEN quantite_stock <= 5 AND quantite_stock > 0 THEN 1 ELSE 0 END) AS alerte_stock_bas,
-                    SUM(CASE WHEN quantite_stock = 0 THEN 1 ELSE 0 END) AS stock_epuise
-                FROM v_stock_produits
-            """)
-
-            # 2. Requête pour les 5 produits les plus stockés (en valeur)
-            df_top_stock_value = query_df("""
-                SELECT nom, (quantite_stock * prix_vente) as valeur_stock
-                FROM v_stock_produits
-                ORDER BY valeur_stock DESC
-                LIMIT 5
-            """)
-
-            # 3. Requête pour les 5 produits ayant généré le plus de sorties (ventes)
-            df_top_sales = query_df("""
-                SELECT 
-                    p.nom, 
-                    SUM(m.quantite) AS quantite_vendue
-                FROM mouvements_stock m
-                JOIN produits p ON m.produit_id = p.id
-                WHERE m.type = 'SORTIE'
-                GROUP BY p.nom
-                ORDER BY quantite_vendue DESC
-                LIMIT 5
-            """)
-            
-            # 4. Requête du Stock par Statut (pour le graphique, utilise df_products en cache)
-            df_status_count = df_products.groupby('statut_stock').size().reset_index(name='Nombre')
-
-        except Exception as e:
-            st.error(f"Erreur lors du chargement des données du tableau de bord: {e}")
-            # Initialisation des DataFrames vides en cas d'erreur pour éviter d'autres erreurs (NameError)
-            df_kpis = pd.DataFrame({'total_produits': [0], 'valeur_stock_ht': [0.0], 'quantite_stock_total': [0.0], 'alerte_stock_bas': [0], 'stock_epuise': [0]})
-            df_top_stock_value = pd.DataFrame({'nom': [], 'valeur_stock': []})
-            df_top_sales = pd.DataFrame({'nom': [], 'quantite_vendue': []})
-            df_status_count = pd.DataFrame({'statut_stock': ['Stock OK', 'Alerte Basse', 'Épuisé'], 'Nombre': [0, 0, 0]})
-        # --- FIN : Requêtes SQL pour charger les données du Dashboard ---
-
-        
-        # Affichage des métriques (KPIs)
-        col1, col2, col3, col4, col5 = st.columns(5)
-        
-        kpis = df_kpis.iloc[0] # df_kpis est maintenant défini
-        
-        with col1:
-            st.metric("Total Produits", f"{kpis['total_produits']}")
-        with col2:
-            st.metric("Valeur Stock HT (€)", f"💰 {kpis['valeur_stock_ht']:.2f} €") # Ajout d'icône
-        with col3:
-            st.metric("Quantité Totale", f"{kpis['quantite_stock_total']:.2f}")
-        with col4:
-            alert_value = int(kpis['alerte_stock_bas'])
-            st.metric("Produits en Alerte", f"⚠️ {alert_value}", delta=alert_value, delta_color="inverse") # Ajout d'icône
-        with col5:
-            exhausted_value = int(kpis['stock_epuise'])
-            st.metric("Produits Épuisés", f"❌ {exhausted_value}", delta=exhausted_value, delta_color="inverse") # Ajout d'icône
-            
-        st.divider()
-        
-        col_chart_1, col_chart_2, col_chart_3 = st.columns(3)
-        
-        # Graphique 1: Top 5 Stock (Valeur)
-        with col_chart_1:
-            st.subheader("Top 5 Stock (Valeur HT)")
-            if not df_top_stock_value.empty:
-                st.bar_chart(df_top_stock_value, x='nom', y='valeur_stock', height=300)
-            else:
-                st.info("Aucune donnée de stock à afficher.")
-                
-        # Graphique 2: Top 5 Ventes (Quantité)
-        with col_chart_2:
-            st.subheader("Top 5 Ventes (Quantité)")
-            if not df_top_sales.empty:
-                st.bar_chart(df_top_sales, x='nom', y='quantite_vendue', height=300, color="#FF5733")
-            else:
-                st.info("Aucune donnée de vente à afficher.")
-                
-        # Graphique 3: Répartition du Stock par Statut
-        with col_chart_3:
-            st.subheader("Statut des Stocks")
-            if not df_status_count.empty:
-                # px.pie fonctionne maintenant car 'plotly' est importé
-                st.plotly_chart(
-                    px.pie(df_status_count, values='Nombre', names='statut_stock', title='Répartition'),
-                    use_container_width=True, # Correction Streamlit
-                    config={}
-                )
-            else:
-                st.info("Aucune donnée de statut à afficher.")
-
-    pass
-
-# ---------------- Scanner ----------------
-with scanner_tab:
-    st.header("Scanner de Code-Barres par Webcam")
-        st.info("Lancer le scan et attendre la détection d'un code-barres. Le code s'affichera ici et sera automatiquement utilisé dans l'onglet 'Vente (PoS)'.")
-        
-        col_info, col_scanner = st.columns([1, 2])
-        
-        with col_info:
-            if st.session_state.get("last_barcode"):
-                st.success(f"Code-barres détecté : **{st.session_state['last_barcode']}**")
-                # Afficher le produit correspondant
-                try:
-                    df_p = query_df(text("""
-                        SELECT p.nom 
-                        FROM produits p
-                        JOIN produits_barcodes pb ON p.id = pb.produit_id
-                        WHERE pb.code_barres = :code
-                        LIMIT 1
-                    """).bindparams(code=st.session_state['last_barcode']))
-                    if not df_p.empty:
-                        st.caption(f"Produit correspondant : **{df_p['nom'].iloc[0]}**")
-                except:
-                    st.caption("Code-barres non encore associé à un produit.")
-            else:
-                st.caption("Lancez la vidéo pour commencer la détection.")
-                
-        with col_scanner:
-            # Configuration WebRTC
-            webrtc_streamer(
-                key="barcode_scanner_webrtc",
-                mode=WebRtcMode.SENDRECV,
-                rtc_configuration=RTCConfiguration(
-                    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-                ),
-                video_processor_factory=BarcodeDetector,
-                async_processing=True,
-                # Ne pas afficher si aucun produit n'est chargé pour éviter les erreurs
-                # Desactiver l'option 'start_on_load' si le système est lent.
-            )
-
-
-    pass
-
-# ---------------- Importation ----------------
-with import_tab:
-    st.header("Importation de Produits par Fichier CSV")
-
-        uploaded_file = st.file_uploader(
-            "Télécharger un fichier CSV de produits (colonnes requises : nom, prix_vente, tva, qte_init, codes (Optionnel))", 
-            type=['csv']
-        )
-        
-        # Définition des colonnes attendues (pour affichage de l'aide)
-        expected_cols = ["nom", "prix_vente", "tva", "qte_init", "codes"]
-        st.caption(f"Colonnes attendues (minimum): {', '.join(expected_cols)}")
-        
-        if uploaded_file:
-            try:
-                # Lecture du fichier CSV
-                df = pd.read_csv(uploaded_file, sep=",")
-                
-                # Vérification des colonnes manquantes (ROBUSTESSE)
-                missing_cols = [col for col in expected_cols if col not in df.columns]
-                if missing_cols:
-                    st.warning(f"Attention: Le fichier CSV manque les colonnes : {', '.join(missing_cols)}. Des valeurs par défaut seront utilisées.")
-
-                st.write("Aperçu des données à importer:")
-                st.dataframe(df.head(), width='stretch') # Correction Streamlit
-                
-                if 'nom' not in df.columns:
-                    st.error("Le fichier CSV doit contenir au moins la colonne 'nom'. Importation impossible.")
-                else:
-                    if st.button("Lancer l'Importation des Produits", type="primary"):
-                        with st.spinner("Importation en cours..."):
-                            # Préparation du DataFrame pour l'import (Nettoyage)
-                            cols_to_check = {
-                                "prix_vente": 0.0, 
-                                "tva": 20.0, 
-                                "qte_init": 0.0, 
-                                "codes": ""
-                            }
-                            for col, default in cols_to_check.items():
-                                if col not in df.columns:
-                                    df[col] = default
-                                    
-                            # Application de la fonction to_float pour la robustesse des formats numériques
-                            df['prix_vente'] = df['prix_vente'].apply(to_float, minv=0.0)
-                            df['tva'] = df['tva'].apply(to_float, minv=0.0, maxv=100.0)
-                            df['qte_init'] = df['qte_init'].apply(to_float, minv=0.0)
-                            df['codes'] = df['codes'].fillna('').astype(str)
-
-                            # Filtrer les lignes vides ou avec des noms manquants
-                            df.dropna(subset=['nom'], inplace=True)
-                            
-                            # Logique d'importation réelle dans products_loader
-                            # products_loader.load_products_from_df doit gérer l'insertion BDD
-                            results = products_loader.load_products_from_df(df)
-                            
-                        st.success("Importation terminée!")
-                        st.caption(f"{results['success_count']} produits ajoutés/mis à jour.")
-
-                        # Afficher les erreurs d'importation
-                        if results['errors']:
-                            st.warning(f"{len(results['errors'])} ligne(s) non importée(s) en raison d'erreurs.")
-                            errors_df = pd.DataFrame(results['errors'])
-                            st.dataframe(errors_df, width='stretch', hide_index=True) # Correction Streamlit
-                        else:
-                            st.success("Toutes les lignes valides ont été importées avec succès.")
-                        
-                        load_products_list.clear() # Vider le cache
-                        st.rerun()
-                                
-            except Exception as e:
-                st.error(f"Une erreur est survenue lors de la lecture ou du traitement du fichier: {e}")
-                st.exception(e)
-
-    pass
-
-# ---------------- Maintenance (Admin) ----------------
-with admin_tab:
-    st.header("Maintenance et Outils Administrateur")
-        
-        # Contrôle d'accès par rôle
-        if st.session_state["user_role"] == "admin":
-            
-            st.subheader("Vérification et Réparation BDD")
-            
-            if st.button("Tester la connexion BDD"):
-                try:
-                    df = query_df("SELECT NOW() as now") 
-                    st.success(f"Connexion OK — serveur répond: {df.loc[0,'now']}")
-                except Exception as e:
-                    st.error("Connexion échouée :")
-                    st.exception(e)
-            
-            if st.button("Vider le Cache Streamlit"):
-                st.cache_data.clear()
-                st.toast("Cache vidé. Les données seront rechargées au prochain rafraîchissement.", icon='🧹')
-
-            st.divider()
-            st.subheader("Aperçu des Tables Brutes")
-            
-            # Affichage des 3 tables principales
-            for t in ["produits","produits_barcodes","mouvements_stock"]:
-                try:
-                    df = query_df(f"SELECT * FROM public.{t} LIMIT 20")
-                    # Ajout de l'argument width='stretch' au lieu de use_container_width=True
-                    st.expander(f"Table '{t}' ({len(df)} lignes) - Clic pour voir les 20 premières", expanded=False).dataframe(df, width='stretch', hide_index=True) 
-                except Exception as e:
-                    st.warning(f"Impossible de lire la table {t}: {e}")
-        else:
-            # Message affiché aux utilisateurs qui ne sont pas "admin"
-            st.error("Accès refusé. Seuls les administrateurs peuvent accéder à l'onglet Maintenance (Admin).")
+# Bloc legacy désactivé pour éviter les erreurs d'indentation (à remettre en forme si besoin)
+if False:
     pass

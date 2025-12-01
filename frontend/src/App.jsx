@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppShell from './app/AppShell.jsx';
 import RestaurantAppShell from './app/RestaurantAppShell.jsx';
-import { epicerieRoutes, restaurantRoutes } from './app/routes.jsx';
+import { epicerieRoutes, restaurantRoutes, treasuryRoutes } from './app/routes.jsx';
 import { useTenant } from './context/TenantContext.jsx';
 import { useAuth } from './hooks/useAuth.js';
 import LoginPage from './features/auth/LoginPage.jsx';
@@ -15,7 +15,8 @@ import LoginPage from './features/auth/LoginPage.jsx';
 export default function App() {
   const { tenant } = useTenant();
   const { isAuthenticated, initializing } = useAuth();
-  const activeRoutes = tenant.code === 'restaurant' ? restaurantRoutes : epicerieRoutes;
+  const activeRoutes =
+    tenant.code === 'restaurant' ? restaurantRoutes : tenant.code === 'tresorerie' ? treasuryRoutes : epicerieRoutes;
   const Shell = tenant.code === 'restaurant' ? RestaurantAppShell : AppShell;
 
   const ProtectedShell = () => {

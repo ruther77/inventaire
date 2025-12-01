@@ -68,6 +68,26 @@ export const fetchInventorySummary = async () => {
   return data;
 };
 
+export const fetchRestaurantConsumptions = async () => {
+  const { data } = await api.get('/restaurant/consumptions');
+  return data;
+};
+
+export const fetchRestaurantPriceHistoryComparison = async () => {
+  const { data } = await api.get('/restaurant/price-history/comparison');
+  return data;
+};
+
+export const fetchRestaurantPlatMappings = async () => {
+  const { data } = await api.get('/restaurant/plats/mappings');
+  return data;
+};
+
+export const syncRestaurantIngredients = async () => {
+  const { data } = await api.post('/restaurant/ingredients/sync');
+  return data;
+};
+
 export const checkoutCart = async (payload) => {
   const { data } = await api.post('/pos/checkout', payload);
   return data;

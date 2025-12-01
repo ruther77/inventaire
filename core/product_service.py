@@ -207,8 +207,8 @@ def update_catalog_entry(
         }  # Retourne le résumé des mises à jour
 
 
-def delete_product_by_barcode(raw_code: str | None) -> dict[str, Any]:
-    """Supprime un code-barres (ou le produit entier s'il est unique)."""  # Docstring de suppression par code-barres
+def delete_product_by_barcode(raw_code: str | None, *, tenant_id: int = 1) -> dict[str, Any]:
+    """Supprime un code-barres (ou le produit entier s'il est unique) pour un tenant donné."""  # Docstring de suppression par code-barres
 
     # Cette fonction est utile pour les menues opérations “nettoyage” parcourues par l’admin.
 
@@ -225,15 +225,15 @@ def delete_product_by_barcode(raw_code: str | None) -> dict[str, Any]:
                        (
                            SELECT COUNT(*)
                            FROM produits_barcodes
-                           WHERE produit_id = pb.produit_id
+                           WHERE produit_id = pb.produit_id AND tenant_id = :tenant_id
                        ) AS code_count
                 FROM produits_barcodes pb
-                JOIN produits p ON p.id = pb.produit_id
-                WHERE lower(pb.code) = lower(:code)
+                JOIN produits p ON p.id = pb.produit_id AND p.tenant_id = pb.tenant_id
+                WHERE lower(pb.code) = lower(:code) AND pb.tenant_id = :tenant_id
                 LIMIT 1
                 """
             ),
-            {"code": canonical},
+            {"code": canonical, "tenant_id": int(tenant_id)},
         ).fetchone()  # Cherche le produit associé au code
 
         if row is None:  # Aucun produit trouvé
@@ -249,9 +249,9 @@ def delete_product_by_barcode(raw_code: str | None) -> dict[str, Any]:
             conn.execute(
                 text(
                     "DELETE FROM produits_barcodes "
-                    "WHERE produit_id = :pid AND lower(code) = lower(:code)"
+                    "WHERE produit_id = :pid AND tenant_id = :tenant_id AND lower(code) = lower(:code)"
                 ),
-                {"pid": product_id, "code": canonical},
+                {"pid": product_id, "code": canonical, "tenant_id": int(tenant_id)},
             )  # Supprime uniquement ce code-barres
             return {
                 "action": "barcode_removed",
@@ -262,8 +262,8 @@ def delete_product_by_barcode(raw_code: str | None) -> dict[str, Any]:
             }  # Retourne le résumé de suppression de code-barres
 
         conn.execute(
-            text("DELETE FROM produits WHERE id = :pid"),
-            {"pid": product_id},
+            text("DELETE FROM produits WHERE id = :pid AND tenant_id = :tenant_id"),
+            {"pid": product_id, "tenant_id": int(tenant_id)},
         )  # Supprime le produit complet si un seul code existait
         return {
             "action": "product_deleted",

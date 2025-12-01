@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional
@@ -24,7 +26,18 @@ class Tenant:
 DEFAULT_TENANT = Tenant(id=1, code="epicerie", name="Épicerie HQ")
 
 
-ensure_tenants_table()
+logger = logging.getLogger(__name__)
+
+
+def bootstrap_tenants_if_enabled() -> None:
+    """Initialise la table des tenants seulement si l'environnement l'autorise."""
+
+    if os.getenv("SKIP_TENANT_INIT"):
+        return
+    try:
+        ensure_tenants_table()
+    except Exception as exc:  # pragma: no cover - mise en garde démarrage
+        logger.warning("Impossible d'initialiser la table tenants au démarrage: %s", exc)
 
 
 @lru_cache(maxsize=32)

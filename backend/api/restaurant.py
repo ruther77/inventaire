@@ -34,8 +34,12 @@ from backend.schemas.restaurant import (
     RestaurantPriceHistoryOverview,
     RestaurantDashboardOverview,
     RestaurantAlert,
+    RestaurantConsumptionEntry,
+    RestaurantPriceHistoryComparisonEntry,
+    RestaurantPlatEpicerieLink,
 )
 from backend.services import restaurant as restaurant_service
+from backend.services import supply as supply_service  # noqa: F401
 
 router = APIRouter(prefix="/restaurant", tags=["restaurant"])
 
@@ -168,6 +172,39 @@ def list_bank_statements(
 @router.get("/bank-accounts/overview", response_model=list[RestaurantBankAccountOverview])
 def list_bank_accounts_overview(tenant: Tenant = Depends(get_current_tenant)):
     return restaurant_service.list_bank_accounts_overview(tenant.id)
+
+
+@router.post("/transfer")
+def transfer_from_epicerie(
+    produit_restaurant_id: int = Body(..., embed=True),
+    quantite: float = Body(1.0, ge=0.0001, embed=True),
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Transfère du stock depuis l'épicerie vers le restaurant via la fonction SQL transfer_from_epicerie.
+    """
+    return restaurant_service.transfer_from_epicerie(tenant.id, produit_restaurant_id, quantite)
+
+
+@router.get("/consumptions", response_model=list[RestaurantConsumptionEntry])
+def list_consumptions(tenant: Tenant = Depends(get_current_tenant)):
+    return restaurant_service.list_sales_consumptions(tenant.id)
+
+
+@router.get("/price-history/comparison", response_model=list[RestaurantPriceHistoryComparisonEntry])
+def list_price_history_comparison(tenant: Tenant = Depends(get_current_tenant)):
+    return restaurant_service.list_combined_price_history(tenant.id)
+
+
+@router.get("/plats/mappings", response_model=list[RestaurantPlatEpicerieLink])
+def list_plats_with_epicerie(tenant: Tenant = Depends(get_current_tenant)):
+    return restaurant_service.list_plat_epicerie_links(tenant.id)
+
+
+@router.post("/ingredients/sync")
+def sync_ingredients(tenant: Tenant = Depends(get_current_tenant)):
+    count = restaurant_service.sync_ingredients_from_mappings(tenant.id)
+    return {"inserted": count}
 
 
 @router.get("/bank-statements/summary", response_model=RestaurantBankStatementSummary)

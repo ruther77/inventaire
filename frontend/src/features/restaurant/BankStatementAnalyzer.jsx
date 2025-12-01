@@ -347,7 +347,11 @@ const BankStatementAnalyzer = ({ defaultAccount = 'incontournable' }) => {
   const isAllWindow = summaryMonths === 'all';
   const summaryMonthsValue = isAllWindow ? 0 : Number(summaryMonths);
   const bankSummary = useRestaurantBankStatementSummary(selectedAccountQuery, summaryMonthsValue, groupingPreset);
-  const summaryData = bankSummary.data;
+  const bankSummaryAll = useRestaurantBankStatementSummary(undefined, summaryMonthsValue, groupingPreset);
+  // Fallback: if the selected account has no groups, fall back to aggregated (all accounts) to avoid empty graphs
+  const summaryDataRaw = bankSummary.data;
+  const summaryData =
+    summaryDataRaw?.groups?.length || !allowAllAccounts ? summaryDataRaw : bankSummaryAll.data;
   const groupingOptions = useMemo(() => {
     if (summaryData?.presets?.length) {
       return summaryData.presets;

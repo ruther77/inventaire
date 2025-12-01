@@ -1,23 +1,36 @@
+import os  # Variables d'environnement pour la configuration
+from functools import lru_cache  # Cache standard pour l'engine
+
 import pandas as pd  # Bibliothèque de manipulation de données tabulaires
-from sqlalchemy import create_engine, text, TextClause  # Création d'engine et requêtes SQL
-from sqlalchemy.sql.elements import ClauseElement  # Type des expressions SQLAlchemy
+from sqlalchemy import create_engine, text  # Création d'engine et requêtes SQL
+from sqlalchemy.sql.elements import ClauseElement, TextClause  # Types des expressions SQLAlchemy
 from sqlalchemy.engine import Engine  # Type du moteur SQLAlchemy
-import streamlit as st  # Cache Streamlit pour partager le moteur
 
 from .database_url import get_database_url  # Fonction pour récupérer l'URL de base de données
+from .settings import AppSettings
 
-DATABASE_URL = get_database_url()  # Construit l'URL de connexion depuis l'environnement
+SETTINGS = AppSettings.load()
+DATABASE_URL = SETTINGS.database_url or get_database_url()  # Construit l'URL de connexion depuis l'environnement
+POOL_SIZE = SETTINGS.db_pool_size
+POOL_MAX_OVERFLOW = SETTINGS.db_pool_max_overflow
 
 
-@st.cache_resource  # Met en cache la ressource côté Streamlit
+@lru_cache(maxsize=1)
 def get_engine() -> Engine:
-    """Retourne le moteur SQLAlchemy, mis en cache par Streamlit."""  # Docstring décrivant le cache moteur
-    return create_engine(
-        DATABASE_URL, 
-        pool_pre_ping=True, 
-        pool_size=10,        # Taille du pool de connexions (10 par défaut)
-        max_overflow=20      # Permet 20 connexions temporaires en cas de pic
-    )  # Crée et retourne l'engine configuré
+    """Retourne le moteur SQLAlchemy, mis en cache via functools (sans dépendance Streamlit)."""
+    # Certains dialectes (ex: sqlite memory) n'acceptent pas pool_size/max_overflow.
+    kwargs = {"pool_pre_ping": True}
+    if DATABASE_URL.startswith("sqlite"):
+        # SQLite en mémoire/file -> utiliser le pool par défaut adapté.
+        pass
+    else:
+        kwargs.update(
+            {
+                "pool_size": max(1, POOL_SIZE),
+                "max_overflow": max(0, POOL_MAX_OVERFLOW),
+            }
+        )
+    return create_engine(DATABASE_URL, **kwargs)
 
 
 def _normalize_statement(sql: str | ClauseElement) -> ClauseElement:
@@ -98,24 +111,24 @@ def exec_sql_return_id(sql: str | ClauseElement, params=None):
 # ... (Vos fonctions existantes : get_engine, query_df, exec_sql, exec_sql_return_id) ...
 
 
-def get_product_options() -> list[tuple[str, int]]:
-    """Retourne la liste des produits actifs (nom, id) triés par nom."""  # Docstring décrivant l'usage
+def get_product_options(*, tenant_id: int = 1) -> list[tuple[str, int]]:
+    """Retourne la liste des produits actifs (nom, id) triés par nom pour un tenant donné."""
     sql = text(
         """
         SELECT nom, id
         FROM produits
-        WHERE actif = TRUE
+        WHERE actif = TRUE AND tenant_id = :tenant_id
         ORDER BY nom
         """
-    )  # Requête pour récupérer les produits actifs triés
+    )
 
-    eng = get_engine()  # Récupère l'engine
-    with eng.connect() as conn:  # Ouvre une connexion en lecture seule
-        result = conn.execute(sql)  # Exécute la requête
-        return [(row.nom, row.id) for row in result]  # Retourne une liste de tuples (nom, id)
+    eng = get_engine()
+    with eng.connect() as conn:
+        result = conn.execute(sql, {"tenant_id": int(tenant_id)})
+        return [(row.nom, row.id) for row in result]
 
 
-def get_product_details(identifier: str | int) -> dict | None:
+def get_product_details(identifier: str | int, *, tenant_id: int = 1) -> dict | None:
     """
     Recherche les détails d'un produit par son ID ou un de ses codes-barres.
 
@@ -134,9 +147,10 @@ def get_product_details(identifier: str | int) -> dict | None:
     FROM 
         produits p
     LEFT JOIN 
-        produits_barcodes pb ON p.id = pb.produit_id
+        produits_barcodes pb ON p.id = pb.produit_id AND pb.tenant_id = p.tenant_id
     WHERE 
         p.actif = TRUE 
+        AND p.tenant_id = :tenant_id
         -- Recherche par ID du produit (si l'identifiant est numérique)
         AND (
             p.id = :identifier_int 
@@ -148,7 +162,7 @@ def get_product_details(identifier: str | int) -> dict | None:
     """  # Requête SQL paramétrée pour trouver un produit
     
     # 1. Préparation des paramètres
-    params = {}  # Dictionnaire des paramètres pour la requête
+    params = {"tenant_id": int(tenant_id)}  # Dictionnaire des paramètres pour la requête
     identifier_str = str(identifier).strip()  # Normalise l'identifiant en chaîne
     
     # Tente de convertir en entier pour la recherche par ID

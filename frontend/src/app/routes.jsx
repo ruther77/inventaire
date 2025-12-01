@@ -9,7 +9,6 @@ import {
   Download,
 } from 'lucide-react';
 
-import DashboardPage from '../features/dashboard/DashboardPage.jsx';
 import CatalogPage from '../features/catalog/CatalogPage.jsx';
 import ImportPage from '../features/invoices/ImportPage.jsx';
 import StockMovementsPage from '../features/stock/StockMovementsPage.jsx';
@@ -18,9 +17,13 @@ import RestaurantDashboard from '../features/restaurant/RestaurantDashboard.jsx'
 import RestaurantChargesPage from '../features/restaurant/RestaurantChargesPage.jsx';
 import RestaurantMenuPage from '../features/restaurant/RestaurantMenuPage.jsx';
 import RestaurantPriceTrends from '../features/restaurant/RestaurantPriceTrends.jsx';
+import RestaurantStockMovementsPage from '../features/restaurant/RestaurantStockMovementsPage.jsx';
+import RestaurantConsumptionPage from '../features/restaurant/RestaurantConsumptionPage.jsx';
+import RestaurantPriceHistoryComparisonPage from '../features/restaurant/RestaurantPriceHistoryComparisonPage.jsx';
 import BankStatementAnalyzer from '../features/restaurant/BankStatementAnalyzer.jsx';
 import ForecastsPage from '../features/restaurant/ForecastsPage.jsx';
 import PortfolioPage from '../features/portfolio/PortfolioPage.jsx';
+import DashboardPage from '../features/dashboard/DashboardPage.jsx';
 
 export const epicerieRoutes = [
   {
@@ -79,13 +82,6 @@ export const epicerieRoutes = [
     icon: Activity,
     element: <ForecastsPage context="epicerie" />,
   },
-  {
-    path: '/bank-statement',
-    label: 'Relevés bancaires',
-    description: 'Flux de trésorerie et charges épicerie',
-    icon: Download,
-    element: <BankStatementAnalyzer defaultAccount="noutam" />,
-  },
 ];
 
 export const restaurantRoutes = [
@@ -111,6 +107,27 @@ export const restaurantRoutes = [
     element: <RestaurantMenuPage />,
   },
   {
+    path: '/stock',
+    label: 'Mouvements',
+    description: 'Entrées / sorties / ajustements restaurant',
+    icon: Activity,
+    element: <RestaurantStockMovementsPage />,
+  },
+  {
+    path: '/consumptions',
+    label: 'Consommations',
+    description: 'Bouteilles sorties & coûts Epicerie',
+    icon: Boxes,
+    element: <RestaurantConsumptionPage />,
+  },
+  {
+    path: '/price-history',
+    label: 'Historique prix',
+    description: 'Tarifs plats vs coût Epicerie',
+    icon: TrendingUp,
+    element: <RestaurantPriceHistoryComparisonPage />,
+  },
+  {
     path: '/price-trends',
     label: 'Tendances prix',
     description: 'Historique des matières & plats',
@@ -124,11 +141,28 @@ export const restaurantRoutes = [
     icon: Activity,
     element: <ForecastsPage context="restaurant" />,
   },
+];
+
+export const treasuryRoutes = [
+  {
+    path: '/',
+    label: 'Trésorerie',
+    description: 'Flux de trésorerie consolidés',
+    icon: LayoutDashboard,
+    element: <DashboardPage />,
+  },
   {
     path: '/bank-statement',
     label: 'Relevés bancaires',
-    description: 'Analyse des dépenses et encaissements',
+    description: 'Encaissements/ décaissements Épicerie HQ',
     icon: Download,
-    element: <BankStatementAnalyzer defaultAccount="incontournable" />,
+    element: <BankStatementAnalyzer defaultAccount="BP-HQ-001" />,
+  },
+  {
+    path: '/portfolio',
+    label: 'Portefeuille',
+    description: 'Capital & cash',
+    icon: TrendingUp,
+    element: <PortfolioPage />,
   },
 ];

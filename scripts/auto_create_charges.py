@@ -31,7 +31,12 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _filter_statements(statements: Iterable[dict[str, object]], limit: int | None) -> list[dict[str, object]]:
-    pending = [stmt for stmt in statements if not stmt.get("depense_id")]
+    # Ne convertir en charges que les sorties (pas les encaissements)
+    pending = [
+        stmt
+        for stmt in statements
+        if not stmt.get("depense_id") and (stmt.get("type") or "").lower() == "sortie"
+    ]
     if limit is not None:
         pending = pending[:limit]
     return pending

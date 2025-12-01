@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 import base64
+import os
 from functools import lru_cache
 from typing import Iterable, List
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from core.data_repository import query_df
+from core.catalog_sql_repository import CatalogSqlRepository
 from core.inventory_service import process_sale_transaction
 from core.product_service import (
     InvalidBarcodeError,
     ProductNotFoundError,
     update_catalog_entry,
 )
-from backend.dependencies.tenant import Tenant, get_current_tenant
+from backend.dependencies.tenant import Tenant, bootstrap_tenants_if_enabled, get_current_tenant
 
 from backend.api import auth as auth_router
 from backend.api import catalog as catalog_router
@@ -33,8 +35,12 @@ from backend.api import reports as reports_router
 from backend.api import admin as admin_router
 from backend.api import restaurant as restaurant_router
 from backend.api import capital as capital_router
+from backend.api import analytics as analytics_router
 from backend.dependencies.auth import optional_api_key
 from backend.dependencies.security import enforce_default_rbac
+from backend.settings import Settings
+from core.user_service import bootstrap_users_if_enabled
+from core.products_loader import ensure_barcode_constraints
 
 
 class ProductPayload(BaseModel):
@@ -56,11 +62,11 @@ class POSCartLine(BaseModel):
     prix_vente: float | None = Field(default=None, ge=0)
     tva: float | None = Field(default=None, ge=0)
 
-    @validator("nom")
+    @field_validator("nom", mode="before")
     def _strip_name(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        cleaned = value.strip()
+        cleaned = str(value).strip()
         return cleaned or None
 
 
@@ -86,7 +92,7 @@ class ProductUpdateRequest(BaseModel):
     seuil_alerte: float | None = Field(default=None, ge=0)
     barcodes: List[str] | None = Field(default=None, description="Codes-barres associés")
 
-    @validator("barcodes")
+    @field_validator("barcodes", mode="before")
     def _clean_barcodes(cls, value: Iterable[str] | None) -> list[str] | None:
         if value is None:
             return None
@@ -98,26 +104,11 @@ class ProductUpdateRequest(BaseModel):
         return cleaned
 
 
-def _fetch_products(tenant_id: int) -> list[ProductPayload]:
+def _fetch_products_repo(tenant_id: int) -> list[ProductPayload]:
     """Retourne la projection minimale des produits pour le catalogue SPA."""
 
-    sql = """
-        SELECT
-            p.id,
-            p.nom,
-            p.categorie,
-            COALESCE(p.prix_vente, 0) AS prix_vente,
-            p.prix_achat,
-            p.stock_actuel,
-            p.tva
-        FROM produits p
-        WHERE tenant_id = :tenant_id
-        ORDER BY p.nom ASC
-    """
-    df = query_df(sql, params={"tenant_id": tenant_id})
-    if df.empty:
-        return []
-    return [ProductPayload(**record) for record in df.to_dict("records")]
+    repo = CatalogSqlRepository()
+    return [ProductPayload(**product.__dict__) for product in repo.list_active_products(tenant_id)]
 
 
 def _compute_inventory_value(tenant_id: int) -> dict[str, float]:
@@ -140,16 +131,39 @@ def _compute_inventory_value(tenant_id: int) -> dict[str, float]:
     }
 
 
+def _load_allowed_origins() -> list[str]:
+    raw_origins = os.getenv("CORS_ALLOWED_ORIGINS")
+    if not raw_origins:
+        # Vite/React dev server par défaut
+        return ["http://localhost:5173"]
+
+    parsed: list[str] = []
+    for entry in raw_origins.split(","):
+        cleaned = entry.strip()
+        if cleaned:
+            parsed.append(cleaned)
+    # Allow explicit wildcard only if set
+    return parsed or ["http://localhost:5173"]
+
+
 @lru_cache
 def create_app() -> FastAPI:
     """Construit l'application FastAPI ainsi que tous les routeurs de domaine."""
 
     app = FastAPI(title="Inventaire Epicerie API", version="1.0.0")
 
+    settings = Settings.load()
+
+    # Initialise la table tenants sans bloquer en prod si la DB est indisponible.
+    bootstrap_tenants_if_enabled()
+    bootstrap_users_if_enabled()
+    ensure_barcode_constraints()
+
+    allowed_origins = settings.cors_allowed_origins or _load_allowed_origins()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=allowed_origins,
+        allow_credentials="*" not in allowed_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -172,6 +186,7 @@ def create_app() -> FastAPI:
     epicerie_router.include_router(reports_router.router)
     epicerie_router.include_router(admin_router.router)
     epicerie_router.include_router(finance_router.router)
+    epicerie_router.include_router(analytics_router.router)
     app.include_router(epicerie_router)
 
     restaurant_domain_router = APIRouter(tags=['restaurant'], dependencies=_security_dependencies())
@@ -186,7 +201,7 @@ def create_app() -> FastAPI:
 
     @app.get("/products", response_model=list[ProductPayload], dependencies=_security_dependencies())
     def list_products(tenant: Tenant = Depends(get_current_tenant)) -> list[ProductPayload]:
-        return _fetch_products(tenant.id)
+        return _fetch_products_repo(tenant.id)
 
     @app.get("/inventory/summary", dependencies=_security_dependencies())
     def inventory_summary(tenant: Tenant = Depends(get_current_tenant)) -> dict[str, float]:

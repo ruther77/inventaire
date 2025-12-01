@@ -278,22 +278,25 @@ def record_processed_invoices(invoice_df: pd.DataFrame, *, supplier: str | None,
             updated_at = now()
         """
     )
+    params_batch: list[dict[str, object]] = []
     for group in groups:
         invoice_id = group["invoice_id"]
         default_path = _build_invoice_filename(tenant_id, invoice_id)
         file_path = str(default_path) if default_path.exists() else None
-        params = {
-            "tenant_id": int(tenant_id),
-            "invoice_id": invoice_id,
-            "supplier": supplier_label,
-            "facture_date": group.get("facture_date"),
-            "line_count": group.get("line_count", 0),
-            "file_path": file_path,
-        }
-        try:
-            exec_sql(sql, params=params)
-        except Exception as exc:  # pragma: no cover - base indisponible
-            LOGGER.warning("Impossible d'enregistrer la facture %s: %s", group["invoice_id"], exc)
+        params_batch.append(
+            {
+                "tenant_id": int(tenant_id),
+                "invoice_id": invoice_id,
+                "supplier": supplier_label,
+                "facture_date": group.get("facture_date"),
+                "line_count": group.get("line_count", 0),
+                "file_path": file_path,
+            }
+        )
+    try:
+        exec_sql(sql, params=params_batch)
+    except Exception as exc:  # pragma: no cover - base indisponible
+        LOGGER.warning("Impossible d'enregistrer les factures (batch): %s", exc)
 
 
 def find_processed_invoice_ids(invoice_ids: set[str], *, tenant_id: int) -> set[str]:

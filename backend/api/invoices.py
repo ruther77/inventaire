@@ -27,7 +27,7 @@ from core.invoice_extractor import extract_text_from_file
 from backend.dependencies.tenant import Tenant, get_current_tenant
 
 try:  # pragma: no cover
-    import multipart  # type: ignore  # noqa: F401
+    import python_multipart  # type: ignore  # noqa: F401
 
     MULTIPART_AVAILABLE = True
 except ImportError:  # pragma: no cover

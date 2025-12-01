@@ -13,6 +13,7 @@ export default function LoginPage() {
     password: '',
     tenant: preferredTenant.code,
   });
+  const [formError, setFormError] = useState(null);
 
   useEffect(() => {
     if (preferredTenant.code !== formState.tenant) {
@@ -29,6 +30,7 @@ export default function LoginPage() {
   const handleChange = (event) => {
     const { name, value } = event.target;
     if (error) clearError();
+    if (formError) setFormError(null);
     setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -36,6 +38,8 @@ export default function LoginPage() {
     const nextCode = event.target.value;
     const nextTenant = tenants.find((entry) => entry.code === nextCode);
     if (nextTenant) {
+      if (error) clearError();
+      if (formError) setFormError(null);
       setTenant(nextTenant);
       setFormState((prev) => ({ ...prev, tenant: nextCode }));
     }
@@ -44,17 +48,27 @@ export default function LoginPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (loading) return;
+    const trimmedUsername = formState.username.trim();
+    if (!trimmedUsername || !formState.password) {
+      setFormError('Identifiant et mot de passe sont obligatoires.');
+      return;
+    }
     try {
       await login({
-        username: formState.username.trim(),
+        username: trimmedUsername,
         password: formState.password,
         tenant: formState.tenant,
       });
       navigate('/', { replace: true });
     } catch (authError) {
       console.warn('Échec de connexion', authError);
+      if (!authError?.response) {
+        setFormError('Connexion au serveur impossible. Vérifiez votre réseau ou réessayez.');
+      }
     }
   };
+
+  const displayError = formError || error;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 py-12">
@@ -117,8 +131,8 @@ export default function LoginPage() {
               placeholder="Mot de passe"
             />
           </div>
-          {error && (
-            <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+          {displayError && (
+            <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{displayError}</p>
           )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Connexion…' : 'Se connecter'}

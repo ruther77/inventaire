@@ -7,6 +7,7 @@ const DEFAULT_TENANT = { id: 1, code: 'epicerie', label: 'Épicerie HQ' };
 export const tenants = [
   DEFAULT_TENANT,
   { id: 2, code: 'restaurant', label: 'Restaurant HQ' },
+  { id: 3, code: 'tresorerie', label: 'Trésorerie HQ' },
 ];
 
 const TenantContext = createContext({

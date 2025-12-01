@@ -16,7 +16,8 @@ def sqlite_engine(monkeypatch):
                 nom TEXT NOT NULL,
                 prix_vente REAL,
                 tva REAL,
-                actif BOOLEAN DEFAULT 1
+                actif BOOLEAN DEFAULT 1,
+                tenant_id INTEGER NOT NULL DEFAULT 1
             )
             """
         )
@@ -25,9 +26,11 @@ def sqlite_engine(monkeypatch):
             CREATE TABLE produits_barcodes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 produit_id INTEGER NOT NULL,
-                code TEXT NOT NULL UNIQUE,
+                code TEXT NOT NULL,
+                tenant_id INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (produit_id) REFERENCES produits(id) ON DELETE CASCADE
+                FOREIGN KEY (produit_id) REFERENCES produits(id) ON DELETE CASCADE,
+                UNIQUE(code, tenant_id)
             )
             """
         )

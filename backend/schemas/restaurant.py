@@ -216,6 +216,46 @@ class RestaurantBankStatementGroupSummary(BaseModel):
     net: float
 
 
+class RestaurantConsumptionEntry(BaseModel):
+    tenant_id: int
+    produit_restaurant_id: int
+    restaurant_plat: str | None = None
+    produit_epicerie_id: int | None = None
+    epicerie_nom: str
+    epicerie_categorie: str
+    prix_achat: float
+    prix_vente: float
+    stock_actuel: float
+    quantity_consumed: float
+    bottles_required: float
+    cost_spent: float
+    stock_after_sales: float
+    last_sale_at: Optional[datetime] = None
+
+
+class RestaurantPriceHistoryComparisonEntry(BaseModel):
+    plat_id: int
+    plat_nom: str
+    prix_vente_ttc: float
+    plat_changed_at: datetime
+    epicerie_id: int | None = None
+    epicerie_nom: str | None = None
+    prix_achat: float | None = None
+    epicerie_changed_at: Optional[datetime] = None
+
+
+class RestaurantPlatEpicerieLink(BaseModel):
+    plat_id: int
+    plat_nom: str
+    plat_categorie: str | None = None
+    produit_epicerie_id: int | None = None
+    epicerie_nom: str | None = None
+    epicerie_categorie: str | None = None
+    prix_achat: float | None = None
+    prix_vente: float | None = None
+    ratio: float | None = None
+
+
 class RestaurantBankStatementSummaryPreset(BaseModel):
     name: str
     label: str

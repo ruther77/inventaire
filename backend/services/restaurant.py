@@ -21,6 +21,7 @@ from core.data_repository import get_engine, query_df
 from core.inventory_forecast import forecast_daily_consumption
 from core.vendor_categories import load_vendor_category_rules
 from core import restaurant_costs
+from core.data_repository import exec_sql, exec_sql_return_id  # type: ignore
 
 
 def _safe_float(value: Any) -> float:
@@ -174,20 +175,63 @@ CATEGORY_RULES: tuple[tuple[tuple[str, ...], str, tuple[str, ...] | None], ...] 
     (("AGIRC", "ARRCO", "MALAKOFF", "KLESIA", "HUMANIS"), "Retraite / Prévoyance", ("Sortie",)),
     (("DGFIP", "IMPOTS", "TVA", "CFE", "CET"), "Fiscalité", ("Sortie",)),
     (("TOTALENERGIES", "TOTAL", "TOTAL ENERGIES", "TEF"), "Énergie", ("Sortie",)),
+    (("TOTALENERGIES CHARGING", "DIGITAL CHARGING", "CHARGING"), "Carburant / Déplacements", ("Sortie",)),
     (("EDF", "E.D.F."), "Énergie", ("Sortie",)),
     (("ENGIE", "GAZ DE FRANCE"), "Énergie", ("Sortie",)),
     (("GAZEL", "GAZELENERGIE"), "Énergie", ("Sortie",)),
     (("ENI", "ILEK", "PLANETE OUI", "MINT ENERGIE"), "Énergie", ("Sortie",)),
     (("EAU DE PARIS", "VEOLIA EAU", "SUEZ EAU", "SAUR"), "Eau", ("Sortie",)),
+    (("RESIDENCE", "LOYER", "LOCATION", "LOCAT", "ST AN"), "Loyer/Location", ("Sortie",)),
     (("FREE", "FREE PRO"), "Télécom", ("Sortie",)),
     (("SFR", "SFR BUSINESS"), "Télécom", ("Sortie",)),
     (("ORANGE", "ORANGE PRO"), "Télécom", ("Sortie",)),
     (("BOUYGUES", "BBOX", "BYTEL"), "Télécom", ("Sortie",)),
     (("CANAL", "CANALSAT"), "Abonnements TV", ("Sortie",)),
     (("NETFLIX", "SPOTIFY", "ABONNEMENT"), "Abonnements", ("Sortie",)),
-    (("SPB", "PACIFICA", "CREDIT AGRICOLE ASSURANCE", "AXA", "ALLIANZ", "MAIF", "MAAF", "MATMUT", "HISCOX"), "Assurance", ("Sortie",)),
-    (("HMD", "AUDIT", "EXPERT COMPTABLE", "CABINET COMPTABLE"), "Comptabilité", ("Sortie",)),
-    (("METRO", "PROMOCASH", "TRANS GOURMET", "TRANSGOURMET", "DAVIGEL", "SYSCO"), "Approvisionnement", ("Sortie",)),
+    (
+        (
+            "SPB",
+            "PACIFICA",
+            "CREDIT AGRICOLE ASSURANCE",
+            "AXA",
+            "ALLIANZ",
+            "MAIF",
+            "MAAF",
+            "MATMUT",
+            "HISCOX",
+            "ASSURANCE LCL",
+        ),
+        "Assurance",
+        ("Sortie",),
+    ),
+    (("HMD", "AUDIT", "EXPERT COMPTABLE", "CABINET COMPTABLE", "HMD AUDIT ET CONSEIL"), "Comptabilité", ("Sortie",)),
+    (
+        (
+            "METRO",
+            "PROMOCASH",
+            "TRANS GOURMET",
+            "TRANSGOURMET",
+            "DAVIGEL",
+            "SYSCO",
+            "BOUCH. BVS",
+            "BOUCH BVS",
+            "BOUCH",
+            "GNANAM",
+            "EXOTI",
+            "EUROCIEL",
+            "KEDY PACK",
+            "TAI YAT",
+            "RETRAIT",
+            "LINCONTOURNABLE",
+            "LEADER PRICE",
+            "LE VINCI",
+        ),
+        "Approvisionnement",
+        ("Sortie",),
+    ),
+    (("CENTRAKOR",), "Fournitures / Matériel", ("Sortie",)),
+    (("PREFILOC", "FINANCEMENT", "CREDIT"), "Financement / Crédit", ("Sortie",)),
+    (("AVEM", "LOCATION TPE", "TPE AVEM"), "Frais d'encaissement", ("Sortie",)),
     (("FRANCE BOISSONS", "C10", "COCA", "COCA COLA", "COCA-COLA", "HEINEKEN FRANCE", "LES GRANDS CHAIS", "CASTEL FRERES"), "Boissons", ("Sortie",)),
     (("RAJAPACK", "RAJA", "PAREDES", "PROD'HYGIENE", "PRO HYGIENE", "HYGIAL"), "Hygiène / Emballages", ("Sortie",)),
     (("NESPRESSO", "LAVAZZA", "MAHLKOENIG", "BUNN"), "Café / Matériel bar", ("Sortie",)),
@@ -203,8 +247,14 @@ CATEGORY_RULES: tuple[tuple[tuple[str, ...], str, tuple[str, ...] | None], ...] 
     (("VERISURE", "EPS"), "Sécurité", ("Sortie",)),
     (("ELIS", "INITIAL"), "Blanchisserie / Linge pro", ("Sortie",)),
     (("RATP", "SNCF", "IDF MOBILITES"), "Transports", ("Sortie",)),
-    (("TOTAL STATION", "ESSO", "SHELL", "AVIA"), "Carburant / Déplacements", ("Sortie",)),
-    (("SPB", "PACIFICA", "ASSUR", "ASSURANCE"), "Assurance", ("Sortie",)),
+    (("UBER", "UBER EATS", "UBER *"), "Transports", ("Sortie",)),
+    (("TOTAL STATION", "ESSO", "SHELL", "AVIA", "TOTALENERGIES", "TOTAL ENERGIES"), "Carburant / Déplacements", ("Sortie",)),
+    (("SPB", "PACIFICA", "ASSUR", "ASSURANCE", "ASSURANCE LCL"), "Assurance", ("Sortie",)),
+    (("PREFILOC", "FINANCEMENT", "CREDIT"), "Financement / Crédit", ("Sortie",)),
+    (("ABON LCL ACCESS", "COTISATION CARTE", "COTISATION MENSUELLE CARTE", "OPTION PRO", "COTISATION MENSUELLE"), "Frais bancaires", None),
+    (("COMMISSIONS SUR REMISE CB",), "Frais bancaires", None),
+    (("RESULTAT ARRETE COMPTE",), "Frais bancaires", None),
+    (("RESIDENCE", "LOYER", "ST AN", "LOCATION", "LOCAT"), "Loyer/Location", ("Sortie",)),
     (("GNANAM", "NOUTAM", "FOURNISSEUR"), "Fournisseur", ("Sortie",)),
     (("FRAIS", "AGIOS", "COMMISSION", "ABONNEMENT", "COTISATION CARTE"), "Frais bancaires", None),
     (("CHANTIER", "FACTURE"), "Autre", None),
@@ -979,7 +1029,16 @@ def list_bank_statements(tenant_id: int, account: str | None = None) -> List[dic
     if account:
         params["account"] = account
     df = query_df(sql, params)
-    return df.to_dict("records") if not df.empty else []
+    if df.empty:
+        return []
+
+    # Pydantic n'aime pas les NaN: on convertit toutes les valeurs NaN en None
+    # (incluant depense_id et toute colonne nullable) avant de sérialiser.
+    df = df.where(pd.notna(df), None)
+    # S'assurer que depense_id reste en object pour ne pas retransformer None en NaN
+    if "depense_id" in df.columns:
+        df["depense_id"] = df["depense_id"].astype(object).where(pd.notna(df["depense_id"]), None)
+    return df.to_dict("records")
 
 
 def list_bank_accounts_overview(tenant_id: int) -> List[dict[str, Any]]:
@@ -1216,6 +1275,20 @@ def create_expense_from_bank_statement(tenant_id: int, entry_id: int, payload: d
     updated_statement = list_bank_statements(tenant_id, account=statement.account)
     statement_dict = next((item for item in updated_statement if item["id"] == entry_id), None)
     return {"expense": expense, "statement": statement_dict}
+
+
+def transfer_from_epicerie(tenant_id: int, produit_restaurant_id: int, quantite: float = 1.0) -> Dict[str, Any]:
+    """Appelle la fonction SQL transfer_from_epicerie pour générer les mouvements croisés épicerie → restaurant."""
+
+    eng = get_engine()
+    with eng.begin() as conn:
+        rows = conn.execute(
+            text("SELECT * FROM transfer_from_epicerie(:pid, :qty)"),
+            {"pid": int(produit_restaurant_id), "qty": float(quantite)},
+        ).mappings().all()
+    if not rows:
+        raise RuntimeError("Aucun mouvement généré (mapping manquant ?)")
+    return {"movements": rows}
 
 
 def get_bank_statement_summary(
@@ -1814,3 +1887,168 @@ def _parse_sumup_block(block: list[str]) -> dict[str, Any] | None:
         "mois": op_month,
         "source": "sumup_pdf",
     }
+
+
+def list_sales_consumptions(tenant_id: int) -> list[Dict[str, Any]]:
+    """Retourne les consommations restaurant converties en quantités Épicerie."""
+
+    sql = text(
+        """
+        SELECT *
+        FROM restaurant_sales_consumptions
+        WHERE tenant_id = :tenant
+        ORDER BY epicerie_nom NULLS LAST, last_sale_at DESC NULLS LAST
+        """
+    )
+    df = query_df(sql, {"tenant": tenant_id})
+    if df.empty:
+        return []
+    return df.to_dict("records")
+
+
+def sync_ingredients_from_mappings(tenant_id: int = 2) -> int:
+    mapping_sql = """
+        SELECT
+            rp.id AS plat_id,
+            rp.nom AS plat_nom,
+            rp.categorie AS plat_categorie,
+            map.ratio,
+            p.id AS produit_epicerie_id,
+            p.nom AS epicerie_nom,
+            p.categorie AS epicerie_categorie,
+            COALESCE(p.prix_achat, 0) AS prix_achat
+        FROM restaurant_epicerie_sku_map map
+        JOIN restaurant_plats rp ON rp.id = map.produit_restaurant_id AND rp.tenant_id = map.tenant_restaurant
+        LEFT JOIN produits p ON p.id = map.produit_epicerie_id AND p.tenant_id = map.tenant_epicerie
+        WHERE map.tenant_restaurant = :tenant
+        ORDER BY rp.nom;
+    """
+
+    def guess_unit(category: str | None) -> str:
+        normalized = (category or '').lower()
+        if any(keyword in normalized for keyword in ('champagne', 'whisky', 'spiritueux', 'alcool', 'bouteille')):
+            return 'bouteille'
+        if any(keyword in normalized for keyword in ('bière', 'biere')):
+            return 'bouteille'
+        if any(keyword in normalized for keyword in ('softs', 'jus', 'boissons')):
+            return 'bouteille'
+        return 'unit'
+
+    mappings = query_df(text(mapping_sql), {"tenant": tenant_id}).to_dict("records")
+    inserted = 0
+    for mapping in mappings:
+        ingredient_name = mapping.get("epicerie_nom") or f"{mapping['plat_nom']} ingredient"
+        unit = guess_unit(mapping.get("epicerie_categorie"))
+        cost = float(mapping.get("prix_achat") or 0)
+        existing = query_df(
+            text(
+                """
+                SELECT id
+                FROM restaurant_ingredients
+                WHERE tenant_id = :tenant
+                  AND LOWER(nom) = LOWER(:name)
+                LIMIT 1;
+                """
+            ),
+            {"tenant": tenant_id, "name": ingredient_name},
+        )
+        if not existing.empty:
+            ingredient_id = int(existing.iloc[0]["id"])
+        else:
+            ingredient_id = exec_sql_return_id(
+                text(
+                    """
+                    INSERT INTO restaurant_ingredients (tenant_id, nom, unite_base, cout_unitaire, stock_actuel)
+                    VALUES (:tenant, :name, :unit, :cost, 0)
+                    RETURNING id;
+                    """
+                ),
+                {"tenant": tenant_id, "name": ingredient_name, "unit": unit, "cost": cost},
+            )
+
+        exec_sql(
+            text(
+                """
+                INSERT INTO restaurant_plat_ingredients (tenant_id, plat_id, ingredient_id, quantite, unite)
+                VALUES (:tenant, :plat_id, :ingredient_id, :quantite, :unit)
+                ON CONFLICT (plat_id, ingredient_id)
+                DO UPDATE SET quantite = EXCLUDED.quantite, unite = EXCLUDED.unite;
+                """
+            ),
+            {
+                "tenant": tenant_id,
+                "plat_id": mapping["plat_id"],
+                "ingredient_id": ingredient_id,
+                "quantite": float(mapping.get("ratio") or 1),
+                "unit": unit,
+            },
+        )
+        inserted += 1
+    return inserted
+
+
+def list_combined_price_history(tenant_id: int) -> list[Dict[str, Any]]:
+    """Retourne l'historique de prix restaurant avec les coûts Epicerie liés."""
+
+    sql = text(
+        """
+        SELECT
+            ph.plat_id,
+            rp.nom AS plat_nom,
+            ph.prix_vente_ttc,
+            ph.changed_at AS plat_changed_at,
+            p.id AS epicerie_id,
+            p.nom AS epicerie_nom,
+            eph.prix_achat,
+            eph.changed_at AS epicerie_changed_at
+        FROM restaurant_plat_price_history ph
+        JOIN restaurant_plats rp ON rp.id = ph.plat_id AND rp.tenant_id = :tenant
+        LEFT JOIN restaurant_epicerie_sku_map map
+            ON map.produit_restaurant_id = ph.plat_id
+            AND map.tenant_restaurant = rp.tenant_id
+        LEFT JOIN produits p ON p.id = map.produit_epicerie_id AND p.tenant_id = map.tenant_epicerie
+        LEFT JOIN LATERAL (
+            SELECT prix_achat, changed_at
+            FROM produits_price_history eph
+            WHERE eph.produit_id = p.id
+              AND eph.changed_at <= ph.changed_at
+            ORDER BY eph.changed_at DESC
+            LIMIT 1
+        ) eph ON TRUE
+        ORDER BY ph.changed_at DESC
+        """
+    )
+    df = query_df(sql, {"tenant": tenant_id})
+    if df.empty:
+        return []
+    return df.to_dict("records")
+
+
+def list_plat_epicerie_links(tenant_id: int) -> list[Dict[str, Any]]:
+    sql = text(
+        """
+        SELECT
+            rp.id AS plat_id,
+            rp.nom AS plat_nom,
+            rp.categorie AS plat_categorie,
+            map.produit_epicerie_id,
+            p.nom AS epicerie_nom,
+            p.categorie AS epicerie_categorie,
+            p.prix_achat,
+            p.prix_vente,
+            map.ratio
+        FROM restaurant_plats rp
+        LEFT JOIN restaurant_epicerie_sku_map map
+            ON map.produit_restaurant_id = rp.id
+            AND map.tenant_restaurant = rp.tenant_id
+        LEFT JOIN produits p
+            ON p.id = map.produit_epicerie_id
+            AND p.tenant_id = map.tenant_epicerie
+        WHERE rp.tenant_id = :tenant
+        ORDER BY rp.categorie NULLS LAST, rp.nom
+        """
+    )
+    df = query_df(sql, {"tenant": tenant_id})
+    if df.empty:
+        return []
+    return df.to_dict("records")

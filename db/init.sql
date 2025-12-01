@@ -653,6 +653,135 @@ CREATE TRIGGER restaurant_plat_price_history_trigger
 AFTER INSERT OR UPDATE ON restaurant_plats
 FOR EACH ROW EXECUTE FUNCTION trg_restaurant_plat_price_history();
 
+-- Centres de coûts (Epicerie HQ)
+INSERT INTO restaurant_cost_centers (tenant_id, nom)
+VALUES
+    (1, 'Approvisionnement/Achats'),
+    (1, 'Encaissement/Commissions'),
+    (1, 'Banque'),
+    (1, 'Assurance'),
+    (1, 'Énergie'),
+    (1, 'Abonnements/IT'),
+    (1, 'Paie/Charges sociales'),
+    (1, 'Fiscalité/URSSAF'),
+    (1, 'Loyer')
+ON CONFLICT (tenant_id, nom) DO NOTHING;
+
+-- Affectation automatique des centres de coûts (Epicerie HQ)
+-- Ne met à jour que les dépenses sans cost_center_id et avec categorie_id connue
+DO $$
+DECLARE
+    cc_id INT;
+BEGIN
+    -- Approvisionnement
+    SELECT id INTO cc_id FROM restaurant_cost_centers WHERE tenant_id = 1 AND nom = 'Approvisionnement/Achats';
+    IF cc_id IS NOT NULL THEN
+        UPDATE restaurant_depenses
+        SET cost_center_id = cc_id
+        WHERE tenant_id = 1 AND cost_center_id IS NULL
+          AND categorie_id IN (
+            SELECT id FROM restaurant_depense_categories
+            WHERE tenant_id = 1 AND nom IN ('Approvisionnement', 'Fournisseur', 'Boissons')
+          );
+    END IF;
+
+    -- Encaissement/Commissions
+    SELECT id INTO cc_id FROM restaurant_cost_centers WHERE tenant_id = 1 AND nom = 'Encaissement/Commissions';
+    IF cc_id IS NOT NULL THEN
+        UPDATE restaurant_depenses
+        SET cost_center_id = cc_id
+        WHERE tenant_id = 1 AND cost_center_id IS NULL
+          AND categorie_id IN (
+            SELECT id FROM restaurant_depense_categories
+            WHERE tenant_id = 1 AND nom IN ('Frais d''encaissement', 'Plateformes / Commissions')
+          );
+    END IF;
+
+    -- Banque
+    SELECT id INTO cc_id FROM restaurant_cost_centers WHERE tenant_id = 1 AND nom = 'Banque';
+    IF cc_id IS NOT NULL THEN
+        UPDATE restaurant_depenses
+        SET cost_center_id = cc_id
+        WHERE tenant_id = 1 AND cost_center_id IS NULL
+          AND categorie_id IN (
+            SELECT id FROM restaurant_depense_categories
+            WHERE tenant_id = 1 AND nom IN ('Frais bancaires')
+          );
+    END IF;
+
+    -- Assurance
+    SELECT id INTO cc_id FROM restaurant_cost_centers WHERE tenant_id = 1 AND nom = 'Assurance';
+    IF cc_id IS NOT NULL THEN
+        UPDATE restaurant_depenses
+        SET cost_center_id = cc_id
+        WHERE tenant_id = 1 AND cost_center_id IS NULL
+          AND categorie_id IN (
+            SELECT id FROM restaurant_depense_categories
+            WHERE tenant_id = 1 AND nom IN ('Assurance')
+          );
+    END IF;
+
+    -- Énergie
+    SELECT id INTO cc_id FROM restaurant_cost_centers WHERE tenant_id = 1 AND nom = 'Énergie';
+    IF cc_id IS NOT NULL THEN
+        UPDATE restaurant_depenses
+        SET cost_center_id = cc_id
+        WHERE tenant_id = 1 AND cost_center_id IS NULL
+          AND categorie_id IN (
+            SELECT id FROM restaurant_depense_categories
+            WHERE tenant_id = 1 AND nom IN ('Énergie', 'Gaz', 'Eau')
+          );
+    END IF;
+
+    -- Abonnements/IT
+    SELECT id INTO cc_id FROM restaurant_cost_centers WHERE tenant_id = 1 AND nom = 'Abonnements/IT';
+    IF cc_id IS NOT NULL THEN
+        UPDATE restaurant_depenses
+        SET cost_center_id = cc_id
+        WHERE tenant_id = 1 AND cost_center_id IS NULL
+          AND categorie_id IN (
+            SELECT id FROM restaurant_depense_categories
+            WHERE tenant_id = 1 AND nom IN ('Abonnements', 'Abonnements TV', 'Télécom', 'SaaS / Informatique')
+          );
+    END IF;
+
+    -- Paie/Charges sociales
+    SELECT id INTO cc_id FROM restaurant_cost_centers WHERE tenant_id = 1 AND nom = 'Paie/Charges sociales';
+    IF cc_id IS NOT NULL THEN
+        UPDATE restaurant_depenses
+        SET cost_center_id = cc_id
+        WHERE tenant_id = 1 AND cost_center_id IS NULL
+          AND categorie_id IN (
+            SELECT id FROM restaurant_depense_categories
+            WHERE tenant_id = 1 AND nom IN ('Salaires', 'Charges sociales', 'Retraite / Prévoyance')
+          );
+    END IF;
+
+    -- Fiscalité/URSSAF
+    SELECT id INTO cc_id FROM restaurant_cost_centers WHERE tenant_id = 1 AND nom = 'Fiscalité/URSSAF';
+    IF cc_id IS NOT NULL THEN
+        UPDATE restaurant_depenses
+        SET cost_center_id = cc_id
+        WHERE tenant_id = 1 AND cost_center_id IS NULL
+          AND categorie_id IN (
+            SELECT id FROM restaurant_depense_categories
+            WHERE tenant_id = 1 AND nom IN ('Fiscalité', 'Impôts et taxes')
+          );
+    END IF;
+
+    -- Loyer
+    SELECT id INTO cc_id FROM restaurant_cost_centers WHERE tenant_id = 1 AND nom = 'Loyer';
+    IF cc_id IS NOT NULL THEN
+        UPDATE restaurant_depenses
+        SET cost_center_id = cc_id
+        WHERE tenant_id = 1 AND cost_center_id IS NULL
+          AND categorie_id IN (
+            SELECT id FROM restaurant_depense_categories
+            WHERE tenant_id = 1 AND nom IN ('Loyer/Location')
+          );
+    END IF;
+END$$;
+
 -- Top ventes 30 jours (maintenu)
 CREATE OR REPLACE VIEW v_top_ventes_30j AS
 SELECT p.id, p.nom,

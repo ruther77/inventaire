@@ -50,7 +50,17 @@ def main() -> None:
             restaurant_service.update_bank_statement(
                 args.tenant,
                 stmt["id"],
-                {"categorie": new_category},
+                {
+                    # On repasse tous les champs requis pour éviter les valeurs manquantes
+                    "account": stmt.get("account"),
+                    "date": stmt.get("date"),
+                    "libelle": stmt.get("libelle"),
+                    "categorie": new_category,
+                    "montant": stmt.get("montant"),
+                    "type": stmt.get("type"),
+                    "mois": stmt.get("mois"),
+                    "depense_id": stmt.get("depense_id"),
+                },
             )
 
     print(f"{updates} relevé(s) recatégorisé(s).")

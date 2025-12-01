@@ -13,6 +13,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useRestaurantForecastOverview } from '../../hooks/useRestaurant.js';
+import { useSupplyPlan } from '../../hooks/useSupplyPlan.js';
 
 const HORIZON_OPTIONS = [
   { value: 7, label: '7 jours' },
@@ -49,7 +50,10 @@ export default function ForecastsPage({ context = 'restaurant' }) {
   const [granularity, setGranularity] = useState('weekly');
   const [top, setTop] = useState(8);
   const forecastQuery = useRestaurantForecastOverview({ horizonDays: horizon, granularity, top });
+  const supplyQuery = useSupplyPlan({ targetCoverage: horizon, alertThreshold: Math.min(7, horizon) });
   const data = forecastQuery.data;
+  const supplyData = supplyQuery.data;
+  const suggestions = supplyData?.items?.slice(0, 5) ?? [];
 
   const timelineData = useMemo(() => {
     if (!data?.timeline?.length) return [];
@@ -207,7 +211,7 @@ export default function ForecastsPage({ context = 'restaurant' }) {
                   <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
                     <th className="px-3 py-2">Produit</th>
                     <th className="px-3 py-2">Prévision/j</th>
-                    <th className="px-3 py-2">Couverture</th>
+                    <th className="px-3 py-2">Couverture / rupture</th>
                     <th className="px-3 py-2">Risque</th>
                   </tr>
                 </thead>
@@ -224,11 +228,18 @@ export default function ForecastsPage({ context = 'restaurant' }) {
                         {numberFormatter.format(product.forecast_daily)} u.
                         <div className="text-xs text-slate-500">{currencyFormatter.format(product.forecast_value)}</div>
                       </td>
-                      <td className="px-3 py-2">
-                        {product.stock_cover_days !== null && product.stock_cover_days !== undefined
-                          ? `${numberFormatter.format(product.stock_cover_days)} j`
-                          : '∞'}
-                      </td>
+                    <td className="px-3 py-2">
+                      {product.stock_cover_days !== null && product.stock_cover_days !== undefined
+                        ? `${numberFormatter.format(product.stock_cover_days)} j`
+                        : '∞'}
+                      {product.stock_cover_days !== null &&
+                        product.stock_cover_days !== undefined &&
+                        Number.isFinite(product.stock_cover_days) && (
+                          <div className="text-xs text-slate-500">
+                            Rupture dans ~{Math.max(0, Math.round(product.stock_cover_days))} j
+                          </div>
+                        )}
+                    </td>
                       <td className="px-3 py-2">
                         <span className={`text-sm font-semibold ${RISK_COLORS[product.risk_level] || 'text-slate-500'}`}>
                           {product.risk_level.toUpperCase()}
@@ -272,6 +283,65 @@ export default function ForecastsPage({ context = 'restaurant' }) {
           )}
         </Card>
       </div>
+
+      <Card className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Réassort</p>
+            <h3 className="text-lg font-semibold text-slate-900">Suggestions automatiques</h3>
+            <p className="text-sm text-slate-500">
+              Basé sur la couverture cible et les prévisions de consommation.
+            </p>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => supplyQuery.refetch()} disabled={supplyQuery.isFetching}>
+            {supplyQuery.isFetching ? 'Actualisation…' : 'Rafraîchir'}
+          </Button>
+        </div>
+        {supplyQuery.isLoading ? (
+          <p className="text-sm text-slate-500">Calcul du plan d&apos;approvisionnement…</p>
+        ) : suggestions.length ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100 text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
+                  <th className="px-3 py-2">Produit</th>
+                  <th className="px-3 py-2">Couverture</th>
+                  <th className="px-3 py-2">Quantité à commander</th>
+                  <th className="px-3 py-2">Valeur</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {suggestions.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-3 py-2">
+                      <p className="font-semibold text-slate-900">{item.nom}</p>
+                      <p className="text-xs text-slate-500">
+                        {item.categorie || '—'} {item.fournisseur ? `· ${item.fournisseur}` : ''}
+                      </p>
+                    </td>
+                    <td className="px-3 py-2">
+                      {item.couverture_jours !== null && item.couverture_jours !== undefined
+                        ? `${numberFormatter.format(item.couverture_jours)} j`
+                        : '∞'}
+                      {item.ecart_couverture !== null && item.ecart_couverture !== undefined && (
+                        <div className="text-xs text-slate-500">
+                          Manque {numberFormatter.format(Math.max(0, Math.abs(item.ecart_couverture || 0)))} j
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 font-semibold text-slate-900">{item.quantite_a_commander} u</td>
+                    <td className="px-3 py-2">{currencyFormatter.format(item.valeur_commande || 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">
+            {supplyQuery.isError ? 'Impossible de récupérer les suggestions.' : 'Aucune recommandation pour ce paramétrage.'}
+          </p>
+        )}
+      </Card>
     </div>
   );
 }
