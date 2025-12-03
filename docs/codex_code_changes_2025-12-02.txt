@@ -1,0 +1,54 @@
+# Code changes (git diff --stat) for 2025-12-02
+
+ backend/api/invoices.py                            |   10 +-
+ backend/api/prices.py                              |    4 +-
+ backend/main.py                                    |   27 +-
+ backend/services/invoices.py                       |    4 +-
+ core/invoice_extractor.py                          |  287 ++--
+ core/price_history_service.py                      |    2 -
+ frontend/src/api/client.js                         |    6 +-
+ frontend/src/features/catalog/CatalogPage.jsx      |   53 +-
+ frontend/src/features/dashboard/DashboardPage.jsx  |   88 +-
+ frontend/src/features/invoices/ImportPage.jsx      |  341 +++--
+ frontend/src/features/prices/PricesPage.jsx        |  614 +-------
+ .../features/restaurant/BankStatementAnalyzer.jsx  | 1543 +-------------------
+ .../src/features/restaurant/RestaurantMenuPage.jsx |  168 ++-
+ frontend/src/features/supply/SupplyPage.jsx        |   33 +-
+ frontend/src/hooks/useInvoiceImport.js             |    6 +-
+ frontend/vite.config.js                            |   10 +
+ tests/test_invoice_extractor.py                    |   31 +
+ 17 files changed, 753 insertions(+), 2474 deletions(-)
+
+# Untracked/modified files
+ M backend/api/invoices.py
+ M backend/api/prices.py
+ M backend/main.py
+ M backend/services/invoices.py
+ M core/invoice_extractor.py
+ M core/price_history_service.py
+ M frontend/src/api/client.js
+ M frontend/src/features/catalog/CatalogPage.jsx
+ M frontend/src/features/dashboard/DashboardPage.jsx
+ M frontend/src/features/invoices/ImportPage.jsx
+ M frontend/src/features/prices/PricesPage.jsx
+ M frontend/src/features/restaurant/BankStatementAnalyzer.jsx
+ M frontend/src/features/restaurant/RestaurantMenuPage.jsx
+ M frontend/src/features/supply/SupplyPage.jsx
+ M frontend/src/hooks/useInvoiceImport.js
+ M frontend/vite.config.js
+ M tests/test_invoice_extractor.py
+?? EUROCIEL/
+?? backups/
+?? data/processed_invoices/
+?? docs/codex_assistant_messages_2025-12-02.txt
+?? docs/codex_code_changes_2025-12-02.txt
+?? docs/codex_shell_calls_2025-12-02.txt
+?? docs/codex_shell_commands_2025-12-02.txt
+?? docs/codex_toolcalls_2025-12-02.txt
+?? docs/docker-events-today.txt
+?? docs/epicerie_backup_20251202_154053.sql
+?? docs/epicerie_backup_20251202_154053.sql.gz
+?? docs/invoices/eurociel.md
+?? "docs/screenshots/Capture d\342\200\231\303\251cran du 2025-12-01 18-21-31.png"
+?? frontend/src/features/invoices/components/
+?? scripts/eurociel_catalogue_to_csv.py

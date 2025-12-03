@@ -1,0 +1,17 @@
+frontend/vite.config.js
+frontend/src/features/supply/SupplyPage.jsx
+frontend/src/features/restaurant/RestaurantMenuPage.jsx
+frontend/src/features/restaurant/BankStatementAnalyzer.jsx
+frontend/src/features/prices/PricesPage.jsx
+frontend/src/features/dashboard/DashboardPage.jsx
+frontend/src/features/stock/StockMovementsPage.jsx
+frontend/src/features/catalog/CatalogPage.jsx
+frontend/src/main.jsx
+frontend/src/api/client.js
+frontend/dist/index.html
+frontend/dist/assets/index-BjSiI--c.js
+frontend/dist/assets/index-C5O8c7KE.css
+frontend/package.json
+core/invoice_extractor.py
+tests/test_invoice_extractor.py
+scripts/eurociel_catalogue_to_csv.py

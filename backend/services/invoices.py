@@ -15,6 +15,7 @@ from core.data_repository import exec_sql, query_df
 from core.inventory_service import match_invoice_products, register_invoice_reception
 from core.pdf_utils import split_pdf_into_invoices
 from core.price_history_service import record_price_history
+from sqlalchemy import text as sa_text
 
 
 def _normalize_invoice_datetime(value: datetime | date | None) -> datetime | None:
@@ -76,6 +77,79 @@ def enrich_lines_with_catalog(
             df["produit_id"] = df["catalogue_id"]
         else:
             df["produit_id"] = df["produit_id"].fillna(df["catalogue_id"])
+
+    # Rattrapage par nom (utile pour les factures Eurociel sans code-barres ou avec codes TVA type C2/C07)
+    # On associe sur lower(nom) et on récupère le code principal du produit.
+    # Cela permet de peupler codes / produit_id même quand "codes" est vide ou contient un code TVA.
+    if not df.empty:
+        names = sorted({str(n).strip().lower() for n in df.get("nom", []) if str(n).strip()})
+        if names:
+            placeholders = ", ".join(f":n{i}" for i in range(len(names)))
+            params = {f"n{i}": name for i, name in enumerate(names)}
+            params["tenant_id"] = int(tenant_id)
+            sql = f"""
+                SELECT
+                    lower(p.nom) AS nom_lower,
+                    p.id AS produit_id,
+                    p.nom AS produit_nom,
+                    p.categorie,
+                    COALESCE(p.prix_achat, 0) AS prix_achat_catalogue,
+                    COALESCE(p.prix_vente, 0) AS prix_vente_catalogue,
+                    COALESCE(p.tva, 0) AS tva_catalogue,
+                    pb.code AS barcode
+                FROM produits p
+                LEFT JOIN LATERAL (
+                    SELECT code
+                    FROM produits_barcodes
+                    WHERE produit_id = p.id
+                    ORDER BY is_principal DESC, id
+                    LIMIT 1
+                ) pb ON TRUE
+                WHERE lower(p.nom) IN ({placeholders})
+                  AND p.tenant_id = :tenant_id
+            """
+            try:
+                name_matches = query_df(sql, params=params)
+            except Exception:
+                name_matches = pd.DataFrame()
+
+            if not name_matches.empty:
+                name_matches = name_matches.rename(
+                    columns={
+                        "nom_lower": "_nom_lower",
+                        "produit_id": "name_catalogue_id",
+                        "produit_nom": "name_catalogue_nom",
+                        "categorie": "name_catalogue_categorie",
+                        "prix_achat_catalogue": "name_prix_achat_catalogue",
+                        "prix_vente_catalogue": "name_prix_vente_catalogue",
+                        "tva_catalogue": "name_tva_catalogue",
+                        "barcode": "name_barcode",
+                    }
+                )
+                df["_nom_lower"] = df["nom"].astype(str).str.lower().str.strip()
+                df = df.merge(name_matches, on="_nom_lower", how="left")
+                # Remplit les champs catalogue/produit manquants avec le match par nom
+                for target, src in [
+                    ("catalogue_id", "name_catalogue_id"),
+                    ("catalogue_nom", "name_catalogue_nom"),
+                    ("catalogue_categorie", "name_catalogue_categorie"),
+                ]:
+                    if target not in df.columns:
+                        df[target] = df[src]
+                    else:
+                        df[target] = df[target].fillna(df[src])
+                if "produit_id" not in df.columns:
+                    df["produit_id"] = df["name_catalogue_id"]
+                else:
+                    df["produit_id"] = df["produit_id"].fillna(df["name_catalogue_id"])
+                if "codes" in df.columns:
+                    # Évite l'erreur pandas "dict-value and non-None to_replace" en utilisant fillna/mask.
+                    df["codes"] = df["codes"].replace("", pd.NA)
+                    df["codes"] = df["codes"].fillna(df["name_barcode"])
+                # Nettoyage colonnes temporaires
+                df.drop(columns=["_nom_lower"], inplace=True, errors="ignore")
+                tmp_cols = [c for c in df.columns if c.startswith("name_")]
+                df.drop(columns=tmp_cols, inplace=True, errors="ignore")
     df.drop(columns=["_code_lower"], inplace=True, errors="ignore")
     for column in ("catalogue_id", "catalogue_nom", "catalogue_categorie"):
         if column not in df.columns:

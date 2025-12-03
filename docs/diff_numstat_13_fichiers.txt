@@ -1,0 +1,13 @@
+25	0	.gitignore
+3	1	backend/api/prices.py
+198	89	core/invoice_extractor.py
+0	2	core/price_history_service.py
+5	1	frontend/src/api/client.js
+47	6	frontend/src/features/catalog/CatalogPage.jsx
+74	14	frontend/src/features/dashboard/DashboardPage.jsx
+11	603	frontend/src/features/prices/PricesPage.jsx
+16	1527	frontend/src/features/restaurant/BankStatementAnalyzer.jsx
+105	63	frontend/src/features/restaurant/RestaurantMenuPage.jsx
+32	1	frontend/src/features/supply/SupplyPage.jsx
+10	0	frontend/vite.config.js
+31	0	tests/test_invoice_extractor.py

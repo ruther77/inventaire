@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
-import Input from '../../components/ui/Input.jsx';
 import Select from '../../components/ui/Select.jsx';
 import {
   useRestaurantIngredients,
@@ -85,6 +84,9 @@ export default function RestaurantMenuPage() {
   const ingredientList = ingredients.data ?? [];
   const filteredIngredients = ingredientList.filter((ing) =>
     ing.nom.toLowerCase().includes(ingredientFilter.toLowerCase()),
+  );
+  const visibleCategories = sortedCategories.filter((category) =>
+    filteredPlats.some((plat) => (plat.categorie || 'Divers') === category),
   );
 
   const formatDate = (value) => {
@@ -182,8 +184,6 @@ export default function RestaurantMenuPage() {
 
   const mappings = useRestaurantPlatMappings();
   const platLinks = mappings.data ?? [];
-  const syncIngredients = useSyncRestaurantIngredients();
-
   return (
     <div className="flex flex-col gap-6">
       <Card className="flex flex-col gap-4">
@@ -559,13 +559,13 @@ export default function RestaurantMenuPage() {
                       <td className="px-3 py-2 text-right">{link.prix_achat != null ? Number(link.prix_achat).toFixed(2) : '—'} €</td>
                     </tr>
                   ))}
-          {mappings.isLoading && (
-            <tr>
-              <td colSpan={4} className="px-3 py-2 text-sm text-slate-500">
-                Chargement des prix Épicerie…
-              </td>
-            </tr>
-          )}
+                  {mappings.isLoading && (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-2 text-sm text-slate-500">
+                        Chargement des prix Épicerie…
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -578,69 +578,75 @@ export default function RestaurantMenuPage() {
               Aucun plat ne correspond aux filtres. Supprime la recherche ou change de catégorie.
             </div>
           ) : (
-            visibleCategories.map((category) => (
-              <div key={category} className="space-y-3 rounded-2xl border border-slate-200 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Catégorie</p>
-                    <h3 className="text-lg font-semibold text-slate-900">{category}</h3>
-                </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  {platsByCategory[category].length} plat(s)
-                </span>
-              </div>
-              <div className="grid gap-3 lg:grid-cols-2">
-                {filteredPlats
+            <>
+              {visibleCategories.map((category) => {
+                const platsInCategory = filteredPlats
                   .filter((plat) => (plat.categorie || 'Divers') === category)
-                  .sort((a, b) => a.nom.localeCompare(b.nom))
-                  .map((plat) => (
-                    <div key={plat.id} className="rounded-2xl border border-slate-100 p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-lg font-semibold text-slate-900">{plat.nom}</p>
-                          <p className="text-xs text-slate-500">
-                            Marge {plat.marge_pct?.toFixed(1) ?? 'N/C'} % · Coût {plat.cout_matiere?.toFixed(2) ?? '0'} €
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-semibold text-slate-900">{plat.prix_vente_ttc.toFixed(2)} €</p>
-                          <div className="mt-1 flex gap-2 text-xs text-brand-700">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setPlatUpdate({ platId: plat.id, price: plat.prix_vente_ttc })}
-                            >
-                              MAJ prix
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => setHistoryPlatId(plat.id)}>
-                              Historique
-                            </Button>
-                          </div>
-                        </div>
+                  .sort((a, b) => a.nom.localeCompare(b.nom));
+
+                return (
+                  <div key={category} className="space-y-3 rounded-2xl border border-slate-200 p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Catégorie</p>
+                        <h3 className="text-lg font-semibold text-slate-900">{category}</h3>
                       </div>
-                      <table className="mt-3 w-full divide-y divide-slate-100 text-sm">
-                        <thead>
-                          <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
-                            <th className="py-1">Ingrédient</th>
-                            <th className="py-1">Quantité</th>
-                            <th className="py-1">Unité</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(plat.ingredients ?? []).map((item) => (
-                            <tr key={item.id}>
-                              <td className="py-1 text-slate-900">{item.nom}</td>
-                              <td className="py-1 text-slate-600">{Number(item.quantite).toFixed(3)}</td>
-                              <td className="py-1 text-slate-600">{item.unite || '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                        {platsByCategory[category].length} plat(s)
+                      </span>
                     </div>
-                  ))}
-              </div>
-            </div>
-          ))}
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      {platsInCategory.map((plat) => (
+                        <div key={plat.id} className="rounded-2xl border border-slate-100 p-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-lg font-semibold text-slate-900">{plat.nom}</p>
+                              <p className="text-xs text-slate-500">
+                                Marge {plat.marge_pct?.toFixed(1) ?? 'N/C'} % · Coût {plat.cout_matiere?.toFixed(2) ?? '0'} €
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-slate-900">{plat.prix_vente_ttc.toFixed(2)} €</p>
+                              <div className="mt-1 flex gap-2 text-xs text-brand-700">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setPlatUpdate({ platId: plat.id, price: plat.prix_vente_ttc })}
+                                >
+                                  MAJ prix
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => setHistoryPlatId(plat.id)}>
+                                  Historique
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                          <table className="mt-3 w-full divide-y divide-slate-100 text-sm">
+                            <thead>
+                              <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
+                                <th className="py-1">Ingrédient</th>
+                                <th className="py-1">Quantité</th>
+                                <th className="py-1">Unité</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(plat.ingredients ?? []).map((item) => (
+                                <tr key={item.id}>
+                                  <td className="py-1 text-slate-900">{item.nom}</td>
+                                  <td className="py-1 text-slate-600">{Number(item.quantite).toFixed(3)}</td>
+                                  <td className="py-1 text-slate-600">{item.unite || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
       </Card>
 

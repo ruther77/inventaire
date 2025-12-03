@@ -1,0 +1,14 @@
+ .gitignore                                         |   25 +
+ backend/api/prices.py                              |    4 +-
+ core/invoice_extractor.py                          |  287 ++--
+ core/price_history_service.py                      |    2 -
+ frontend/src/api/client.js                         |    6 +-
+ frontend/src/features/catalog/CatalogPage.jsx      |   53 +-
+ frontend/src/features/dashboard/DashboardPage.jsx  |   88 +-
+ frontend/src/features/prices/PricesPage.jsx        |  614 +-------
+ .../features/restaurant/BankStatementAnalyzer.jsx  | 1543 +-------------------
+ .../src/features/restaurant/RestaurantMenuPage.jsx |  168 ++-
+ frontend/src/features/supply/SupplyPage.jsx        |   33 +-
+ frontend/vite.config.js                            |   10 +
+ tests/test_invoice_extractor.py                    |   31 +
+ 13 files changed, 557 insertions(+), 2307 deletions(-)

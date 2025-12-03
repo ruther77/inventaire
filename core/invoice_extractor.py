@@ -262,6 +262,9 @@ def _normalize_barcode(value: str | None) -> str:
     if 8 <= len(digits) <= 15:  # Longueur acceptable
         return digits  # Retourne la version digits-only
     compact = re.sub(r"\s+", "", str(value)).upper()  # Compacte et uppercase
+    # Évite de renvoyer des codes TVA courts (ex: C2/C07) en guise d'EAN
+    if len(compact) <= 3 and not compact.isdigit():
+        return ""
     return compact  # Retourne la version compacte
 
 
