@@ -1,0 +1,57 @@
+# /frontend – cartographie des pages, hooks et flux métier
+
+Ce document décrit la structure de la SPA React (Vite) : comment les tenants sont gérés, les routes exposées, les appels API et les fonctionnalités métiers principales par page. Il identifie aussi les flux critiques (catalogue → API / factures → import / restaurant → relevés) et les composants centraux.
+
+## 1. Entrée & contexte
+- `src/main.jsx` : point d’entrée. Enveloppe l’application avec `QueryClientProvider` (cache TanStack Query), `AuthProvider` (session JWT) puis `TenantProvider` (projection du tenant courant) et enfin `BrowserRouter`.
+- `src/App.jsx` : choisit dynamiquement le shell et les routes en fonction du tenant (`code === 'restaurant'` bascule sur les routes Restaurant). La navigation est organisée via `<Routes>`/`<Route>` et un fallback `Navigate` vers la page principale.
+
+## 2. Contexte Tenant
+- `src/context/TenantContext.jsx` : mémorise dans `localStorage` le tenant préféré **tant que l’utilisateur n’est pas authentifié**, puis se verrouille sur les claims (`tenant_id`, `tenant_code`, `tenant_name`) remontés par le token JWT une fois connecté. Le hook `useTenant()` expose à la fois le tenant actif, la préférence (pour préremplir la page de login) et l’état `isTenantLocked` pour l’UI.
+
+## 3. Client HTTP
+- `src/api/client.js` : singleton Axios (`baseURL` configurable) avec en-têtes `Content-Type: application/json` et `Authorization: Bearer <token>`. `setAccessToken` / `clearAccessToken` sont pilotés par l’`AuthProvider`, et un interceptor 401 déclenche automatiquement la déconnexion.
+- Organise les requêtes par groupes :
+  * **Catalogue / inventory** (`fetchProducts`, `fetchInventorySummary`, `checkoutCart`, CRUD produits) : ciblent `/products`, `/inventory/summary`, `/pos/checkout`, `/catalog`.
+  * **Plan d’approvisionnement & audit** (`fetchSupplyPlan`, `fetchAudit*`, `createAuditAssignment`, `updateAuditActionStatus`): compilent les query params et consomment `/supply/plan`, `/audit/*`.
+  * **Factures** (`extractInvoiceFromText`, `extractInvoiceFromFile`, `importInvoiceLines`, `importInvoiceToCatalog`) : encapsulent les payloads texte/fichier pour extraire, enrichir, importer factures → stock/catalogue.
+  * **Tarifs & restaurant** : `fetchPriceHistory`, `updateRestaurantIngredientPrice`, `fetchRestaurantPlatPriceHistory`, `/restaurant/*` pour charges, menus, relevés bancaires.
+  * **Reporting/admin/maintenance** : `fetchDashboardMetrics`, `fetchReportsOverview`, `fetchAdminOverview`, backups (`createBackupRequest`, `restoreBackupRequest`, `fetchIntegrityReport`, `fetchBackupSettings`, `saveBackupSettingsRequest`), gestion utilisateurs (`fetchAdminUsers`, `updateAdminUserRole`, `resetAdminUserPassword`).
+  * **Surcharge PoS** : `checkoutCart`.
+- Chaque helper assemble ses URL, formate les query params (notamment pour les listes `categories`, `levels`), ce qui centralise la logique de communication entre la SPA et l’API FastAPI.
+
+## 4. Shell & navigation
+- `src/app/routes.jsx` : définit les routes des deux tenants :
+  * **Épicerie** : Dashboard, Catalogue, Approvisionnement, Audit, Stock, PoS, Réceptions, Scanner, Suivi prix, Rapports, Outils legacy, Admin, Maintenance.
+  * **Restaurant** : Pilotage, Charges, Menu, Tendances prix, Relevés bancaires.
+- `Portefeuille` : nouvelle route `/portfolio` (épicerie & restaurant) qui consomme `/capital/overview` pour afficher le capital global, la trésorerie par business et les derniers prix historiques. Cette page propose des filtres (tenant/global), un graphique à barres des prix et un drill-down sur chaque ligne.
+- `AppShell.jsx` et `RestaurantAppShell.jsx` orchestrent layout commun (sidebar, topbar). `SidebarNav.jsx` et `TopBar.jsx` affichent la navigation, le switcher tenant et les KPI globaux.
+
+## 5. Fonctionnalités clés par dossier `features/`
+- `dashboard/DashboardPage.jsx`: consomme `fetchDashboardMetrics`, affiche KPI, charts, top produits, alertes marges.
+- `catalog/CatalogPage.jsx`: gère recherche paginée, filtres (catégorie, statut), CRUD produits, modals d’édition. Utilise `fetchProducts`, `createProduct`, etc.
+- `supply/SupplyPage.jsx`: appelle `fetchSupplyPlan` avec paramètres (couverture, seuil) pour afficher un tableau, priorités, breakdown fournisseurs.
+- `audit/AuditPage.jsx`: récupère diagnostics (`fetchAuditDiagnostics`), actions (`fetchAuditActions`), permet création assignment (`createAuditAssignment`) et clôture (`updateAuditActionStatus`).
+- `stock/StockMovementsPage.jsx`: montre timeseries de `fetchDashboardMetrics` ou autres, mais se base sur l’API `/stock`.
+- `pos/PosPage.jsx`: interface caisse qui utilise `checkoutCart` + `fetchProducts` pour l’instant.
+- `invoices/ImportPage.jsx`: ingestion de texte/PDF, appels `extractInvoiceFromText`, `extractInvoiceFromFile`, `importInvoiceLines`, `importInvoiceToCatalog` avec gestion des marges.
+- `prices/PricesPage.jsx`: affiche `fetchPriceHistory` et son DataTable.
+- `reports/ReportsPage.jsx`: exploite `fetchReportsOverview` et propose exports CSV (front-end déclenche `fetchAdmin` etc).
+- `maintenance/MaintenancePage.jsx`, `admin/AdminPage.jsx`: gèrent les backups, settings, utilisateurs via les endpoints `/admin` et `/maintenance`.
+- `restaurant/*` : pages spécifiques avec `fetchRestaurantBankStatements`, `createExpenseFromBankStatement`, `fetchRestaurantDashboard`, etc., reproduisant la logique restaurant.
+- `scanner/ScannerPage.jsx`: probablement un wrapper pour la capture caméra (non inspectée ici).
+
+## 6. Hooks & styles
+- `features/*` utilisent `hooks` (non inspectés ici) et `styles.css` + `tailwind.config.js` pour la charte visuelle.
+
+## 7. Flux de données principaux
+1. **Connexion & tenant** → `LoginPage` appelle `/auth/token` (OAuth2 Password) → `AuthProvider` stocke `access_token + user` → `TenantProvider` reflète le tenant issu du claim (`tenant_id`).
+2. **Catalogue & plan** → `fetchProducts` / `fetchSupplyPlan` → appels FastAPI → DataGrid (table + modals).
+3. **Facture/stock** → extraction texte/PDF → `importInvoiceLines` / `importInvoiceToCatalog` → `inventory_service` + `products_loader` backend.
+4. **Restaurant** → `fetchRestaurantBankStatements` / `importRestaurantBankStatementsPdf` → `backend.services.restaurant` (parser PDF) → dashboards charges/marges.
+5. **Admin & maintenance** → `createBackupRequest`, `restoreBackupRequest`, `fetchAdminOverview`, `fetchAdminUsers` etc.
+
+## 8. Observations
+- La SPA est déjà segmentée par tenant et expose environ 20 routes métiers (épicerie + restaurant).  
+- Le client Axios contient les fonctions nécessaires pour consommer l’intégralité de l’API FastAPI; il centralise la routine de paramétrage (`Authorization: Bearer …`, queryparams) et relaie les 401 vers l’`AuthProvider`.  
+- Pour aller plus loin tu peux documenter chaque page `features/*` en reprenant la logique métier (ex. catalogue vs supply vs restaurant), ou ajouter des tests d’intégration sur les hooks.
