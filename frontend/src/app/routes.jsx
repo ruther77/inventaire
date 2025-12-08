@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import {
   LayoutDashboard,
   Boxes,
@@ -7,12 +8,17 @@ import {
   Utensils,
   ReceiptText,
   Download,
+  Landmark,
 } from 'lucide-react';
 
+// Epicerie pages
 import CatalogPage from '../features/catalog/CatalogPage.jsx';
 import ImportPage from '../features/invoices/ImportPage.jsx';
 import StockMovementsPage from '../features/stock/StockMovementsPage.jsx';
 import PricesPage from '../features/prices/PricesPage.jsx';
+import DashboardPage from '../features/dashboard/DashboardPage.jsx';
+
+// Restaurant pages
 import RestaurantDashboard from '../features/restaurant/RestaurantDashboard.jsx';
 import RestaurantChargesPage from '../features/restaurant/RestaurantChargesPage.jsx';
 import RestaurantMenuPage from '../features/restaurant/RestaurantMenuPage.jsx';
@@ -20,10 +26,29 @@ import RestaurantPriceTrends from '../features/restaurant/RestaurantPriceTrends.
 import RestaurantStockMovementsPage from '../features/restaurant/RestaurantStockMovementsPage.jsx';
 import RestaurantConsumptionPage from '../features/restaurant/RestaurantConsumptionPage.jsx';
 import RestaurantPriceHistoryComparisonPage from '../features/restaurant/RestaurantPriceHistoryComparisonPage.jsx';
-import BankStatementAnalyzer from '../features/restaurant/BankStatementAnalyzer.jsx';
 import ForecastsPage from '../features/restaurant/ForecastsPage.jsx';
+
+// Shared
 import PortfolioPage from '../features/portfolio/PortfolioPage.jsx';
-import DashboardPage from '../features/dashboard/DashboardPage.jsx';
+
+// Tresorerie pages - Lazy loaded pour performance
+const FinanceOverview = lazy(() => import('../features/finance/FinanceOverview.jsx'));
+const FinanceTransactionsPage = lazy(() => import('../features/finance/FinanceTransactionsPage.jsx'));
+const FinanceAccountsPage = lazy(() => import('../features/finance/FinanceAccountsPage.jsx'));
+const FinanceImportsPage = lazy(() => import('../features/finance/FinanceImportsPage.jsx'));
+const FinanceRulesPage = lazy(() => import('../features/finance/FinanceRulesPage.jsx'));
+const FinanceAnomaliesPage = lazy(() => import('../features/finance/FinanceAnomaliesPage.jsx'));
+
+// Wrapper pour lazy loading avec fallback
+const LazyPage = ({ children }) => (
+  <Suspense fallback={
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="animate-pulse text-slate-400">Chargement...</div>
+    </div>
+  }>
+    {children}
+  </Suspense>
+);
 
 export const epicerieRoutes = [
   {
@@ -146,17 +171,45 @@ export const restaurantRoutes = [
 export const treasuryRoutes = [
   {
     path: '/',
-    label: 'Trésorerie',
-    description: 'Flux de trésorerie consolidés',
+    label: 'Vue d\'ensemble',
+    description: 'Flux de tresorerie consolides',
     icon: LayoutDashboard,
-    element: <DashboardPage />,
+    element: <LazyPage><FinanceOverview /></LazyPage>,
   },
   {
-    path: '/bank-statement',
-    label: 'Relevés bancaires',
-    description: 'Encaissements/ décaissements Épicerie HQ',
+    path: '/transactions',
+    label: 'Transactions',
+    description: 'Releves bancaires et mouvements',
+    icon: Activity,
+    element: <LazyPage><FinanceTransactionsPage /></LazyPage>,
+  },
+  {
+    path: '/comptes',
+    label: 'Comptes',
+    description: 'Soldes et apercu des comptes',
+    icon: Landmark,
+    element: <LazyPage><FinanceAccountsPage /></LazyPage>,
+  },
+  {
+    path: '/imports',
+    label: 'Imports',
+    description: 'Importer releves CSV/PDF',
     icon: Download,
-    element: <BankStatementAnalyzer defaultAccount="BP-HQ-001" />,
+    element: <LazyPage><FinanceImportsPage /></LazyPage>,
+  },
+  {
+    path: '/regles',
+    label: 'Regles',
+    description: 'Categorisation automatique',
+    icon: ReceiptText,
+    element: <LazyPage><FinanceRulesPage /></LazyPage>,
+  },
+  {
+    path: '/anomalies',
+    label: 'Anomalies',
+    description: 'Rapprochement et alertes',
+    icon: Activity,
+    element: <LazyPage><FinanceAnomaliesPage /></LazyPage>,
   },
   {
     path: '/portfolio',
