@@ -55,5 +55,33 @@ node_modules/
 *.log
 # Backups BDD
 backups/*.sql.gz
+backups/*.dump
+backups/*.sql
+*.dump
+
+# Dossiers lourds a externaliser
+venv_extract/
+.venv_tmp/
+EUROCIEL/
+data/
+releve/
+pdfs/
+
+# Fichiers legacy a ne pas versionner
+test1.py
+database.php
+database.local.php
+markers_full.csv
+
+# Archives (nettoyage projet)
+_archive/
+
+# IDE
+.vscode/
+.idea/
+.blackboxcli/
+
 # Autres fichiers temporaires
 *.swp
+*.bak
+*.tmp
