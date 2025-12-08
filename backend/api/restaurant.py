@@ -161,16 +161,24 @@ def recompute_plat_costs(
     return restaurant_service.refresh_plat_costs(tenant.id, margin_threshold=margin_threshold)
 
 
-@router.get("/bank-statements", response_model=list[RestaurantBankStatementEntry])
+@router.get("/bank-statements", response_model=list[RestaurantBankStatementEntry], deprecated=True)
 def list_bank_statements(
     account: str | None = Query(None),
     tenant: Tenant = Depends(get_current_tenant),
 ):
+    """
+    DEPRECATED: Utiliser GET /finance/transactions à la place.
+    Cet endpoint sera supprimé dans une version future.
+    """
     return restaurant_service.list_bank_statements(tenant.id, account=account)
 
 
-@router.get("/bank-accounts/overview", response_model=list[RestaurantBankAccountOverview])
+@router.get("/bank-accounts/overview", response_model=list[RestaurantBankAccountOverview], deprecated=True)
 def list_bank_accounts_overview(tenant: Tenant = Depends(get_current_tenant)):
+    """
+    DEPRECATED: Utiliser GET /finance/accounts/overview à la place.
+    Cet endpoint sera supprimé dans une version future.
+    """
     return restaurant_service.list_bank_accounts_overview(tenant.id)
 
 
@@ -207,40 +215,56 @@ def sync_ingredients(tenant: Tenant = Depends(get_current_tenant)):
     return {"inserted": count}
 
 
-@router.get("/bank-statements/summary", response_model=RestaurantBankStatementSummary)
+@router.get("/bank-statements/summary", response_model=RestaurantBankStatementSummary, deprecated=True)
 def bank_statement_summary(
     account: str | None = Query(None),
     months: int = Query(6, ge=0, le=120),
     grouping: str | None = Query("default"),
     tenant: Tenant = Depends(get_current_tenant),
 ):
+    """
+    DEPRECATED: Utiliser GET /finance/stats/treasury à la place.
+    Cet endpoint sera supprimé dans une version future.
+    """
     return restaurant_service.get_bank_statement_summary(tenant.id, account=account, months=months, grouping=grouping)
 
 
-@router.post("/bank-statements", response_model=RestaurantBankStatementEntry)
+@router.post("/bank-statements", response_model=RestaurantBankStatementEntry, deprecated=True)
 def create_bank_statement(
     payload: RestaurantBankStatementCreate,
     tenant: Tenant = Depends(get_current_tenant),
 ):
+    """
+    DEPRECATED: Utiliser POST /finance/transactions à la place.
+    Cet endpoint sera supprimé dans une version future.
+    """
     return restaurant_service.create_bank_statement(tenant.id, payload.dict())
 
 
-@router.patch("/bank-statements/{entry_id}", response_model=RestaurantBankStatementEntry)
+@router.patch("/bank-statements/{entry_id}", response_model=RestaurantBankStatementEntry, deprecated=True)
 def update_bank_statement(
     entry_id: int,
     payload: RestaurantBankStatementUpdate,
     tenant: Tenant = Depends(get_current_tenant),
 ):
+    """
+    DEPRECATED: Utiliser PATCH /finance/transactions/{id} à la place.
+    Cet endpoint sera supprimé dans une version future.
+    """
     update_payload = {k: v for k, v in payload.dict().items() if v is not None}
     return restaurant_service.update_bank_statement(tenant.id, entry_id, update_payload)
 
 
-@router.post("/bank-statements/{entry_id}/create-expense", response_model=RestaurantBankStatementExpenseLink)
+@router.post("/bank-statements/{entry_id}/create-expense", response_model=RestaurantBankStatementExpenseLink, deprecated=True)
 def create_expense_from_statement(
     entry_id: int,
     payload: RestaurantExpenseFromStatement,
     tenant: Tenant = Depends(get_current_tenant),
 ):
+    """
+    DEPRECATED: La liaison transaction-dépense sera gérée via /finance/*.
+    Cet endpoint sera supprimé dans une version future.
+    """
     result = restaurant_service.create_expense_from_bank_statement(tenant.id, entry_id, payload.dict(exclude_unset=True))
     return RestaurantBankStatementExpenseLink(
         expense=result["expense"],
@@ -248,12 +272,16 @@ def create_expense_from_statement(
     )
 
 
-@router.post("/bank-statements/import-pdf")
+@router.post("/bank-statements/import-pdf", deprecated=True)
 async def import_bank_statements_pdf(
     account: str = Form(...),
     file: UploadFile = File(...),
     tenant: Tenant = Depends(get_current_tenant),
 ):
+    """
+    DEPRECATED: Utiliser POST /finance/bank-statements/import à la place.
+    Cet endpoint sera supprimé dans une version future.
+    """
     content = await file.read()
     summary = restaurant_service.import_bank_statements_from_pdf(tenant.id, account, content)
     duplicates = summary["total"] - summary["inserted"]

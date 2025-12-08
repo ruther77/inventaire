@@ -2,10 +2,24 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import UploadFile, File
 
 from backend.dependencies.tenant import Tenant, get_current_tenant
-from backend.services import finance as finance_service
+from backend.services.finance import core as finance_service
+from backend.services.finance import accounts as finance_accounts
+from backend.services.finance import transactions as finance_transactions
+from backend.services.finance import invoices as finance_invoices
+from backend.services.finance import bank_statements as finance_bank_statements
+from backend.services.finance import reconciliation as finance_reconciliation
+from backend.services.finance import rules as finance_rules
+from backend.services.finance import imports as finance_imports
+from backend.services.finance import metrics as finance_metrics
+from backend.services.finance import stats as finance_stats
+from backend.services.finance import dashboard as finance_dashboard
+from backend.services.finance import categories as finance_categories
+from backend.services.importers import bank_statement_csv
 from backend.schemas.finance import (
     FinanceMatch,
     FinanceMatchStatusRequest,
@@ -19,9 +33,443 @@ from backend.schemas.finance import (
     AnomalyRefreshRequest,
     AnomalyRefreshResponse,
     FinanceAnomaly,
+    FinanceAccountCreate,
+    FinanceTransactionCreate,
+    FinanceTransactionUpdate,
+    FinanceVendorCreate,
+    FinanceInvoiceCreate,
+    FinancePaymentCreate,
+    FinanceReconciliationCreate,
+    FinanceBatchCategorizeRequest,
+    FinanceAutreSuggestion,
+    FinanceTransactionSearchResponse,
+    FinanceBankStatementSearchResponse,
+    FinanceInvoiceSearchResponse,
 )
+from backend.schemas.finance_rules import FinanceRule, FinanceRuleCreate
 
 router = APIRouter(prefix="/finance", tags=["finance"])
+logger = logging.getLogger(__name__)
+
+
+# --- Comptes ---
+
+
+@router.post("/accounts")
+def create_account(
+    payload: FinanceAccountCreate,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_accounts.create_account(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/accounts")
+def list_accounts(
+    entity_id: int | None = Query(default=None),
+    is_active: bool | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    return finance_accounts.list_accounts(entity_id=entity_id, is_active=is_active)
+
+
+# --- Transactions ---
+
+
+@router.post("/transactions")
+def create_transaction(
+    payload: FinanceTransactionCreate,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_transactions.create_transaction(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/transactions")
+def list_transactions(
+    entity_id: int | None = Query(default=None),
+    account_id: int | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    return finance_transactions.list_transactions(
+        entity_id=entity_id,
+        account_id=account_id,
+        status=status_filter,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+@router.get("/transactions/search", response_model=FinanceTransactionSearchResponse)
+def search_transactions(
+    entity_id: int | None = Query(default=None),
+    account_id: int | None = Query(default=None),
+    category_id: int | None = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    amount_min: float | None = Query(default=None),
+    amount_max: float | None = Query(default=None),
+    q: str | None = Query(default=None, description="Recherche texte sur libellé/note"),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=50, ge=1, le=500),
+    sort: str = Query(default="-date_operation", description="date_operation|amount|category|account avec - pour desc"),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> FinanceTransactionSearchResponse:
+    return finance_transactions.search_transactions(
+        entity_id=entity_id,
+        account_id=account_id,
+        category_id=category_id,
+        date_from=date_from,
+        date_to=date_to,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        q=q,
+        page=page,
+        size=size,
+        sort=sort,
+    )
+
+
+@router.patch("/transactions/{transaction_id}")
+def update_transaction(
+    transaction_id: int,
+    payload: FinanceTransactionUpdate,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_transactions.update_transaction(transaction_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/transactions/{transaction_id}/lock")
+def lock_transaction(
+    transaction_id: int,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_transactions.lock_transaction(transaction_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+# --- Fournisseurs / factures / paiements ---
+
+
+@router.post("/vendors")
+def create_vendor(
+    payload: FinanceVendorCreate,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_invoices.create_vendor(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/vendors")
+def list_vendors(
+    entity_id: int | None = Query(default=None),
+    is_active: bool | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    return finance_invoices.list_vendors(entity_id=entity_id, is_active=is_active)
+
+
+@router.post("/invoices")
+def create_invoice(
+    payload: FinanceInvoiceCreate,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_invoices.create_invoice(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/invoices/search", response_model=FinanceInvoiceSearchResponse)
+def search_invoices(
+    entity_id: int | None = Query(default=None),
+    vendor_id: int | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=50, ge=1, le=500),
+    sort: str = Query(default="-date_invoice", description="date_invoice|date_due|montant_ttc|vendor|status avec - pour desc"),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> FinanceInvoiceSearchResponse:
+    result = finance_invoices.search_invoices(
+        entity_id=entity_id,
+        vendor_id=vendor_id,
+        status=status_filter,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        size=size,
+        sort=sort,
+    )
+    return FinanceInvoiceSearchResponse(**result)
+
+
+@router.post("/payments")
+def create_payment(
+    payload: FinancePaymentCreate,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_invoices.create_payment(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+# --- Suggestions / catégorisation rapide ---
+
+
+@router.get("/categories/suggestions/autre-top", response_model=list[FinanceAutreSuggestion])
+def suggest_autre_top(
+    entity_id: int | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[FinanceAutreSuggestion]:
+    return finance_transactions.suggest_autre_top(entity_id=entity_id, limit=limit)
+
+
+@router.get("/categories")
+def list_categories(
+    entity_id: int | None = Query(default=None),
+    is_active: bool | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    return finance_categories.list_categories(entity_id=entity_id, is_active=is_active)
+
+
+@router.get("/categories/suggestions/complete")
+def autocomplete_categories(
+    q: str = Query(..., min_length=1),
+    entity_id: int | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    return finance_transactions.autocomplete_categories(q=q, entity_id=entity_id, limit=limit)
+
+
+@router.post("/transactions/batch-categorize")
+def batch_categorize_transactions(
+    payload: FinanceBatchCategorizeRequest,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_transactions.batch_categorize(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+# --- Règles de catégorisation ---
+
+
+@router.get("/rules", response_model=list[FinanceRule])
+def list_rules(
+    entity_id: int | None = Query(default=None),
+    is_active: bool | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[FinanceRule]:
+    return finance_rules.list_rules(entity_id=entity_id, is_active=is_active)
+
+
+@router.post("/rules", response_model=FinanceRule)
+def create_rule(payload: FinanceRuleCreate, tenant: Tenant = Depends(get_current_tenant)) -> FinanceRule:
+    return finance_rules.create_rule(payload)
+
+
+@router.patch("/rules/{rule_id}", response_model=FinanceRule)
+def update_rule(
+    rule_id: int,
+    payload: dict,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> FinanceRule:
+    try:
+        return finance_rules.update_rule(rule_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.delete("/rules/{rule_id}")
+def delete_rule(rule_id: int, tenant: Tenant = Depends(get_current_tenant)) -> dict:
+    try:
+        return finance_rules.delete_rule(rule_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/imports")
+def list_imports(tenant: Tenant = Depends(get_current_tenant)) -> list[dict]:
+    return finance_imports.list_imports()
+
+
+# --- Stats catégories / comptes ---
+
+
+@router.get("/categories/stats")
+def categories_stats(
+    entity_id: int | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    return finance_stats.categories_stats(entity_id=entity_id)
+
+
+@router.get("/accounts/overview")
+def accounts_overview(
+    entity_id: int | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    return finance_stats.accounts_overview(entity_id=entity_id)
+
+
+@router.get("/dashboard/summary")
+def finance_dashboard_summary(
+    entity_id: int | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    return finance_dashboard.dashboard_summary(entity_id=entity_id)
+
+
+@router.post("/stats/refresh")
+def refresh_stats_cache(
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    """Rafraîchit les vues matérialisées des stats finance."""
+    return finance_stats.refresh_materialized_views()
+
+
+@router.get("/stats/timeline")
+def get_timeline_stats(
+    entity_id: int | None = Query(default=None),
+    months: int | None = Query(default=12, description="Nombre de mois (null=tout)"),
+    granularity: str = Query(default="monthly", description="daily|weekly|monthly"),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    """Retourne la chronologie agrégée des flux pour les graphiques."""
+    return finance_stats.timeline_stats(
+        entity_id=entity_id,
+        months=months,
+        granularity=granularity,
+    )
+
+
+@router.get("/stats/category-breakdown")
+def get_category_breakdown(
+    entity_id: int | None = Query(default=None),
+    months: int | None = Query(default=12, description="Nombre de mois (null=tout)"),
+    direction: str | None = Query(default=None, description="IN|OUT|null pour les deux"),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    """Retourne la répartition par catégorie pour les pie/bar charts."""
+    return finance_stats.category_breakdown(
+        entity_id=entity_id,
+        months=months,
+        direction=direction,
+    )
+
+
+@router.get("/stats/treasury")
+def get_treasury_summary(
+    entity_id: int | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    """Retourne un résumé de trésorerie (totaux, solde, période)."""
+    return finance_stats.treasury_summary(entity_id=entity_id)
+
+
+# --- Rapprochements (nouvelles tables finance_bank_statement_lines / finance_transactions) ---
+
+
+@router.post("/reconciliations")
+def create_reconciliation(
+    payload: FinanceReconciliationCreate,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_reconciliation.create_reconciliation(
+            payload.statement_line_id,
+            payload.transaction_id,
+            status=payload.status,
+            created_by=tenant.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.delete("/reconciliations/{reconciliation_id}")
+def delete_reconciliation(
+    reconciliation_id: int,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        finance_reconciliation.delete_reconciliation(reconciliation_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return {"id": reconciliation_id, "deleted": True}
+
+
+@router.get("/bank-statements/search", response_model=FinanceBankStatementSearchResponse)
+def search_bank_statements(
+    account_id: int | None = Query(default=None),
+    period_start: str | None = Query(default=None),
+    period_end: str | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=50, ge=1, le=500),
+    sort: str = Query(default="-imported_at", description="imported_at|period_start|period_end|account avec - pour desc"),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> FinanceBankStatementSearchResponse:
+    result = finance_bank_statements.search_bank_statements(
+        account_id=account_id,
+        period_start=period_start,
+        period_end=period_end,
+        status=status_filter,
+        page=page,
+        size=size,
+        sort=sort,
+    )
+    return FinanceBankStatementSearchResponse(**result)
+
+
+@router.post("/bank-statements/import")
+async def import_bank_statements(
+    account_id: int = Query(..., description="ID du compte finance_accounts"),
+    file: UploadFile = File(...),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        content = await file.read()
+        summary = bank_statement_csv.import_csv(content, account_id=account_id, source=file.filename or "CSV")
+        finance_rules.record_import(account_id=account_id, file_name=file.filename or "CSV", summary=summary, error=None)
+        finance_metrics.record_import_metrics(
+            account_id=account_id,
+            inserted=summary.get("inserted"),
+            total=summary.get("total"),
+            status="DONE",
+            error=None,
+        )
+        return summary
+    except ValueError as exc:
+        finance_rules.record_import(account_id=account_id, file_name=file.filename or "CSV", summary=None, error=str(exc))
+        finance_metrics.record_import_metrics(
+            account_id=account_id,
+            inserted=None,
+            total=None,
+            status="ERROR",
+            error=str(exc),
+        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/reconciliation/run", response_model=FinanceRunResponse)
@@ -35,6 +483,7 @@ def run_reconciliation(
         max_days_difference=payload.max_days_difference,
         auto_threshold=payload.auto_threshold,
     )
+    finance_metrics.record_reco_run(summary)
     return FinanceRunResponse(**summary)
 
 
@@ -74,7 +523,11 @@ def list_matches(
     status: str | None = Query(default="pending", description="Filtrer par statut."),
     tenant: Tenant = Depends(get_current_tenant),
 ) -> list[FinanceMatch]:
-    results = finance_service.list_matches(tenant.id, status=status)
+    try:
+        results = finance_service.list_matches(tenant.id, status=status)
+    except Exception as exc:  # defensive fallback when optional tables are absent
+        logger.warning("finance matches unavailable: %s", exc)
+        return []
     return [_build_match(record) for record in results]
 
 
@@ -131,7 +584,49 @@ def list_anomalies(
     severity: str | None = Query(default=None, description="Filtrer par sévérité."),
     tenant: Tenant = Depends(get_current_tenant),
 ) -> list[FinanceAnomaly]:
-    entries = finance_service.list_anomalies(tenant.id, severity=severity)
+    try:
+        entries = finance_service.list_anomalies(tenant.id, severity=severity)
+    except Exception as exc:  # optional table may be absent on some tenants
+        logger.warning("finance anomalies unavailable: %s", exc)
+        entries = []
+    return [
+        FinanceAnomaly(
+            id=entry["id"],
+            rule=entry["rule"],
+            severity=entry["severity"],
+            message=entry.get("message"),
+            score=entry.get("score"),
+            amount=entry.get("amount"),
+            expected_amount=entry.get("expected_amount"),
+            statement_id=entry["statement_id"],
+            statement_date=entry["statement_date"],
+            statement_label=entry["statement_label"],
+            statement_account=entry.get("statement_account"),
+            statement_category=entry.get("statement_category"),
+        )
+        for entry in entries
+    ]
+
+
+@router.get("/reconciliation/runs/{run_id}/anomalies", response_model=list[FinanceAnomaly])
+def get_reconciliation_run_anomalies(
+    run_id: int,
+    severity: str | None = Query(default=None, description="Filtrer par sévérité."),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[FinanceAnomaly]:
+    """
+    Retourne les anomalies détectées pour un run de rapprochement spécifique.
+
+    Note: Dans l'implémentation actuelle, les anomalies sont stockées par tenant.
+    Ce endpoint filtre les anomalies par tenant et sévérité. Le run_id peut être
+    utilisé pour des filtres futurs si la table est étendue avec un champ run_id.
+    """
+    try:
+        entries = finance_service.list_anomalies(tenant.id, severity=severity)
+    except Exception as exc:
+        logger.warning("finance anomalies unavailable for run %s: %s", run_id, exc)
+        entries = []
+
     return [
         FinanceAnomaly(
             id=entry["id"],
