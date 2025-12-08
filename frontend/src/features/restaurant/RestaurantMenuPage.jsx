@@ -25,8 +25,14 @@ export default function RestaurantMenuPage() {
   const attachIngredient = useAttachIngredientToPlat();
 
   const menuList = plats.data ?? [];
-  const lowMargins = [...menuList].sort((a, b) => a.marge_pct - b.marge_pct).slice(0, 3);
-  const highMargins = [...menuList].sort((a, b) => b.marge_pct - a.marge_pct).slice(0, 3);
+  const lowMargins = [...menuList]
+    .filter((p) => p.marge_pct != null)
+    .sort((a, b) => (a.marge_pct ?? 0) - (b.marge_pct ?? 0))
+    .slice(0, 3);
+  const highMargins = [...menuList]
+    .filter((p) => p.marge_pct != null)
+    .sort((a, b) => (b.marge_pct ?? 0) - (a.marge_pct ?? 0))
+    .slice(0, 3);
 
   const [ingredientForm, setIngredientForm] = useState({
     nom: '',
@@ -242,8 +248,8 @@ export default function RestaurantMenuPage() {
                 <tr key={ing.id}>
                   <td className="px-3 py-2 text-slate-900">{ing.nom}</td>
                   <td className="px-3 py-2 text-slate-600">{ing.unite_base}</td>
-                  <td className="px-3 py-2 text-slate-600">{ing.cout_unitaire.toFixed(2)} €</td>
-                  <td className="px-3 py-2 text-slate-600">{ing.stock_actuel.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-slate-600">{(ing.cout_unitaire ?? 0).toFixed(2)} €</td>
+                  <td className="px-3 py-2 text-slate-600">{(ing.stock_actuel ?? 0).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -278,7 +284,7 @@ export default function RestaurantMenuPage() {
               </select>
               {selectedIngredient && (
                 <p className="text-xs text-slate-500">
-                  Coût actuel : <span className="font-semibold text-slate-900">{selectedIngredient.cout_unitaire.toFixed(2)} €</span>
+                  Coût actuel : <span className="font-semibold text-slate-900">{(selectedIngredient.cout_unitaire ?? 0).toFixed(2)} €</span>
                 </p>
               )}
             </div>
@@ -312,7 +318,7 @@ export default function RestaurantMenuPage() {
                       <p className="font-semibold text-slate-900">{entry.ingredient_nom}</p>
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{formatDate(entry.changed_at)}</p>
                     </div>
-                    <span className="text-sm font-semibold text-slate-700">{entry.cout_unitaire.toFixed(2)} €</span>
+                    <span className="text-sm font-semibold text-slate-700">{(entry.cout_unitaire ?? 0).toFixed(2)} €</span>
                   </li>
                 ))}
               </ul>
@@ -346,7 +352,7 @@ export default function RestaurantMenuPage() {
               </select>
               {selectedPlat && (
                 <p className="text-xs text-slate-500">
-                  Prix actuel : <span className="font-semibold text-slate-900">{selectedPlat.prix_vente_ttc.toFixed(2)} €</span>
+                  Prix actuel : <span className="font-semibold text-slate-900">{(selectedPlat.prix_vente_ttc ?? 0).toFixed(2)} €</span>
                 </p>
               )}
             </div>
@@ -380,7 +386,7 @@ export default function RestaurantMenuPage() {
                       <p className="font-semibold text-slate-900">{entry.plat_nom}</p>
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{formatDate(entry.changed_at)}</p>
                     </div>
-                    <span className="text-sm font-semibold text-slate-700">{entry.prix_vente_ttc.toFixed(2)} €</span>
+                    <span className="text-sm font-semibold text-slate-700">{(entry.prix_vente_ttc ?? 0).toFixed(2)} €</span>
                   </li>
                 ))}
               </ul>
@@ -606,7 +612,7 @@ export default function RestaurantMenuPage() {
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm font-semibold text-slate-900">{plat.prix_vente_ttc.toFixed(2)} €</p>
+                              <p className="text-sm font-semibold text-slate-900">{(plat.prix_vente_ttc ?? 0).toFixed(2)} €</p>
                               <div className="mt-1 flex gap-2 text-xs text-brand-700">
                                 <Button
                                   variant="ghost"
@@ -665,10 +671,10 @@ export default function RestaurantMenuPage() {
                       <p className="font-semibold text-slate-900">{plat.nom}</p>
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{plat.categorie ?? 'NC'}</p>
                     </div>
-                    <span className="text-sm font-semibold text-rose-600">{plat.marge_pct.toFixed(1)} %</span>
+                    <span className="text-sm font-semibold text-rose-600">{(plat.marge_pct ?? 0).toFixed(1)} %</span>
                   </div>
                   <p className="mt-2 text-xs text-slate-500">
-                    Coût matière : <span className="font-semibold text-slate-700">{plat.cout_matiere.toFixed(2)} €</span>
+                    Coût matière : <span className="font-semibold text-slate-700">{(plat.cout_matiere ?? 0).toFixed(2)} €</span>
                   </p>
                 </li>
               ))}
@@ -690,10 +696,10 @@ export default function RestaurantMenuPage() {
                       <p className="font-semibold text-slate-900">{plat.nom}</p>
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{plat.categorie ?? 'NC'}</p>
                     </div>
-                    <span className="text-sm font-semibold text-emerald-600">{plat.marge_pct.toFixed(1)} %</span>
+                    <span className="text-sm font-semibold text-emerald-600">{(plat.marge_pct ?? 0).toFixed(1)} %</span>
                   </div>
                   <p className="mt-2 text-xs text-slate-500">
-                    Prix carte : <span className="font-semibold text-slate-700">{plat.prix_vente_ttc.toFixed(2)} €</span>
+                    Prix carte : <span className="font-semibold text-slate-700">{(plat.prix_vente_ttc ?? 0).toFixed(2)} €</span>
                   </p>
                 </li>
               ))}
