@@ -6,8 +6,6 @@ import {
   Line,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   Tooltip,
   XAxis,
   YAxis,
@@ -17,7 +15,6 @@ import {
 import {
   useRestaurantPriceHistoryOverview,
   useRestaurantPlats,
-  useRestaurantBankStatementSummary,
 } from '../../hooks/useRestaurant.js';
 
 const numberFormatter = new Intl.NumberFormat('fr-FR', {
@@ -40,24 +37,22 @@ export default function RestaurantPriceTrends() {
   const [windowDays, setWindowDays] = useState(90);
   const { data, isLoading } = useRestaurantPriceHistoryOverview(200);
   const platsQuery = useRestaurantPlats();
-  const bankSummary = useRestaurantBankStatementSummary(undefined, 6);
 
   const ingredientChanges = data?.ingredients ?? [];
   const platChanges = data?.plats ?? [];
   const plats = platsQuery.data ?? [];
-  const bankTimeline = bankSummary.data?.monthly ?? [];
 
-  const filterByWindow = (entries) => {
-    if (windowDays === 'all') return entries;
+  const filteredIngredientChanges = useMemo(() => {
+    if (windowDays === 'all') return ingredientChanges;
     const threshold = Date.now() - Number(windowDays) * 24 * 60 * 60 * 1000;
-    return entries.filter((entry) => new Date(entry.changed_at).valueOf() >= threshold);
-  };
+    return ingredientChanges.filter((entry) => new Date(entry.changed_at).valueOf() >= threshold);
+  }, [ingredientChanges, windowDays]);
 
-  const filteredIngredientChanges = useMemo(
-    () => filterByWindow(ingredientChanges),
-    [ingredientChanges, windowDays],
-  );
-  const filteredPlatChanges = useMemo(() => filterByWindow(platChanges), [platChanges, windowDays]);
+  const filteredPlatChanges = useMemo(() => {
+    if (windowDays === 'all') return platChanges;
+    const threshold = Date.now() - Number(windowDays) * 24 * 60 * 60 * 1000;
+    return platChanges.filter((entry) => new Date(entry.changed_at).valueOf() >= threshold);
+  }, [platChanges, windowDays]);
 
   const groupLatestDelta = (entries, keyField, valueField) => {
     const grouped = new Map();
@@ -129,17 +124,6 @@ export default function RestaurantPriceTrends() {
     plats.length === 0
       ? 0
       : plats.reduce((sum, plat) => sum + (plat.marge_pct ?? 0), 0) / plats.length;
-
-  const bankChartData = useMemo(
-    () =>
-      bankTimeline.map((entry) => ({
-        label: entry.mois,
-        entrees: Number(entry.entrees ?? 0),
-        sorties: Number(entry.sorties ?? 0),
-        net: Number(entry.net ?? (entry.entrees || 0) - (entry.sorties || 0)),
-      })),
-    [bankTimeline],
-  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -307,49 +291,6 @@ export default function RestaurantPriceTrends() {
           )}
         </Card>
       </div>
-
-      <Card className="space-y-4">
-        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Flux bancaires</p>
-            <h3 className="text-lg font-semibold text-slate-900">Entrées / sorties récentes</h3>
-            <p className="text-sm text-slate-500">Vue synthétique des 6 derniers mois (tenant Restaurant HQ).</p>
-          </div>
-        </div>
-        {bankSummary.isLoading ? (
-          <p className="text-sm text-slate-500">Chargement des relevés…</p>
-        ) : bankChartData.length === 0 ? (
-          <p className="text-sm text-slate-500">Aucun flux bancaires enregistrés pour cette période.</p>
-        ) : (
-          <div className="grid gap-4 lg:grid-cols-[1.4fr,0.6fr]">
-            <div className="h-72 rounded-2xl border border-slate-100 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={bankChartData}>
-                  <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `${numberFormatter.format(value)} €`} />
-                  <Legend />
-                  <Area type="monotone" dataKey="entrees" name="Entrées" stroke="#10b981" fill="#10b981" fillOpacity={0.15} />
-                  <Area type="monotone" dataKey="sorties" name="Sorties" stroke="#ef4444" fill="#ef4444" fillOpacity={0.1} />
-                  <Line type="monotone" dataKey="net" name="Net" stroke="#6366f1" strokeWidth={2} dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="h-72 rounded-2xl border border-slate-100 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={bankChartData}>
-                  <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `${numberFormatter.format(value)} €`} />
-                  <Bar dataKey="net" name="Net mensuel" fill="#0ea5e9" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-      </Card>
 
       <Card className="space-y-4">
         <div>
