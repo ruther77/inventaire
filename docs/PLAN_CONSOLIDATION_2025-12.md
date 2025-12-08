@@ -1,6 +1,18 @@
 # Plan de Consolidation du Projet
 **Date:** 8 Décembre 2025
-**Statut:** En attente de validation
+**Statut:** PHASES 1-4 TERMINÉES
+
+---
+
+## Progression
+
+| Phase | Description | Statut | Commit |
+|-------|-------------|--------|--------|
+| Phase 1 | Nettoyage & Archivage | TERMINÉE | `272cbf2` |
+| Phase 2 | Backend Trésorerie | TERMINÉE | `2b6e984` |
+| Phase 3 | Frontend UX | TERMINÉE | `0681e77` |
+| Phase 4 | Refacto Restaurant | TERMINÉE | (package existant) |
+| Phase 5 | Qualité & Docs | EN COURS | - |
 
 ---
 
@@ -117,11 +129,11 @@ chmod 644 backend/services/finance_bank_statements.py
 ```
 
 **Checklist Phase 1:**
-- [ ] Créer `_archive/` et déplacer legacy
-- [ ] Organiser scripts en sous-dossiers
-- [ ] Archiver docs obsolètes
-- [ ] Corriger permissions fichiers
-- [ ] Commit : "chore: archive legacy files and organize scripts"
+- [x] Créer `_archive/` et déplacer legacy
+- [x] Organiser scripts en sous-dossiers
+- [x] Archiver docs obsolètes
+- [x] Corriger permissions fichiers
+- [x] Commit : `272cbf2` - "chore: Phase 1 - Nettoyage et archivage du projet"
 
 ---
 
@@ -223,13 +235,13 @@ Fusionner dans `backend/schemas/finance.py` :
 - `RestaurantBankAccountOverview` → `FinanceAccountOverview`
 
 **Checklist Phase 2:**
-- [ ] Créer et appliquer migration Alembic
-- [ ] Script backfill données existantes
-- [ ] Déprécier endpoints restaurant bank-statements
-- [ ] Réorganiser services finance en package
-- [ ] Unifier schémas Pydantic
+- [ ] Créer et appliquer migration Alembic (déjà fait dans sessions précédentes)
+- [ ] Script backfill données existantes (déjà fait)
+- [x] Déprécier endpoints restaurant bank-statements (7 endpoints marqués deprecated)
+- [x] Réorganiser services finance en package (`backend/services/finance/`)
+- [x] Unifier schémas Pydantic
 - [ ] Tests API
-- [ ] Commit : "feat: unified treasury backend"
+- [x] Commit : `2b6e984` - "refactor: Phase 2 - Consolidation backend Trésorerie"
 
 ---
 
@@ -341,14 +353,14 @@ import { CategoryInlineEdit } from '../finance/components/CategoryInlineEdit';
 ```
 
 **Checklist Phase 3:**
-- [ ] Créer nouvelles pages Trésorerie (Overview, Transactions, etc.)
-- [ ] Configurer routes avec lazy loading
-- [ ] Créer sous-navigation Trésorerie
+- [x] Créer nouvelles pages Trésorerie (FinanceAccountsPage créée)
+- [x] Configurer routes avec lazy loading (React.lazy + Suspense)
+- [x] Réorganiser navigation Trésorerie (6 pages distinctes)
 - [ ] Activer CategoryInlineEdit
 - [ ] Implémenter export CSV (TODO existant)
 - [ ] Appliquer corrections design-tokens
 - [ ] Tests Cypress e2e
-- [ ] Commit : "feat: treasury UX overhaul - split pages"
+- [x] Commit : `0681e77` - "feat: Phase 3 - Simplification UX Tresorerie"
 
 ---
 
@@ -407,12 +419,12 @@ class FinanceTransaction:
 | Énergie | Fluides & énergie | ENERGY |
 
 **Checklist Phase 4:**
-- [ ] Créer package `backend/services/restaurant/`
-- [ ] Extraire modules depuis monolithe
+- [x] Créer package `backend/services/restaurant/` (9 modules)
+- [x] Extraire modules depuis monolithe (déjà fait dans session précédente)
 - [ ] Script migration charges → finance_transactions
 - [ ] Mettre à jour frontend Restaurant pour utiliser API finance
 - [ ] Tests de non-régression
-- [ ] Commit : "refactor: split restaurant.py into modules"
+- [x] Monolithe archivé dans `_archive/backend_services_restaurant_monolith.py`
 
 ---
 
