@@ -114,7 +114,7 @@ export const fetchRestaurantPriceHistoryOverview = async () => {
 };
 
 export const fetchRestaurantForecastOverview = async () => {
-  const { data } = await api.get('/restaurant/forecast/overview');
+  const { data } = await api.get('/restaurant/forecasts/overview');
   return data;
 };
 
@@ -123,12 +123,12 @@ export const fetchRestaurantTvaSummary = async (filters = {}) => {
   if (filters.dateFrom) params.set('date_from', filters.dateFrom);
   if (filters.dateTo) params.set('date_to', filters.dateTo);
   const query = params.toString();
-  const { data } = await api.get(query ? `/restaurant/tva/summary?${query}` : '/restaurant/tva/summary');
+  const { data } = await api.get(query ? `/restaurant/charges/tva-summary?${query}` : '/restaurant/charges/tva-summary');
   return data;
 };
 
 export const fetchRestaurantDashboard = async () => {
-  const { data } = await api.get('/restaurant/dashboard');
+  const { data } = await api.get('/restaurant/dashboard/overview');
   return data;
 };
 
