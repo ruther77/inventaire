@@ -1,0 +1,53 @@
+{
+    // Utilisez IntelliSense pour en savoir plus sur les attributs possibles.
+    // Pointez pour afficher la description des attributs existants.
+    // Pour plus d'informations, visitez : https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Lancer Chrome en utilisant localhost (8080)",
+            "url": "http://localhost:8080",
+            "webRoot": "${workspaceFolder}"
+        },
+        {
+            "type": "python",
+            "request": "launch",
+            "name": "Launch FastAPI (uvicorn)",
+            "module": "uvicorn",
+            "args": [
+                "backend.main:app",
+                "--reload",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8000"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                // Exemple : définir la variable d'environnement si besoin
+                // "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "type": "pwa-chrome",
+            "request": "launch",
+            "name": "Open FastAPI docs (http://localhost:8000/docs)",
+            "url": "http://localhost:8000/docs",
+            "webRoot": "${workspaceFolder}",
+            "preLaunchTask": "docker-compose: up"
+        }
+    ],
+
+    "compounds": [
+        {
+            "name": "Run Backend and Open Docs",
+            "configurations": [
+                "Launch FastAPI (uvicorn)",
+                "Open FastAPI docs (http://localhost:8000/docs)"
+            ]
+        }
+    ]
+}

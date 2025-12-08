@@ -1,0 +1,33 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "docker-compose: up",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "docker-compose down --remove-orphans || true\n# Stoppe les conteneurs Docker qui publient le port 8000 (s'il y en a)\ncontainers=$(docker ps --filter \"publish=8000\" -q)\nif [ -n \"$containers\" ]; then\n  echo \"Stopping containers publishing port 8000: $containers\"\n  docker stop $containers || true\nfi\n# Vérifie s'il y a un processus non-Docker écoutant sur 8000\npid=''\nif command -v lsof >/dev/null 2>&1; then\n  pid=$(lsof -ti:8000 || true)\nelif command -v ss >/dev/null 2>&1; then\n  pid=$(ss -ltnp 2>/dev/null | awk '/:8000 /{print $NF}' | sed -E 's/.*,pid=([0-9]+),.*/\\1/' || true)\nfi\nif [ -n \"$pid\" ]; then\n  echo \"Port 8000 is occupied by process(es): $pid\"\n  echo \"Please stop the process(es) manually (e.g. sudo kill <PID>) or change the port mapping in your docker-compose.yml.\"\n  exit 1\nfi\n# Lancer docker-compose\ndocker-compose up"
+            ],
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "docker-compose: down",
+            "type": "shell",
+            "command": "docker-compose",
+            "args": [
+                "down"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        }
+    ]
+}
