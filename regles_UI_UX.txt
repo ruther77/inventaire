@@ -1,0 +1,59 @@
+1. Hiérarchie cognitive (vs visuelle)
+Ne pensez pas en termes de taille/couleur, mais en termes de charge cognitive. Les meilleurs designs réduisent la charge mentale de l'utilisateur à chaque interaction. Utilisez la progressive disclosure : révélez l'information graduellement selon le contexte.
+2. Affordance intelligente
+Au-delà du simple "ce qui ressemble à un bouton est cliquable". L'affordance experte crée des éléments qui suggèrent tacitement leur comportement sans explication. Les micro-interactions (petits changements visuels au hover/focus) sont vos alliées.
+3. Conception pour l'inévitable (Error Prevention > Error Recovery)
+Les experts anticipent les erreurs avant qu'elles ne se produisent. Plutôt que des messages d'erreur sophistiqués, empêchez l'erreur : validation en temps réel, confirmations intelligentes, limitations d'entrée contextuelle.
+4. Consistance systémique (pas superficielle)
+La consistance experte dépasse les boutons et icônes. C'est une logique comportementale cohérente : si un élément A se comporte X dans le contexte 1, il doit se comporter X dans tous les contextes similaires. Cela crée une "grammaire" utilisable intuitivement.
+5. Conception invisible (Flow state)
+Les meilleurs UX se font oublier. L'utilisateur ne pense pas à l'interface, il accomplit sa tâche. Cela signifie : anticipation des besoins, autocomplétion intelligente, raccourcis cachés pour les experts, mais visibles pour les novices.
+6. Densité informationnelle adaptive
+Un écran n'est pas bon ou mauvais parce qu'il est "dense" ou "épuré". C'est bon s'il offre exactement la densité appropriée pour cette tâche à ce moment. Les experts utilisent le zoom sémantique (détails masqués par défaut, révélés au besoin) plutôt que de forcer le scrolling.
+7. Scannabilité extrême (pas seulement lisibilité)
+Ne demandez pas aux utilisateurs de lire, forcez-les à scanner. Utilisez :
+
+Des patterns visuels répétables (grid, rythme)
+Des contrastes de poids typographique (gras pour les termes clés)
+De l'espace blanc stratégique (pas juste du vide, du "respiration")
+Des groupements par proximité, pas juste par couleur
+
+8. Conception pour les cas d'usage réels (Edge cases are normal cases)
+Les designers novices conçoivent pour les "happy paths". Les experts conçoivent pour :
+
+Les listes vides
+Les textes très longs ou très courts
+Les noms spéciaux (caractères spéciaux, accents)
+Les états de chargement, d'erreur, de succès
+
+9. Feedback multi-sensorial
+Au-delà du visuel. Utilisez la micro-animation, le son subtle (quand approprié), et même les vibrations sur mobile. Mais jamais de feedback superflu : chaque animation doit avoir un but (transition, feedback, guidance).
+10. Contexte > Contenu
+Les meilleurs UX montrent le contexte pertinent en temps réel. Plutôt qu'un bouton "Besoin d'aide ?", montrez des informations conditionnelles : si l'utilisateur hésite sur un champ, montrez un exemple pertinent juste à côté.
+11. Réduction de la friction de décision
+Chaque décision que l'utilisateur doit prendre ralentit son workflow. Les experts :
+
+Définissent des défauts intelligents (basés sur les données/comportements)
+Groupent les décisions connexes
+Cachent les options avancées par défaut
+Proposent des chemins recommandés sans forcer
+
+12. Accessibilité = meilleur design
+Pas un ajout : concevoir pour l'accessibilité (WCAG) rend le design meilleur pour tous. Les utilisateurs malvoyants bénéficient des mêmes contrastes que les utilisateurs en environnement très lumineux. Les utilisateurs dyslexiques bénéficient des mêmes polices que tout le monde en conditions de fatigue.
+13. Performance = UX
+Un formulaire sémantiquement parfait mais lent = mauvaise UX. Les experts comprennent que la performance perçue (feedback rapide, animations fluides) est aussi importante que la performance réelle.
+14. Langage et microcopy
+Le texte d'une interface n'est pas un détail. Le meilleur UX utilise un ton conversationnel, des labels clairs, des messages d'erreur utiles (qui disent QUOI s'est passé et COMMENT corriger), pas juste "Erreur".
+15. Design pour les extrêmes
+Les meilleurs designs fonctionnent pour :
+
+Les utilisateurs novices (onboarding clair, guides visuels)
+Les utilisateurs experts (raccourcis, workflows rapides)
+Et tous les niveaux entre les deux (pas deux interfaces différentes)
+
+16. Cohérence mentale > Cohérence visuelle
+Deux éléments peuvent avoir des visuels différents s'ils servent des rôles mentaux différents. Inversement, deux éléments visuellement identiques mais avec des comportements différents créent de la confusion.
+17. Conception orientée données
+Les experts ne devinent pas. Ils utilisent : heatmaps, eye-tracking, enregistrements session, A/B tests. Les décisions UX sont basées sur le comportement réel, pas les hypothèses.
+18. Respect de l'intention utilisateur
+Si l'utilisateur essaie d'accomplir X, ne le forcez pas dans Y juste parce que c'est mieux pour votre métrique. Comprenez le pourquoi derrière le comportement avant de le corriger.

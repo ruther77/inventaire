@@ -4,18 +4,12 @@
 .env
 .env.*
 *.py[cod]
-__pycache__/
-.pytest_cache/
-.mypy_cache/
-*.log
-*.sqlite*
-*.db
-*.sql
-venv/
-venv_extract/
-.vscode/
-.idea/
-.DS_Store
+__pycache__
+*.pyc
+.env
+.venv
+venv
+.vscode
 
 # Artefacts locaux
 *.egg-info/

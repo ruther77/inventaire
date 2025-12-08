@@ -134,12 +134,12 @@ export default function SidebarNav({ routes, isOpen, onClose }) {
                       <Icon className="h-4 w-4" />
                       {label}
                     </div>
-                    <p className="text-xs text-slate-400">{description}</p>
+                    <p className="text-xs text-slate-300">{description}</p>
                   </NavLink>
                   {sections && (
                     <button
                       type="button"
-                      className="rounded-full border border-white/20 p-2 text-white hover:border-white/40"
+                      className="rounded-full border border-white/20 p-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-white hover:border-white/40 hover:bg-white/10 transition-colors"
                       onClick={(event) => {
                         event.stopPropagation();
                         setOpenRoute(showSections ? null : path);
@@ -166,7 +166,7 @@ export default function SidebarNav({ routes, isOpen, onClose }) {
                             onClick={onClose}
                           >
                             <span className="font-semibold text-white">{section.label}</span>
-                            <span className="text-[11px] text-slate-300">{section.description}</span>
+                            <span className="text-[11px] text-slate-400">{section.description}</span>
                           </NavLink>
                         </li>
                       ))}

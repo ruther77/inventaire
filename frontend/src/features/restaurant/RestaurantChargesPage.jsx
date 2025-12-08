@@ -119,16 +119,23 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
   );
   const avgMonthly = filteredMonthly.length ? totalHT / filteredMonthly.length : 0;
 
-  const groupTotals = (field, fallbackLabel) =>
-    scopedExpenses.reduce((acc, expense) => {
-      const label = expense[field] || fallbackLabel;
+  const categoryTotals = useMemo(() => {
+    return scopedExpenses.reduce((acc, expense) => {
+      const label = expense.categorie || 'Autres charges';
       const amount = Number(expense.montant_ht) || 0;
       acc[label] = (acc[label] || 0) + amount;
       return acc;
     }, {});
+  }, [scopedExpenses]);
 
-  const categoryTotals = useMemo(() => groupTotals('categorie', 'Autres charges'), [scopedExpenses]);
-  const costCenterTotals = useMemo(() => groupTotals('cost_center', 'Non affecté'), [scopedExpenses]);
+  const costCenterTotals = useMemo(() => {
+    return scopedExpenses.reduce((acc, expense) => {
+      const label = expense.cost_center || 'Non affecté';
+      const amount = Number(expense.montant_ht) || 0;
+      acc[label] = (acc[label] || 0) + amount;
+      return acc;
+    }, {});
+  }, [scopedExpenses]);
 
   const topCategories = useMemo(
     () =>

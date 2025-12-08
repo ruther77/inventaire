@@ -88,6 +88,21 @@ export const syncRestaurantIngredients = async () => {
   return data;
 };
 
+export const fetchEpicerieProducts = async () => {
+  const { data } = await api.get('/restaurant/epicerie/products');
+  return data;
+};
+
+export const updatePlatMapping = async (platId, payload) => {
+  const { data } = await api.put(`/restaurant/plats/${platId}/mapping`, payload);
+  return data;
+};
+
+export const deletePlatMapping = async (platId) => {
+  const { data } = await api.delete(`/restaurant/plats/${platId}/mapping`);
+  return data;
+};
+
 export const updateRestaurantIngredientPrice = async (ingredientId, payload) => {
   const { data } = await api.patch(`/restaurant/ingredients/${ingredientId}/price`, payload);
   return data;
@@ -530,6 +545,26 @@ export const fetchFinanceAccounts = async (filters = {}) => {
   if (filters.isActive !== undefined) params.set('is_active', filters.isActive);
   const query = params.toString();
   const { data } = await api.get(query ? `/finance/accounts?${query}` : '/finance/accounts');
+  return data;
+};
+
+export const getFinanceAccount = async (accountId) => {
+  const { data } = await api.get(`/finance/accounts/${accountId}`);
+  return data;
+};
+
+export const createFinanceAccount = async (payload) => {
+  const { data } = await api.post('/finance/accounts', payload);
+  return data;
+};
+
+export const updateFinanceAccount = async ({ accountId, payload }) => {
+  const { data } = await api.put(`/finance/accounts/${accountId}`, payload);
+  return data;
+};
+
+export const deleteFinanceAccount = async (accountId) => {
+  const { data } = await api.delete(`/finance/accounts/${accountId}`);
   return data;
 };
 

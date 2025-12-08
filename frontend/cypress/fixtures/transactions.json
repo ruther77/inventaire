@@ -1,0 +1,34 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "date": "2025-12-01",
+      "description": "Achat fournitures",
+      "amount": -150.50,
+      "category": "Fournitures",
+      "account": "Compte courant",
+      "status": "validated"
+    },
+    {
+      "id": 2,
+      "date": "2025-12-02",
+      "description": "Vente produits",
+      "amount": 250.00,
+      "category": "Ventes",
+      "account": "Compte courant",
+      "status": "pending"
+    },
+    {
+      "id": 3,
+      "date": "2025-12-03",
+      "description": "Paiement loyer",
+      "amount": -800.00,
+      "category": "Loyer",
+      "account": "Compte courant",
+      "status": "validated"
+    }
+  ],
+  "total": 3,
+  "page": 1,
+  "pageSize": 10
+}

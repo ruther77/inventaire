@@ -23,8 +23,11 @@ from pathlib import Path
 import psycopg2
 from psycopg2.extras import execute_values
 
-# Importer les parseurs depuis analyze_releves
-sys.path.insert(0, str(Path(__file__).parent))
+# Importer les parseurs depuis analyze_releves (dans scripts/etl/)
+scripts_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(scripts_dir / "etl"))
+sys.path.insert(0, str(scripts_dir.parent))  # Pour core/
+
 from analyze_releves import (
     CATEGORIES,
     KeywordAnalyzer,
@@ -39,22 +42,22 @@ from analyze_releves import (
 DB_CONFIG = {
     "host": os.environ.get("DB_HOST", "db"),
     "port": os.environ.get("DB_PORT", "5432"),
-    "dbname": os.environ.get("DB_NAME", "epicerie"),
+    "dbname": os.environ.get("DB_NAME", "postgres"),
     "user": os.environ.get("DB_USER", "postgres"),
     "password": os.environ.get("DB_PASSWORD", "postgres"),
 }
 
 # Mapping fichiers -> (account_id, entity_id)
 FILE_TO_ACCOUNT = {
-    # LCL - INCONTOURNABLE (entity_id=3)
-    "COMPTECOURANT_00459448258": (1, 3),
-    "l'incontournable": (1, 3),
-    # LCL - NOUTAM (entity_id=2)
-    "releve noutam lcl": (2, 2),
-    # SUMUP - INCONTOURNABLE (entity_id=3)
-    "sumup releve": (3, 3),
-    # BNP - ANGELE (entity_id=2)
-    "releve 23 24 25 BNP angele": (14, 2),
+    # LCL - NOUTAM / Epicerie (account 1, entity 1)
+    "COMPTECOURANT_00459448258": (1, 1),
+    "releve noutam lcl": (1, 1),
+    # LCL - L'INCONTOURNABLE / Restaurant (account 2, entity 2)
+    "l'incontournable": (2, 2),
+    # BNP - ANGELE (account 3, entity 2)
+    "releve 23 24 25 BNP angele": (3, 2),
+    # SUMUP - L'INCONTOURNABLE (account 4, entity 2)
+    "sumup releve": (4, 2),
 }
 
 
@@ -106,13 +109,30 @@ def compute_checksum(date_op, libelle, montant, account_id) -> str:
     return hashlib.md5(data.encode()).hexdigest()
 
 
-def import_to_db(folder: str = "/app/releve"):
-    """Import les relevés dans la base de données."""
+def get_month_bounds(year: int, month: int):
+    """Retourne le premier et dernier jour du mois."""
+    import calendar
+    first_day = datetime(year, month, 1)
+    last_day_num = calendar.monthrange(year, month)[1]
+    last_day = datetime(year, month, last_day_num)
+    return first_day, last_day
+
+
+def import_to_db(folder: str = "/app/releve", split_by_month: bool = True):
+    """Import les relevés dans la base de données.
+
+    Args:
+        folder: Dossier contenant les PDF
+        split_by_month: Si True, crée un relevé par mois au lieu d'un par fichier
+    """
+    from collections import defaultdict
+
     folder_path = Path(folder)
     pdf_files = list(folder_path.glob("*.pdf"))
 
     print(f"📂 Import depuis: {folder}")
     print(f"   {len(pdf_files)} fichiers PDF trouvés")
+    print(f"   Mode: {'Découpage par mois' if split_by_month else 'Un relevé par fichier'}")
 
     # Connexion BDD
     conn = psycopg2.connect(**DB_CONFIG)
@@ -125,7 +145,7 @@ def import_to_db(folder: str = "/app/releve"):
 
     # Catégorie par défaut pour les non-catégorisées
     default_category_id = categories_map.get('frais_generaux', categories_map.get('achats_fournisseurs'))
-    if not default_category_id:
+    if not default_category_id and categories_map:
         default_category_id = list(categories_map.values())[0]
     print(f"   Catégorie par défaut: {default_category_id}")
 
@@ -146,164 +166,228 @@ def import_to_db(folder: str = "/app/releve"):
                 print(f"   ⚠ {pdf_file.name}: Aucune transaction")
                 continue
 
-            # Déterminer la période
-            period_start = None
-            period_end = None
+            # Parser toutes les transactions avec leurs dates
+            parsed_transactions = []
+            period_ref = None
 
+            # Extraire la période de référence du fichier pour ajuster les années
             if stmt.period_start:
-                period_start = parse_date(stmt.period_start, stmt.bank_type)
-            if stmt.period_end:
-                period_end = parse_date(stmt.period_end, stmt.bank_type)
-
-            # Si pas de période, utiliser les dates des transactions
-            if not period_start or not period_end:
-                dates = []
-                for tx in stmt.transactions:
-                    d = parse_date(tx.date, stmt.bank_type)
-                    if d:
-                        dates.append(d)
-                if dates:
-                    period_start = min(dates)
-                    period_end = max(dates)
-
-            # Calculer le hash du fichier pour éviter doublons
-            file_hash = hashlib.md5(pdf_file.read_bytes()).hexdigest()
-
-            # Vérifier si déjà importé
-            cur.execute("SELECT id FROM finance_bank_statements WHERE hash = %s", (file_hash,))
-            existing = cur.fetchone()
-            if existing:
-                print(f"   ⏭ {pdf_file.name}: Déjà importé (id={existing[0]})")
-                continue
-
-            # Insérer le statement
-            cur.execute("""
-                INSERT INTO finance_bank_statements
-                (account_id, period_start, period_end, source, file_name, hash)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """, (account_id, period_start, period_end, 'PDF_IMPORT', pdf_file.name, file_hash))
-            statement_id = cur.fetchone()[0]
-            total_statements += 1
-
-            # Préparer les lignes
-            lines_data = []
-            transactions_data = []
+                period_ref = parse_date(stmt.period_start, stmt.bank_type)
+            elif stmt.period_end:
+                period_ref = parse_date(stmt.period_end, stmt.bank_type)
 
             for tx in stmt.transactions:
-                # Parser la date
                 date_op = parse_date(tx.date, stmt.bank_type)
                 date_val = parse_date(tx.valeur, stmt.bank_type) if tx.valeur else date_op
 
                 if not date_op:
                     continue
 
-                # Ajuster l'année selon la période
-                if period_start and date_op.year == 2024:
-                    if period_start.year != 2024:
-                        # Ajuster l'année (attention au 29 février)
-                        target_year = period_start.year if date_op.month >= period_start.month else (period_end.year if period_end else period_start.year)
-                        try:
-                            date_op = date_op.replace(year=target_year)
-                        except ValueError:
-                            # 29 février dans une année non bissextile
-                            date_op = date_op.replace(day=28, year=target_year)
-
-                # Calculer le montant (positif pour crédit, négatif pour débit)
+                # Calculer le montant
                 montant = Decimal("0")
                 if tx.credit:
                     montant = tx.credit
                 elif tx.debit:
                     montant = -tx.debit
 
-                # Checksum pour éviter doublons
-                checksum = compute_checksum(date_op, tx.libelle, montant, account_id)
+                # Utiliser la période du relevé d'origine si disponible (LCL)
+                # Sinon fallback sur le mois calendaire
+                if tx.statement_period:
+                    period_key = tx.statement_period  # (period_start, period_end) DD.MM.YYYY
+                else:
+                    # Fallback: construire une clé basée sur le mois calendaire
+                    period_key = (date_op.year, date_op.month)
 
-                # Catégoriser
-                cat_code, keywords = analyzer.categorize(tx.libelle)
-                category_id = categories_map.get(cat_code) if cat_code else None
+                parsed_transactions.append({
+                    'date_op': date_op,
+                    'date_val': date_val,
+                    'libelle': tx.libelle,
+                    'montant': montant,
+                    'period_key': period_key,
+                    'statement_period': tx.statement_period,
+                })
 
-                lines_data.append((
-                    statement_id,
-                    date_op,
-                    date_val,
-                    tx.libelle,
-                    float(montant),
-                    None,  # balance_apres
-                    None,  # ref_banque
-                    None,  # raw_data
-                    checksum,
-                ))
+            if not parsed_transactions:
+                print(f"   ⚠ {pdf_file.name}: Aucune transaction valide")
+                continue
 
-                transactions_data.append((
-                    account_id,
-                    date_op,
-                    tx.libelle,
-                    float(montant),
-                    category_id,
-                    checksum,
-                ))
+            # Grouper par période de relevé
+            if split_by_month:
+                by_period = defaultdict(list)
+                for ptx in parsed_transactions:
+                    by_period[ptx['period_key']].append(ptx)
 
-            # Insérer les lignes de statement (sans ON CONFLICT car pas de contrainte UNIQUE)
-            if lines_data:
-                for line in lines_data:
-                    statement_id_l, date_op_l, date_val_l, libelle_l, montant_l, balance_l, ref_l, raw_l, checksum_l = line
-                    # Vérifier si le checksum existe déjà
-                    cur.execute("SELECT id FROM finance_bank_statement_lines WHERE checksum = %s", (checksum_l,))
-                    if cur.fetchone():
-                        continue
+                print(f"   📄 {pdf_file.name}: {len(parsed_transactions)} tx → {len(by_period)} périodes")
+
+                for period_key, period_txs in sorted(by_period.items(), key=lambda x: str(x[0])):
+                    # Déterminer les dates de période
+                    if isinstance(period_key, tuple) and len(period_key) == 2 and isinstance(period_key[0], str):
+                        # C'est une vraie période de relevé (period_start, period_end) DD.MM.YYYY
+                        period_start = parse_date(period_key[0], stmt.bank_type)
+                        period_end = parse_date(period_key[1], stmt.bank_type)
+                        period_label = f"{period_key[0]}-{period_key[1]}"
+                        # Extraire year/month de la fin de période pour lookup solde
+                        year = period_end.year
+                        month = period_end.month
+                    else:
+                        # Fallback: (year, month) tuple
+                        year, month = period_key
+                        period_start, period_end = get_month_bounds(year, month)
+                        period_label = f"{year}-{month:02d}"
+
+                    period_hash = hashlib.md5(f"{pdf_file.name}:{period_label}".encode()).hexdigest()
+
+                    # Récupérer le solde d'ouverture pour cette période
+                    opening_balance = stmt.opening_balances.get((year, month))
+
+                    # Vérifier si cette période est déjà importée
                     cur.execute("""
-                        INSERT INTO finance_bank_statement_lines
-                        (statement_id, date_operation, date_valeur, libelle_banque, montant,
-                         balance_apres, ref_banque, raw_data, checksum)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, line)
-                    total_lines += 1
+                        SELECT id, opening_balance FROM finance_bank_statements
+                        WHERE account_id = %s AND period_start = %s AND period_end = %s
+                    """, (account_id, period_start.date(), period_end.date()))
+                    existing = cur.fetchone()
+                    if existing:
+                        # Mettre à jour le solde d'ouverture si manquant
+                        if opening_balance is not None and existing[1] is None:
+                            cur.execute("""
+                                UPDATE finance_bank_statements
+                                SET opening_balance = %s
+                                WHERE id = %s
+                            """, (float(opening_balance), existing[0]))
+                            conn.commit()
+                            print(f"      🔄 {period_label}: Solde ouverture mis à jour ({opening_balance:.2f}€)")
+                        else:
+                            print(f"      ⏭ {period_label}: Déjà importé")
+                        continue
 
-            # Insérer les transactions
-            for tx_data in transactions_data:
-                _, date_op, libelle, montant, category_id, checksum = tx_data
+                    # Créer le statement pour cette période avec solde d'ouverture
+                    cur.execute("""
+                        INSERT INTO finance_bank_statements
+                        (account_id, period_start, period_end, source, file_name, hash, opening_balance)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    """, (account_id, period_start.date(), period_end.date(), 'PDF_IMPORT',
+                          f"{pdf_file.name}:{period_label}", period_hash,
+                          float(opening_balance) if opening_balance else None))
+                    statement_id = cur.fetchone()[0]
+                    total_statements += 1
 
-                # Déterminer la direction
-                direction = 'IN' if montant > 0 else 'OUT'
-                amount_abs = abs(montant)
+                    # Insérer les lignes de cette période
+                    period_lines = 0
+                    period_tx_count = 0
+                    for ptx in period_txs:
+                        checksum = compute_checksum(ptx['date_op'], ptx['libelle'], ptx['montant'], account_id)
 
-                # Vérifier si existe déjà (même compte, date, montant, libellé)
-                cur.execute("""
-                    SELECT ft.id FROM finance_transactions ft
-                    JOIN finance_transaction_lines ftl ON ftl.transaction_id = ft.id
-                    WHERE ft.account_id = %s AND ft.date_operation = %s
-                      AND ft.amount = %s AND ftl.description = %s
-                    LIMIT 1
-                """, (account_id, date_op, amount_abs, libelle))
+                        # Vérifier doublon ligne
+                        cur.execute("SELECT id FROM finance_bank_statement_lines WHERE checksum = %s", (checksum,))
+                        if cur.fetchone():
+                            continue
 
+                        # Insérer ligne de relevé
+                        cur.execute("""
+                            INSERT INTO finance_bank_statement_lines
+                            (statement_id, date_operation, date_valeur, libelle_banque, montant, checksum)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (statement_id, ptx['date_op'].date(),
+                              ptx['date_val'].date() if ptx['date_val'] else None,
+                              ptx['libelle'], float(ptx['montant']), checksum))
+                        period_lines += 1
+                        total_lines += 1
+
+                        # Créer la transaction
+                        direction = 'IN' if ptx['montant'] > 0 else 'OUT'
+                        amount_abs = abs(float(ptx['montant']))
+
+                        # Catégoriser
+                        cat_code, _ = analyzer.categorize(ptx['libelle'])
+                        category_id = categories_map.get(cat_code) if cat_code else default_category_id
+                        if not category_id:
+                            category_id = default_category_id
+
+                        cur.execute("""
+                            INSERT INTO finance_transactions
+                            (entity_id, account_id, direction, source, date_operation, amount,
+                             ref_externe, status)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            RETURNING id
+                        """, (entity_id, account_id, direction, 'IMPORT_PDF',
+                              ptx['date_op'].date(), amount_abs, f"stmtline:{checksum}", 'CONFIRMED'))
+                        tx_id = cur.fetchone()[0]
+
+                        cur.execute("""
+                            INSERT INTO finance_transaction_lines
+                            (transaction_id, category_id, montant_ttc, description, position)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (tx_id, category_id, amount_abs, ptx['libelle'], 1))
+                        period_tx_count += 1
+                        total_transactions += 1
+
+                    conn.commit()
+                    print(f"      ✓ {period_label}: {period_lines} lignes, {period_tx_count} tx")
+
+            else:
+                # Mode original: un relevé par fichier
+                period_start = min(ptx['date_op'] for ptx in parsed_transactions)
+                period_end = max(ptx['date_op'] for ptx in parsed_transactions)
+                file_hash = hashlib.md5(pdf_file.read_bytes()).hexdigest()
+
+                cur.execute("SELECT id FROM finance_bank_statements WHERE hash = %s", (file_hash,))
                 if cur.fetchone():
+                    print(f"   ⏭ {pdf_file.name}: Déjà importé")
                     continue
 
-                # Insérer transaction
                 cur.execute("""
-                    INSERT INTO finance_transactions
-                    (entity_id, account_id, direction, source, date_operation, amount, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO finance_bank_statements
+                    (account_id, period_start, period_end, source, file_name, hash)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     RETURNING id
-                """, (entity_id, account_id, direction, 'IMPORT_PDF', date_op, amount_abs, 'CONFIRMED'))
-                tx_id = cur.fetchone()[0]
+                """, (account_id, period_start.date(), period_end.date(), 'PDF_IMPORT', pdf_file.name, file_hash))
+                statement_id = cur.fetchone()[0]
+                total_statements += 1
 
-                # Catégorie fallback si non trouvée (frais_generaux)
-                if category_id is None:
-                    category_id = default_category_id
+                for ptx in parsed_transactions:
+                    checksum = compute_checksum(ptx['date_op'], ptx['libelle'], ptx['montant'], account_id)
 
-                # Insérer ligne de transaction avec catégorie
-                cur.execute("""
-                    INSERT INTO finance_transaction_lines
-                    (transaction_id, category_id, montant_ttc, description, position)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (tx_id, category_id, amount_abs, libelle, 1))
+                    # Vérifier doublon ligne
+                    cur.execute("SELECT id FROM finance_bank_statement_lines WHERE checksum = %s", (checksum,))
+                    if cur.fetchone():
+                        continue
 
-                total_transactions += 1
+                    # Insérer ligne de relevé
+                    cur.execute("""
+                        INSERT INTO finance_bank_statement_lines
+                        (statement_id, date_operation, date_valeur, libelle_banque, montant, checksum)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (statement_id, ptx['date_op'].date(),
+                          ptx['date_val'].date() if ptx['date_val'] else None,
+                          ptx['libelle'], float(ptx['montant']), checksum))
+                    total_lines += 1
 
-            conn.commit()
-            print(f"   ✓ {pdf_file.name}: {len(stmt.transactions)} tx → compte {account_id}")
+                    # Créer la transaction
+                    direction = 'IN' if ptx['montant'] > 0 else 'OUT'
+                    amount_abs = abs(float(ptx['montant']))
+
+                    cat_code, _ = analyzer.categorize(ptx['libelle'])
+                    category_id = categories_map.get(cat_code) if cat_code else default_category_id
+
+                    cur.execute("""
+                        INSERT INTO finance_transactions
+                        (entity_id, account_id, direction, source, date_operation, amount, ref_externe, status)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    """, (entity_id, account_id, direction, 'IMPORT_PDF',
+                          ptx['date_op'].date(), amount_abs, f"stmtline:{checksum}", 'CONFIRMED'))
+                    tx_id = cur.fetchone()[0]
+
+                    cur.execute("""
+                        INSERT INTO finance_transaction_lines
+                        (transaction_id, category_id, montant_ttc, description, position)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (tx_id, category_id, amount_abs, ptx['libelle'], 1))
+                    total_transactions += 1
+
+                conn.commit()
+                print(f"   ✓ {pdf_file.name}: {len(parsed_transactions)} tx → compte {account_id}")
 
         except Exception as e:
             conn.rollback()

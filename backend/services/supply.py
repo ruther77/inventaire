@@ -72,6 +72,7 @@ def compute_supply_plan(
                 "value_total": 0.0,
                 "margin_total": 0.0,
             },
+            "available_categories": [],
             "items": [],
             "supplier_breakdown": [],
         }
@@ -154,6 +155,7 @@ def compute_supply_plan(
                 "value_total": 0.0,
                 "margin_total": 0.0,
             },
+            "available_categories": all_categories,
             "items": [],
             "supplier_breakdown": [],
         }

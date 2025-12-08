@@ -256,6 +256,11 @@ class RestaurantPlatEpicerieLink(BaseModel):
     ratio: float | None = None
 
 
+class RestaurantPlatMappingCreate(BaseModel):
+    produit_epicerie_id: int
+    ratio: float = Field(default=1.0, ge=0.0001)
+
+
 class RestaurantBankStatementSummaryPreset(BaseModel):
     name: str
     label: str

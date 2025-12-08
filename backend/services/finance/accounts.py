@@ -96,3 +96,93 @@ def list_accounts(entity_id: Optional[int] = None, is_active: Optional[bool] = N
     if df.empty:
         return []
     return df.to_dict("records")
+
+
+def get_account(account_id: int) -> dict[str, Any] | None:
+    """Récupère un compte par son ID."""
+    df = query_df(
+        text(
+            """
+            SELECT id, entity_id, type, label, iban, bic, currency, is_active, metadata, created_at, updated_at
+            FROM finance_accounts
+            WHERE id = :account_id
+            """
+        ),
+        params={"account_id": int(account_id)},
+    )
+    if df.empty:
+        return None
+    return df.to_dict("records")[0]
+
+
+def update_account(account_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    """Met à jour un compte financier."""
+    from core.data_repository import get_engine
+
+    # Vérifier que le compte existe
+    existing = get_account(account_id)
+    if not existing:
+        raise ValueError("Compte introuvable")
+
+    # Construire la requête dynamiquement
+    allowed_fields = {"label", "iban", "bic", "type", "is_active", "metadata"}
+    updates = []
+    params: dict[str, Any] = {"account_id": int(account_id)}
+
+    for field in allowed_fields:
+        if field in payload:
+            updates.append(f"{field} = :{field}")
+            params[field] = payload[field]
+
+    if not updates:
+        return existing
+
+    updates.append("updated_at = now()")
+    update_sql = ", ".join(updates)
+
+    with get_engine().begin() as conn:
+        conn.execute(
+            text(f"UPDATE finance_accounts SET {update_sql} WHERE id = :account_id"),
+            params,
+        )
+
+    return get_account(account_id) or existing
+
+
+def delete_account(account_id: int) -> bool:
+    """Supprime un compte financier (soft delete via is_active=false, ou hard delete si pas de données)."""
+    from core.data_repository import get_engine
+
+    existing = get_account(account_id)
+    if not existing:
+        raise ValueError("Compte introuvable")
+
+    with get_engine().begin() as conn:
+        # Vérifier si le compte a des transactions ou relevés associés
+        has_data = conn.execute(
+            text(
+                """
+                SELECT 1 FROM (
+                    SELECT 1 FROM finance_transactions WHERE account_id = :account_id LIMIT 1
+                    UNION ALL
+                    SELECT 1 FROM finance_bank_statements WHERE account_id = :account_id LIMIT 1
+                ) sub LIMIT 1
+                """
+            ),
+            {"account_id": account_id},
+        ).fetchone()
+
+        if has_data:
+            # Soft delete: désactiver le compte
+            conn.execute(
+                text("UPDATE finance_accounts SET is_active = false, updated_at = now() WHERE id = :account_id"),
+                {"account_id": account_id},
+            )
+        else:
+            # Hard delete: supprimer le compte
+            conn.execute(
+                text("DELETE FROM finance_accounts WHERE id = :account_id"),
+                {"account_id": account_id},
+            )
+
+    return True

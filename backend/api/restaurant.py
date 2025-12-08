@@ -37,6 +37,7 @@ from backend.schemas.restaurant import (
     RestaurantConsumptionEntry,
     RestaurantPriceHistoryComparisonEntry,
     RestaurantPlatEpicerieLink,
+    RestaurantPlatMappingCreate,
 )
 from backend.services import restaurant as restaurant_service
 from backend.services import supply as supply_service  # noqa: F401
@@ -213,6 +214,42 @@ def list_plats_with_epicerie(tenant: Tenant = Depends(get_current_tenant)):
 def sync_ingredients(tenant: Tenant = Depends(get_current_tenant)):
     count = restaurant_service.sync_ingredients_from_mappings(tenant.id)
     return {"inserted": count}
+
+
+@router.get("/epicerie/products")
+def list_epicerie_products():
+    """List all epicerie products available for mapping."""
+    return restaurant_service.list_epicerie_products(tenant_epicerie=1)
+
+
+@router.put("/plats/{plat_id}/mapping", response_model=RestaurantPlatEpicerieLink)
+def upsert_plat_mapping(
+    plat_id: int,
+    payload: RestaurantPlatMappingCreate,
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """Create or update a plat-epicerie mapping."""
+    restaurant_service.upsert_plat_epicerie_mapping(
+        tenant_restaurant=tenant.id,
+        plat_id=plat_id,
+        produit_epicerie_id=payload.produit_epicerie_id,
+        ratio=payload.ratio,
+    )
+    links = restaurant_service.list_plat_epicerie_links(tenant.id)
+    for link in links:
+        if link["plat_id"] == plat_id:
+            return link
+    return {"plat_id": plat_id, "plat_nom": "", "produit_epicerie_id": payload.produit_epicerie_id, "ratio": payload.ratio}
+
+
+@router.delete("/plats/{plat_id}/mapping")
+def delete_plat_mapping(
+    plat_id: int,
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """Delete a plat-epicerie mapping."""
+    restaurant_service.delete_plat_epicerie_mapping(tenant.id, plat_id)
+    return {"status": "deleted", "plat_id": plat_id}
 
 
 @router.get("/bank-statements/summary", response_model=RestaurantBankStatementSummary, deprecated=True)

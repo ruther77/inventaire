@@ -10,6 +10,20 @@
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     background-color: #edf2f7;
     color: #0f172a;
+
+    /* Animation timing tokens */
+    --duration-fastest: 75ms;
+    --duration-fast: 150ms;
+    --duration-default: 200ms;
+    --duration-slow: 300ms;
+    --duration-slower: 500ms;
+
+    /* Easing tokens */
+    --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --ease-out: cubic-bezier(0, 0, 0.2, 1);
+    --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
 
   body {
@@ -20,9 +34,127 @@
   #root {
     @apply min-h-screen bg-slate-100;
   }
+
+  /* Smooth scrolling par défaut */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Focus visible amélioré */
+  :focus-visible {
+    outline: 2px solid theme('colors.brand.500');
+    outline-offset: 2px;
+  }
+
+  /* Selection styling */
+  ::selection {
+    background-color: theme('colors.brand.100');
+    color: theme('colors.brand.900');
+  }
 }
 
 @layer components {
+  /* ============================================
+     ANIMATIONS - Keyframes et classes utilitaires
+     ============================================ */
+
+  /* Fade in */
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Fade out */
+  @keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  /* Zoom in */
+  @keyframes zoom-in-95 {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  /* Zoom out */
+  @keyframes zoom-out-95 {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
+  }
+
+  /* Slide in from bottom */
+  @keyframes slide-in-from-bottom {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Slide in from top */
+  @keyframes slide-in-from-top {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Slide in from left */
+  @keyframes slide-in-from-left {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Slide in from right */
+  @keyframes slide-in-from-right {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Spin */
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* Bounce */
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  /* Shake */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+
+  /* Animation utility classes */
+  .animate-in {
+    animation-duration: 200ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    animation-fill-mode: forwards;
+  }
+
+  .animate-out {
+    animation-duration: 150ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    animation-fill-mode: forwards;
+  }
+
+  .fade-in { animation-name: fade-in; }
+  .fade-out { animation-name: fade-out; }
+  .zoom-in-95 { animation-name: zoom-in-95; }
+  .zoom-out-95 { animation-name: zoom-out-95; }
+  .slide-in-from-bottom { animation-name: slide-in-from-bottom; }
+  .slide-in-from-top { animation-name: slide-in-from-top; }
+  .slide-in-from-left { animation-name: slide-in-from-left; }
+  .slide-in-from-right { animation-name: slide-in-from-right; }
+
+  .duration-150 { animation-duration: 150ms; }
+  .duration-200 { animation-duration: 200ms; }
+  .duration-300 { animation-duration: 300ms; }
+  .duration-500 { animation-duration: 500ms; }
+
+  /* ============================================
+     GLASS PANEL - Composant de base
+     ============================================ */
   .glass-panel {
     @apply rounded-3xl bg-white/90 shadow-soft ring-1 ring-slate-200 backdrop-blur;
   }
@@ -100,5 +232,258 @@
 
   .restaurant-panel {
     @apply rounded-[32px] border border-white/10 bg-white/95 p-6 text-slate-900 shadow-2xl;
+  }
+
+  /* ============================================
+     STAGGERED ANIMATIONS - Pour listes et grilles
+     ============================================ */
+
+  @keyframes stagger-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .stagger-item {
+    animation: stagger-fade-in 300ms var(--ease-spring) forwards;
+    opacity: 0;
+  }
+
+  .stagger-item:nth-child(1) { animation-delay: 0ms; }
+  .stagger-item:nth-child(2) { animation-delay: 50ms; }
+  .stagger-item:nth-child(3) { animation-delay: 100ms; }
+  .stagger-item:nth-child(4) { animation-delay: 150ms; }
+  .stagger-item:nth-child(5) { animation-delay: 200ms; }
+  .stagger-item:nth-child(6) { animation-delay: 250ms; }
+  .stagger-item:nth-child(7) { animation-delay: 300ms; }
+  .stagger-item:nth-child(8) { animation-delay: 350ms; }
+  .stagger-item:nth-child(9) { animation-delay: 400ms; }
+  .stagger-item:nth-child(10) { animation-delay: 450ms; }
+  .stagger-item:nth-child(n+11) { animation-delay: 500ms; }
+
+  /* Variante rapide */
+  .stagger-fast .stagger-item:nth-child(1) { animation-delay: 0ms; }
+  .stagger-fast .stagger-item:nth-child(2) { animation-delay: 30ms; }
+  .stagger-fast .stagger-item:nth-child(3) { animation-delay: 60ms; }
+  .stagger-fast .stagger-item:nth-child(4) { animation-delay: 90ms; }
+  .stagger-fast .stagger-item:nth-child(5) { animation-delay: 120ms; }
+  .stagger-fast .stagger-item:nth-child(n+6) { animation-delay: 150ms; }
+
+  /* ============================================
+     SKELETON SHIMMER - Effet de chargement avancé
+     ============================================ */
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      theme('colors.slate.200') 0%,
+      theme('colors.slate.100') 20%,
+      theme('colors.slate.200') 40%,
+      theme('colors.slate.200') 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  /* Shimmer sur fond sombre */
+  .skeleton-shimmer-dark {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0.1) 20%,
+      rgba(255, 255, 255, 0.05) 40%,
+      rgba(255, 255, 255, 0.05) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  /* ============================================
+     HOVER EFFECTS - Effets de survol avancés
+     ============================================ */
+
+  .hover-lift {
+    @apply transition-transform duration-200;
+  }
+
+  .hover-lift:hover {
+    @apply -translate-y-1;
+  }
+
+  .hover-glow {
+    @apply transition-shadow duration-200;
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 20px rgba(29, 131, 255, 0.3);
+  }
+
+  /* ============================================
+     SIDEBAR NAV - Indicateur de position animé
+     ============================================ */
+
+  .nav-indicator {
+    @apply absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 rounded-full bg-brand-400;
+    animation: nav-indicator-in 200ms var(--ease-spring) forwards;
+  }
+
+  @keyframes nav-indicator-in {
+    from {
+      opacity: 0;
+      transform: translateY(-50%) scaleY(0);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(-50%) scaleY(1);
+    }
+  }
+
+  /* ============================================
+     ROW HOVER - Effet pour les lignes de tableau
+     ============================================ */
+
+  .row-hover {
+    @apply transition-all duration-150;
+  }
+
+  .row-hover:hover {
+    @apply bg-slate-50 shadow-sm;
+  }
+
+  /* ============================================
+     FOCUS RING VARIANTS - Anneaux de focus colorés
+     ============================================ */
+
+  .focus-ring-brand {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2;
+  }
+
+  .focus-ring-success {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2;
+  }
+
+  .focus-ring-error {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2;
+  }
+
+  .focus-ring-warning {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2;
+  }
+
+  .focus-ring-dark {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900;
+  }
+
+  /* ============================================
+     TACTILE TARGETS - Zones tactiles minimales
+     ============================================ */
+
+  .tactile-target {
+    @apply min-w-[44px] min-h-[44px] flex items-center justify-center;
+  }
+
+  .tactile-target-sm {
+    @apply min-w-[36px] min-h-[36px] flex items-center justify-center;
+  }
+
+  .tactile-target-lg {
+    @apply min-w-[48px] min-h-[48px] flex items-center justify-center;
+  }
+
+  /* ============================================
+     SCREEN READER ONLY - Accessibilité
+     ============================================ */
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .not-sr-only {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+}
+
+/* ============================================
+   REDUCE MOTION - Support accessibilité
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .stagger-item {
+    opacity: 1;
+    animation: none;
+  }
+
+  .skeleton-shimmer,
+  .skeleton-shimmer-dark {
+    animation: none;
+    background: theme('colors.slate.200');
+  }
+
+  .hover-lift:hover {
+    transform: none;
+  }
+}
+
+/* ============================================
+   HIGH CONTRAST MODE - Support accessibilité
+   ============================================ */
+
+@media (prefers-contrast: more) {
+  :root {
+    --border-width: 2px;
+  }
+
+  .glass-panel {
+    @apply border-2 border-slate-400;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    @apply border-2;
+  }
+
+  .badge {
+    @apply border-2;
   }
 }

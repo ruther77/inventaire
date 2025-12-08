@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "Règle fournitures",
+      "condition": "description contient 'fournitures'",
+      "action": "Catégoriser comme Fournitures",
+      "category": "Fournitures",
+      "active": true,
+      "priority": 1
+    },
+    {
+      "id": 2,
+      "name": "Règle loyer",
+      "condition": "description contient 'loyer'",
+      "action": "Catégoriser comme Loyer",
+      "category": "Loyer",
+      "active": true,
+      "priority": 2
+    }
+  ],
+  "total": 2
+}

@@ -78,6 +78,41 @@ def list_accounts(
     return finance_accounts.list_accounts(entity_id=entity_id, is_active=is_active)
 
 
+@router.get("/accounts/{account_id}")
+def get_account(
+    account_id: int,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    account = finance_accounts.get_account(account_id)
+    if not account:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte introuvable")
+    return account
+
+
+@router.put("/accounts/{account_id}")
+def update_account(
+    account_id: int,
+    payload: dict,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_accounts.update_account(account_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.delete("/accounts/{account_id}")
+def delete_account(
+    account_id: int,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        finance_accounts.delete_account(account_id)
+        return {"success": True, "message": "Compte supprime ou desactive"}
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 # --- Transactions ---
 
 

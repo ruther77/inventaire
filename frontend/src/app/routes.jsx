@@ -26,6 +26,7 @@ import RestaurantPriceTrends from '../features/restaurant/RestaurantPriceTrends.
 import RestaurantStockMovementsPage from '../features/restaurant/RestaurantStockMovementsPage.jsx';
 import RestaurantConsumptionPage from '../features/restaurant/RestaurantConsumptionPage.jsx';
 import RestaurantPriceHistoryComparisonPage from '../features/restaurant/RestaurantPriceHistoryComparisonPage.jsx';
+import RestaurantEpicerieLinkPage from '../features/restaurant/RestaurantEpicerieLinkPage.jsx';
 import ForecastsPage from '../features/restaurant/ForecastsPage.jsx';
 
 // Shared
@@ -130,6 +131,13 @@ export const restaurantRoutes = [
     description: 'Fiches techniques et coûts matières',
     icon: Utensils,
     element: <RestaurantMenuPage />,
+  },
+  {
+    path: '/epicerie-links',
+    label: 'Liens Epicerie',
+    description: 'Associer plats et produits epicerie',
+    icon: Boxes,
+    element: <RestaurantEpicerieLinkPage />,
   },
   {
     path: '/stock',

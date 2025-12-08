@@ -39,6 +39,8 @@ class Transaction:
     source_file: str = ""
     source_page: int = 0
     bank_type: str = ""
+    # Période du relevé d'origine (period_start, period_end) au format DD.MM.YYYY
+    statement_period: tuple[str, str] | None = None
 
 
 @dataclass
@@ -53,6 +55,8 @@ class ParsedStatement:
     source_file: str = ""
     total_pages: int = 0
     parsing_errors: list[str] = field(default_factory=list)
+    # Soldes d'ouverture par période: {(year, month): Decimal}
+    opening_balances: dict[tuple[int, int], Decimal] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -102,7 +106,65 @@ class LCLParser:
     - Date format: DD.MM
     - Valeur format: DD.MM.YY
     - Montants avec virgule, point final pour débit
+
+    Positions typiques des colonnes (en points):
+    - DATE: x ≈ 41-66
+    - LIBELLE: x ≈ 197-234
+    - VALEUR: x ≈ 364-401
+    - DEBIT: x ≈ 432-459
+    - CREDIT: x ≈ 504-537
     """
+
+    # Seuil de position X pour distinguer DEBIT / CREDIT
+    # Les montants avec x < 480 sont en colonne DEBIT
+    # Les montants avec x >= 480 sont en colonne CREDIT
+    CREDIT_COLUMN_X_THRESHOLD = 480
+
+    @classmethod
+    def _extract_amount_positions(cls, page) -> dict[str, list[dict]]:
+        """
+        Extrait les positions X des montants sur une page.
+        Retourne un dict: {line_text: [{"amount": str, "x": float}, ...]}
+        """
+        positions = defaultdict(list)
+
+        # Utiliser extract_words pour obtenir les positions
+        words = page.extract_words(
+            x_tolerance=3,
+            y_tolerance=3,
+            keep_blank_chars=False,
+        )
+
+        # Grouper les mots par ligne (même y approximativement)
+        lines_by_y = defaultdict(list)
+        for word in words:
+            y_key = round(word['top'] / 10) * 10  # Grouper par tranche de 10
+            lines_by_y[y_key].append(word)
+
+        # Pour chaque ligne, identifier les montants et leur position
+        amount_pattern = re.compile(r'^[\d\s,]+,\d{2}\.?$')
+        for y_key, line_words in lines_by_y.items():
+            # Trier par x
+            line_words.sort(key=lambda w: w['x0'])
+
+            # Construire le texte de la ligne
+            line_text = ' '.join(w['text'] for w in line_words)
+
+            # Identifier les montants
+            for word in line_words:
+                text = word['text']
+                # Vérifier si c'est un montant (chiffres avec virgule)
+                if re.match(r'^[\d\s,]+,\d{2}\.?$', text) or re.match(r'^[\d,]+$', text):
+                    # Vérifier que c'est vraiment un montant significatif
+                    cleaned = text.replace(' ', '').replace('.', '')
+                    if ',' in cleaned and len(cleaned) > 3:
+                        positions[line_text].append({
+                            "amount": text,
+                            "x": word['x0'],
+                            "y": word['top'],
+                        })
+
+        return dict(positions)
 
     @classmethod
     def parse(cls, pdf_path: str | Path) -> ParsedStatement:
@@ -115,6 +177,9 @@ class LCLParser:
         with pdfplumber.open(pdf_path) as pdf:
             result.total_pages = len(pdf.pages)
             all_lines = []
+            all_positions = {}  # {page_num: {line_text: [positions]}}
+            current_period = None  # (period_start, period_end) pour la page courante
+            seen_periods = set()  # Pour éviter de ré-extraire le solde d'ouverture
 
             for page_num, page in enumerate(pdf.pages, 1):
                 text = page.extract_text() or ""
@@ -123,13 +188,43 @@ class LCLParser:
                 if page_num == 1:
                     cls._extract_metadata(text, result)
 
-                # Extraire les lignes de cette page
-                lines = cls._extract_operation_lines(text, page_num)
+                # Extraire les positions des montants sur cette page
+                page_positions = cls._extract_amount_positions(page)
+                all_positions[page_num] = page_positions
+
+                # Extraire la période de cette page (pour PDF multi-relevés)
+                period_match = re.search(
+                    r"du\s+(\d{2}\.\d{2}\.\d{4})\s+au\s+(\d{2}\.\d{2}\.\d{4})", text
+                )
+                if period_match:
+                    new_period = (period_match.group(1), period_match.group(2))
+
+                    # Si nouvelle période, extraire le solde d'ouverture
+                    if new_period != current_period and new_period not in seen_periods:
+                        seen_periods.add(new_period)
+                        period_end = new_period[1]  # DD.MM.YYYY
+                        year = int(period_end[6:10])
+                        month = int(period_end[3:5])
+
+                        # Chercher ANCIEN SOLDE sur cette page
+                        solde_match = re.search(
+                            r"ANCIEN\s+SOLDE\s+([\d\s]+[,\.]\d{2})", text
+                        )
+                        if solde_match:
+                            solde_str = solde_match.group(1).replace(' ', '')
+                            solde = parse_amount(solde_str)
+                            if solde is not None:
+                                result.opening_balances[(year, month)] = solde
+
+                    current_period = new_period
+
+                # Extraire les lignes de cette page avec la période associée
+                lines = cls._extract_operation_lines(text, page_num, current_period)
                 all_lines.extend(lines)
 
-            # Parser les transactions depuis les lignes
+            # Parser les transactions depuis les lignes avec les positions
             result.transactions = cls._parse_lines_to_transactions(
-                all_lines, str(pdf_path)
+                all_lines, str(pdf_path), all_positions
             )
 
         return result
@@ -158,8 +253,8 @@ class LCLParser:
             result.account_holder = holder_match.group(1).strip()
 
     @classmethod
-    def _extract_operation_lines(cls, text: str, page_num: int) -> list[tuple[int, str]]:
-        """Extrait les lignes d'opérations d'une page."""
+    def _extract_operation_lines(cls, text: str, page_num: int, period: tuple | None = None) -> list[tuple[int, str, tuple | None]]:
+        """Extrait les lignes d'opérations d'une page avec la période associée."""
         lines = text.split('\n')
         operation_lines = []
         in_operations = False
@@ -178,34 +273,52 @@ class LCLParser:
             if re.match(r"DATE\s+LIBELLE\s+VALEUR", line, re.IGNORECASE):
                 continue
 
-            # Ignorer les footers
+            # Ignorer les footers et totaux
             if any(p in line for p in [
                 "Page ", "Crédit Lyonnais", "SIREN",
                 "Ce document ne vaut", "Les sommes figurant",
-                "garantiedesdepots", "médiateur"
+                "garantiedesdepots", "médiateur",
+                "TOTAUX", "SOLDE EN EUROS",
+                "reprisdansles", "Dispositions",
+                "www.LCL.fr", "www.amf-france",
+                "mediateurducredit", "IBAN",
+                "Titulaire du compte", "Domiciliation",
+                "Votreconseiller", "Identifiant client",
+                "Références bancaires", "Conditions Générales",
             ]):
                 continue
 
             # Ignorer les headers répétés sur pages suivantes
             if any(p in line for p in [
-                "RELEVE DE COMPTE", "Indicatif :", "CREDIT LYONNAIS"
+                "RELEVE DE COMPTE", "Indicatif :", "CREDIT LYONNAIS",
+                "RELEVE D'IDENTITE BANCAIRE",
             ]):
                 in_operations = True  # Réactiver après header répété
                 continue
 
             if in_operations:
-                operation_lines.append((page_num, line))
+                operation_lines.append((page_num, line, period))
 
         return operation_lines
 
     @classmethod
     def _parse_lines_to_transactions(
-        cls, lines: list[tuple[int, str]], source_file: str
+        cls, lines: list[tuple[int, str, tuple | None]], source_file: str,
+        positions: dict[int, dict[str, list[dict]]] | None = None
     ) -> list[Transaction]:
-        """Parse les lignes en transactions."""
+        """Parse les lignes en transactions.
+
+        Args:
+            lines: Liste de (page_num, line_text, period)
+            source_file: Chemin du fichier source
+            positions: Dict {page_num: {line_text: [{"amount": str, "x": float}]}}
+                       pour validation position-based
+        """
         transactions = []
         current_tx = None
         current_libelle_parts = []
+        current_period = None
+        positions = positions or {}
 
         # Pattern pour ligne de transaction LCL
         # Format: DD.MM LIBELLE DD.MM.YY MONTANT [.]
@@ -221,7 +334,14 @@ class LCLParser:
         # Pattern alternatif pour lignes avec seulement date et libellé
         simple_pattern = re.compile(r"^(\d{2}\.\d{2})\s+(.+)$")
 
-        for page_num, line in lines:
+        for item in lines:
+            # Support pour tuples à 2 ou 3 éléments
+            if len(item) == 3:
+                page_num, line, period = item
+                if period:
+                    current_period = period
+            else:
+                page_num, line = item
             # Ignorer lignes "SOLDE"
             if "SOLDE" in line.upper() and "ANCIEN" not in line.upper():
                 continue
@@ -241,29 +361,67 @@ class LCLParser:
                 montant_str = match.group(4)
                 has_dot = match.group(5) is not None  # Point final = débit
 
-                # Logique de classification LCL:
-                # - Point final (.) -> toujours débit (frais, commissions)
-                # - Sans point:
-                #   - "REMISE" dans le libellé -> crédit (entrée d'argent)
-                #   - Autres (CB, PRLV, VIR) -> débit (sortie d'argent)
+                # Logique de classification LCL améliorée:
+                # - Point final (.) -> débit (frais, commissions bancaires)
+                # - Mots-clés crédit -> crédit (entrée d'argent)
+                # - Sinon -> débit (sortie d'argent)
                 montant = parse_amount(montant_str)
-                is_remise = "REMISE" in libelle.upper()
+                libelle_upper = libelle.upper()
 
-                if has_dot:
-                    # Point final = débit certain (frais, commissions)
+                # Patterns qui indiquent un CRÉDIT (entrée d'argent)
+                credit_patterns = [
+                    "REMISE",           # Remise CB, remise chèque
+                    "REM CHQ",          # Remise de chèque (format court)
+                    "VERSEMENT",        # Dépôt espèces
+                    "VRST",             # Versement abrégé
+                    "DEPOT",            # Dépôt
+                    "VIR SEPA RECU",    # Virement reçu
+                    "VIRSEPARECU",      # Virement reçu collé
+                    "VIR INST RECU",    # Virement instantané reçu
+                    "VIRINSTRECU",      # Virement instantané collé
+                    "VIRCPTEACPTERECU", # Virement interne reçu
+                    "VIR CPTE A CPTE RECU",
+                    "AVOIR",            # Avoir/remboursement
+                    "REMBT",            # Remboursement
+                    "REMBOURSEMENT",
+                    "ENCAISSEMENT",
+                    "CREDIT",           # Crédit explicite
+                ]
+
+                is_credit = any(pattern in libelle_upper for pattern in credit_patterns)
+
+                if has_dot and not is_credit:
+                    # Point final sans pattern crédit = débit certain
                     debit_val = montant
                     credit_val = None
-                elif is_remise:
-                    # REMISE = crédit (entrée d'argent)
+                elif is_credit:
+                    # Pattern crédit détecté = crédit
                     debit_val = None
                     credit_val = montant
                 else:
-                    # Par défaut = débit (CB, PRLV, VIR, etc.)
+                    # Par défaut = débit (CB, PRLV, etc.)
                     debit_val = montant
                     credit_val = None
 
+                # Enrichir la date avec l'année de la période si disponible
+                date_with_year = date
+                if current_period:
+                    # Extraire l'année de la période de fin (format DD.MM.YYYY)
+                    period_end = current_period[1]
+                    if len(period_end) == 10:  # DD.MM.YYYY
+                        period_year = period_end[6:10]
+                        period_month = int(period_end[3:5])
+                        tx_month = int(date[3:5])
+                        # Si le mois de la tx est > mois période, c'est l'année précédente
+                        # (ex: tx en décembre, période finit en janvier)
+                        if tx_month > period_month + 1:
+                            year = int(period_year) - 1
+                        else:
+                            year = int(period_year)
+                        date_with_year = f"{date}.{year}"
+
                 current_tx = Transaction(
-                    date=date,
+                    date=date_with_year,
                     libelle=libelle,
                     valeur=valeur,
                     debit=debit_val,
@@ -272,13 +430,20 @@ class LCLParser:
                     source_file=source_file,
                     source_page=page_num,
                     bank_type="LCL",
+                    statement_period=current_period,
                 )
                 current_libelle_parts = [libelle]
 
             elif current_tx:
                 # Ligne de continuation - ajouter au libellé
-                # Ignorer les lignes de détail technique
-                if not re.match(r"^(LIBELLE|REF\.|ID\.|REF\.MANDAT|BRUT|NO\s+\d)", line):
+                # Ignorer les lignes de détail technique et les footers
+                skip_patterns = [
+                    r"^(LIBELLE|REF\.|ID\.|REF\.MANDAT|BRUT|NO\s+\d)",
+                    r"TOTAUX", r"SOLDE EN EUROS", r"ANCIEN SOLDE",
+                    r"www\.", r"IBAN", r"BIC",
+                ]
+                is_skip = any(re.search(p, line, re.IGNORECASE) for p in skip_patterns)
+                if not is_skip:
                     if not line.startswith(("LIBELLE:", "REF.CLIENT:", "ID.CREANCIER:")):
                         current_libelle_parts.append(line)
 
@@ -286,6 +451,65 @@ class LCLParser:
         if current_tx:
             current_tx.libelle = clean_libelle(" ".join(current_libelle_parts))
             transactions.append(current_tx)
+
+        # Post-traitement: reclassifier les transactions basé sur le libellé complet
+        # Certaines transactions ont des mots-clés crédit dans les lignes de continuation
+        credit_patterns = [
+            "REMISE",
+            "REM CHQ",
+            "VERSEMENT",
+            "VRST",
+            "DEPOT",
+            "VIR SEPA RECU",
+            "VIRSEPARECU",
+            "VIR INST RECU",
+            "VIRINSTRECU",
+            "VIRCPTEACPTERECU",
+            "VIR CPTE A CPTE RECU",
+            "AVOIR",
+            "REMBT",
+            "REMBOURSEMENT",
+            "ENCAISSEMENT",
+            "CREDIT",
+        ]
+
+        for tx in transactions:
+            # Si c'est un débit sans point final (classification par défaut),
+            # vérifier si le libellé complet contient un pattern crédit
+            if tx.debit is not None and tx.credit is None:
+                # Vérifier raw_text pour le point final
+                has_dot = tx.raw_text.rstrip().endswith('.')
+                if not has_dot:
+                    libelle_upper = tx.libelle.upper()
+                    is_credit = any(pattern in libelle_upper for pattern in credit_patterns)
+                    if is_credit:
+                        # Reclassifier comme crédit
+                        tx.credit = tx.debit
+                        tx.debit = None
+                    else:
+                        # Fallback: utiliser la position X du montant pour classifier
+                        # Si le montant est en colonne CREDIT (x >= 480), reclassifier
+                        page_positions = positions.get(tx.source_page, {})
+                        # Chercher la ligne correspondante dans les positions
+                        for line_text, amount_positions in page_positions.items():
+                            # Vérifier si cette ligne correspond à la transaction
+                            # (contient la date et une partie du libellé)
+                            if tx.date[:5] in line_text:  # Date format DD.MM
+                                for pos in amount_positions:
+                                    # Vérifier si le montant correspond (comparaison numérique)
+                                    try:
+                                        amount_str = pos['amount'].replace(' ', '').replace('.', '')
+                                        amount_val = Decimal(amount_str.rstrip(',').replace(',', '.'))
+                                        if amount_val == tx.debit:
+                                            if pos['x'] >= cls.CREDIT_COLUMN_X_THRESHOLD:
+                                                # Le montant est en colonne CREDIT
+                                                tx.credit = tx.debit
+                                                tx.debit = None
+                                                break
+                                    except (ValueError, InvalidOperation):
+                                        continue
+                                if tx.credit is not None:
+                                    break
 
         return transactions
 
@@ -314,14 +538,51 @@ class BNPParser:
             source_file=str(pdf_path),
         )
 
+        # Mois français pour conversion
+        mois_fr = {
+            'janvier': 1, 'fØvrier': 2, 'février': 2, 'mars': 3, 'avril': 4,
+            'mai': 5, 'juin': 6, 'juillet': 7, 'aoØt': 8, 'août': 8,
+            'septembre': 9, 'octobre': 10, 'novembre': 11, 'dØcembre': 12, 'décembre': 12
+        }
+
         with pdfplumber.open(pdf_path) as pdf:
             result.total_pages = len(pdf.pages)
+            seen_periods = set()  # Pour éviter les doublons
 
             for page_num, page in enumerate(pdf.pages, 1):
                 text = page.extract_text() or ""
 
                 if page_num == 1:
                     cls._extract_metadata(text, result)
+
+                # Extraire la période de cette page (format collé: du27janvier2023au27fØvrier2023)
+                period_match = re.search(
+                    r"du(\d{1,2})(\w+?)(\d{4})au(\d{1,2})(\w+?)(\d{4})", text
+                )
+                if period_match:
+                    day_end = int(period_match.group(4))
+                    month_name = period_match.group(5).lower()
+                    year_end = int(period_match.group(6))
+                    month_end = mois_fr.get(month_name, 0)
+
+                    if month_end and (year_end, month_end) not in seen_periods:
+                        seen_periods.add((year_end, month_end))
+
+                        # Chercher le solde d'ouverture (SOLDECREDITEURAU ou SOLDEDEBITEURAU)
+                        # Format: SOLDECREDITEURAU27.12.2022 18,32 ou SOLDEDEBITEURAU...
+                        solde_match = re.search(
+                            r"SOLDE(CREDITEUR|DEBITEUR)AU\d+\.\d+\.\d+\s+([\d\s,]+)",
+                            text
+                        )
+                        if solde_match:
+                            solde_type = solde_match.group(1)
+                            solde_str = solde_match.group(2).strip()
+                            solde = parse_amount(solde_str)
+                            if solde is not None:
+                                # DEBITEUR = négatif
+                                if solde_type == "DEBITEUR":
+                                    solde = -solde
+                                result.opening_balances[(year_end, month_end)] = solde
 
                 # Extraire via texte (plus fiable pour BNP)
                 transactions = cls._parse_page_text(text, page_num, str(pdf_path))
@@ -363,6 +624,27 @@ class BNPParser:
             r"([\d\s]+,\d{2})?$"  # Crédit
         )
 
+        # Patterns qui indiquent un CRÉDIT (entrée d'argent) pour BNP
+        credit_patterns = [
+            "VIRSEPARECU",      # Virement reçu
+            "VIR SEPA RECU",
+            "VIRCPTEACPTERECU", # Virement interne reçu
+            "VIR CPTE A CPTE RECU",
+            "VIRINSTRECU",      # Virement instantané
+            "VIR INST RECU",
+            "VIRSCTINSTRECU",   # Virement SEPA instantané
+            "VRSTESPECESAUTOMATE", # Versement espèces
+            "VRST ESPECES",
+            "VERSEMENT",
+            "REMISECHEQUES",    # Remise de chèques
+            "REM CHQ",
+            "REMISE",
+            "AVOIR",
+            "REMBOURSEMENT",
+            "CREDIT",
+            "ENCAISSEMENT",
+        ]
+
         current_tx = None
         current_parts = []
 
@@ -385,6 +667,8 @@ class BNPParser:
                 # Sauvegarder précédente
                 if current_tx:
                     current_tx.libelle = clean_libelle(" ".join(current_parts))
+                    # Reclasser crédit/débit basé sur le libellé complet
+                    cls._reclassify_credit_debit(current_tx, credit_patterns)
                     transactions.append(current_tx)
 
                 date = match.group(1)
@@ -413,9 +697,26 @@ class BNPParser:
 
         if current_tx:
             current_tx.libelle = clean_libelle(" ".join(current_parts))
+            cls._reclassify_credit_debit(current_tx, credit_patterns)
             transactions.append(current_tx)
 
         return transactions
+
+    @classmethod
+    def _reclassify_credit_debit(cls, tx: Transaction, credit_patterns: list[str]) -> None:
+        """Reclasse crédit/débit selon le libellé (pdfplumber ne sépare pas bien les colonnes)."""
+        libelle_upper = tx.libelle.upper().replace(" ", "")
+
+        is_credit = any(pattern.replace(" ", "") in libelle_upper for pattern in credit_patterns)
+
+        # Si c'est un crédit mais montant en débit, on inverse
+        if is_credit and tx.debit and not tx.credit:
+            tx.credit = tx.debit
+            tx.debit = None
+        # Si ce n'est pas un crédit mais montant en crédit, on inverse
+        elif not is_credit and tx.credit and not tx.debit:
+            tx.debit = tx.credit
+            tx.credit = None
 
 
 # =============================================================================

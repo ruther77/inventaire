@@ -134,8 +134,14 @@ def _compute_inventory_value(tenant_id: int) -> dict[str, float]:
 def _load_allowed_origins() -> list[str]:
     raw_origins = os.getenv("CORS_ALLOWED_ORIGINS")
     if not raw_origins:
-        # Vite/React dev server par défaut
-        return ["http://localhost:5173"]
+        # Vite/React dev server par défaut (ports fréquents + front docker)
+        return [
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://localhost:5175",
+            "http://localhost:3000",
+            "http://localhost:8501",
+        ]
 
     parsed: list[str] = []
     for entry in raw_origins.split(","):
@@ -150,7 +156,36 @@ def _load_allowed_origins() -> list[str]:
 def create_app() -> FastAPI:
     """Construit l'application FastAPI ainsi que tous les routeurs de domaine."""
 
-    app = FastAPI(title="Inventaire Epicerie API", version="1.0.0")
+    app = FastAPI(
+        title="Inventaire Epicerie API",
+        version="1.0.0",
+        description="""
+## API de gestion d'inventaire pour Epicerie et Restaurant
+
+Cette API permet de gerer:
+- **Catalogue produits** : CRUD produits, codes-barres, categories
+- **Stock** : Mouvements d'entree/sortie, alertes de seuil
+- **Factures** : Import et extraction de factures PDF
+- **Restaurant** : Gestion des plats, ingredients, marges
+- **Finance** : Releves bancaires, tresorerie, rapprochement
+- **Rapports** : Analytics et tableaux de bord
+
+### Authentification
+L'API utilise OAuth2 avec JWT tokens. Obtenez un token via `/auth/token`.
+
+### Multi-tenant
+Chaque requete est filtree par tenant_id pour isoler les donnees.
+        """,
+        openapi_tags=[
+            {"name": "auth", "description": "Authentification et gestion des tokens"},
+            {"name": "epicerie", "description": "Gestion du catalogue et stock epicerie"},
+            {"name": "restaurant", "description": "Module restaurant (plats, ingredients, marges)"},
+            {"name": "finance", "description": "Tresorerie et releves bancaires"},
+            {"name": "admin", "description": "Administration et configuration"},
+        ],
+        docs_url="/docs",
+        redoc_url="/redoc",
+    )
 
     settings = Settings.load()
 
@@ -198,6 +233,19 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def healthcheck() -> dict[str, str]:
         return {"status": "ok"}
+
+    # Ajout : petit tuto/lexique VSCode (lettres Git U/M et points/icônes)
+    @app.get("/vscode/tuto")
+    def vscode_tuto() -> dict[str, str]:
+        return {
+            "titre": "Tuto VSCode — lettres Git et points",
+            "résumé": "Significations rapides pour le panneau Source Control et les icônes d'onglet.",
+            "U": "Untracked — fichier non suivi par Git. Utilisez 'git add' pour le suivre.",
+            "M": "Modified — fichier existant modifié. Stagez ('git add') puis 'git commit'.",
+            "points": "Point rempli (●) sur l'onglet = modifications non sauvegardées. Dans l'explorateur, les décorations (lettres/icônes) indiquent l'état Git : U (untracked), M (modified), A (added), D (deleted), R (renamed).",
+            "actions_vs_code": "Ouvrir Source Control (Ctrl+Shift+G) → cliquer sur + pour staged files → saisir message → ✓ pour commit.",
+            "exemple_cli": "git add <fichier> && git commit -m 'message' && git push"
+        }
 
     @app.get("/products", response_model=list[ProductPayload], dependencies=_security_dependencies())
     def list_products(tenant: Tenant = Depends(get_current_tenant)) -> list[ProductPayload]:

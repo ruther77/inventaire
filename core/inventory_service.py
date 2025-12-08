@@ -429,10 +429,11 @@ def register_invoice_reception(
         unit_cost = _as_decimal(price_achat) if price_achat is not None else None
         cost_entries.append(
             {
-                "product_id": int(row.produit_id_num),
-                "quantity": row.qty_norm,
+                "pid": int(row.produit_id_num),
+                "qty": row.qty_norm,
                 "unit_cost": unit_cost,
                 "tenant_id": int(tenant_id),
+                "received_at": reception_date,
             }
         )
 
@@ -485,7 +486,7 @@ def register_invoice_reception(
             for entry, movement_id in zip(cost_entries, inserted_ids):  # Aligne chaque coût avec un mouvement
                 inventory_costing.add_cost_layer(
                     conn,
-                    tenant_id=int(tenant_id),
+                    tenant_id=entry["tenant_id"],
                     product_id=entry["pid"],
                     quantity=entry["qty"],
                     unit_cost=entry["unit_cost"],

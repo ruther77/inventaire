@@ -31,7 +31,7 @@ const getIsoWeekInfo = (dateObj) => {
   };
 };
 
-const aggregateTimeline = (transactions, granularity) => {
+const aggregateTimeline = (transactions, granularity, limitCount = null) => {
   if (!transactions?.length) return [];
   const buckets = new Map();
 
@@ -44,9 +44,13 @@ const aggregateTimeline = (transactions, granularity) => {
 
   transactions.forEach((tx) => {
     if (!tx) return;
-    const amount = Number(tx.montant);
+    let amount = Number(tx.montant);
     if (Number.isNaN(amount)) return;
     const entryType = tx.type === 'Entrée' ? 'Entrée' : 'Sortie';
+    // Sécurise les montants : on agrège en valeur absolue pour les sorties.
+    if (entryType === 'Sortie') {
+      amount = Math.abs(amount);
+    }
     if (granularity === 'monthly') {
       const monthKey = tx.mois || (tx.date ? tx.date.slice(0, 7) : null);
       if (!monthKey) return;
@@ -101,7 +105,8 @@ const aggregateTimeline = (transactions, granularity) => {
         sorties: roundAmount(rest.sorties || 0),
         net,
       };
-    });
+    })
+    .slice(limitCount ? -limitCount : undefined);
 };
 
 const getBucketLabelForResolution = (transaction, resolution) => {

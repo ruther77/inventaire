@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "type": "duplicate",
+      "severity": "high",
+      "description": "Transaction potentiellement dupliquée",
+      "transactionId": 123,
+      "amount": -150.50,
+      "date": "2025-12-01"
+    },
+    {
+      "id": 2,
+      "type": "amount",
+      "severity": "medium",
+      "description": "Montant inhabituel",
+      "transactionId": 124,
+      "amount": -5000.00,
+      "date": "2025-12-02"
+    }
+  ],
+  "total": 2
+}

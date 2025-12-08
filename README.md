@@ -1,9 +1,13 @@
-# inventaire-epicerie
+# Plateforme de Gestion Épicerie & Restaurant
 
-Application Streamlit pour la gestion d'inventaire d'une épicerie, avec
-chargement des produits depuis des fichiers CSV, suivi des ventes et tableau de
-bord interactif. Une API FastAPI et une interface React monopage complètent
-désormais l'application historique pour amorcer la migration vers une SPA.
+Plateforme web complète pour la gestion intégrée de deux métiers : **Épicerie**
+(inventaire, catalogue, factures fournisseurs, suivi des prix) et **Restaurant**
+(menus & recettes, coûts matières, charges opérationnelles, marges). Un module
+**Trésorerie** unifié permet le suivi des flux bancaires, la catégorisation
+automatique des dépenses et le rapprochement comptable.
+
+L'architecture repose sur une **SPA React** moderne (Vite + TailwindCSS), une
+**API REST FastAPI** et une base **PostgreSQL** avec support multi-tenant natif.
 
 ## État du projet
 

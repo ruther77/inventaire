@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   db:
     image: public.ecr.aws/docker/library/postgres:16
@@ -135,6 +137,19 @@ services:
       - "5175:80"
     networks:
       - inventaire-net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app/backend:rw
+      - ./requirements.txt:/app/requirements.txt:ro
+    ports:
+      - "8003:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
 
 volumes:
   db_data:

@@ -13,8 +13,6 @@ import {
   useUpdateRestaurantPlatPrice,
   useRestaurantIngredientPriceHistory,
   useRestaurantPlatPriceHistory,
-  useRestaurantPlatMappings,
-  useSyncRestaurantIngredients,
 } from '../../hooks/useRestaurant.js';
 
 export default function RestaurantMenuPage() {
@@ -67,7 +65,6 @@ export default function RestaurantMenuPage() {
   const ingredientHistory = useRestaurantIngredientPriceHistory(historyIngredientId);
   const platHistory = useRestaurantPlatPriceHistory(historyPlatId);
 
-  const syncIngredients = useSyncRestaurantIngredients();
   const selectedPlat = platUpdate.platId
     ? (plats.data ?? []).find((plat) => plat.id === Number(platUpdate.platId))
     : null;
@@ -188,8 +185,6 @@ export default function RestaurantMenuPage() {
     );
   };
 
-  const mappings = useRestaurantPlatMappings();
-  const platLinks = mappings.data ?? [];
   return (
     <div className="flex flex-col gap-6">
       <Card className="flex flex-col gap-4">
@@ -521,62 +516,6 @@ export default function RestaurantMenuPage() {
             className="w-full max-w-xs rounded-2xl border border-slate-200 px-4 py-2 text-sm"
           />
         </div>
-
-        <Card className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">liens épicerie</p>
-            <h2 className="text-lg font-semibold text-slate-900">Produits associés</h2>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => syncIngredients.mutate()}
-            disabled={syncIngredients.isLoading}
-          >
-            {syncIngredients.isLoading ? 'Synchronisation…' : 'Synchro auto'}
-          </Button>
-        </div>
-          {!platLinks.length && !mappings.isLoading ? (
-            <p className="text-sm text-slate-500">Aucune correspondance Epicerie définie pour les plats.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm text-slate-700">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                  <tr>
-                    <th className="px-3 py-2">Plat</th>
-                    <th className="px-3 py-2">Produit Épicerie</th>
-                    <th className="px-3 py-2 text-right">Ratio</th>
-                    <th className="px-3 py-2 text-right">Prix achat</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {platLinks.map((link) => (
-                    <tr key={`${link.plat_id}-${link.produit_epicerie_id}`}>
-                      <td className="px-3 py-2">
-                        <p className="font-semibold text-slate-900">{link.plat_nom}</p>
-                        <p className="text-xs text-slate-400">{link.plat_categorie ?? 'Divers'}</p>
-                      </td>
-                      <td className="px-3 py-2">
-                        {link.epicerie_nom ?? '—'}
-                        <div className="text-xs text-slate-400">{link.produit_epicerie_id ?? '—'}</div>
-                      </td>
-                      <td className="px-3 py-2 text-right">{link.ratio ?? '—'}</td>
-                      <td className="px-3 py-2 text-right">{link.prix_achat != null ? Number(link.prix_achat).toFixed(2) : '—'} €</td>
-                    </tr>
-                  ))}
-                  {mappings.isLoading && (
-                    <tr>
-                      <td colSpan={4} className="px-3 py-2 text-sm text-slate-500">
-                        Chargement des prix Épicerie…
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
 
         <div className="grid gap-4">
           {visibleCategories.length === 0 ? (

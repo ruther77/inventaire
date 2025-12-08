@@ -17,7 +17,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Iterable, List, Tuple
 
@@ -250,8 +250,21 @@ def parse_pdf(pdf_path: Path, account: str) -> Iterable[Entry]:
         amount = clean_amount(debit_raw or credit_raw)
         direction = "debit" if debit_raw else "credit"
         value_date = parse_iso(value_date_raw)
-        year = datetime.strptime(value_date_raw, "%d.%m.%y").year
-        operation_date = datetime.strptime(f"{op_date_raw}.{year % 100:02d}", "%d.%m.%y").date().isoformat()
+
+        # Inférer l'année de l'opération depuis la période (pas depuis la date de valeur)
+        # Car une opération de décembre peut avoir une date de valeur en janvier
+        period_start_date = datetime.strptime(period_start, "%Y-%m-%d").date()
+        period_end_date = datetime.strptime(period_end, "%Y-%m-%d").date()
+        op_day, op_month = map(int, op_date_raw.split("."))
+
+        # Utiliser l'année de fin de période par défaut
+        op_year = period_end_date.year
+        # Si le mois d'opération est plus grand que le mois de fin de période,
+        # l'opération était probablement en début de période (année précédente)
+        if op_month > period_end_date.month:
+            op_year = period_start_date.year
+
+        operation_date = date(op_year, op_month, op_day).isoformat()
         label_base, label_canon = normalize_label(label_raw)
         statement_id = f"{account}_{period_start}_{period_end}"
         hkey = f"{statement_id}|{value_date}|{label_canon}|{amount:.2f}|{direction}"

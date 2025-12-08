@@ -311,11 +311,12 @@ def import_lcl(pdf: Path, entity: str, account_label: str, *, dry_run: bool = Fa
                 amt = op.montant if op.direction == "IN" else -op.montant
                 conn.execute(
                     text(
-                        "INSERT INTO finance_bank_statement_lines (statement_id, date_operation, date_valeur, libelle_banque, montant) "
-                        "VALUES (:sid, :do, :dv, :lib, :amt)"
+                        "INSERT INTO finance_bank_statement_lines (statement_id, account_id, date_operation, date_valeur, libelle_banque, montant) "
+                        "VALUES (:sid, :acc, :do, :dv, :lib, :amt)"
                     ),
                     {
                         "sid": stmt,
+                        "acc": account_id,
                         "do": op.date_operation,
                         "dv": op.date_valeur,
                         "lib": op.libelle,

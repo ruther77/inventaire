@@ -6,18 +6,15 @@ import api, {
   updateRestaurantPlatPrice,
   fetchRestaurantPlatPriceHistory,
   fetchRestaurantPriceHistoryOverview,
-  fetchRestaurantBankStatements,
-  fetchRestaurantBankStatementSummary,
-  fetchRestaurantBankAccountsOverview,
   fetchRestaurantForecastOverview,
   fetchRestaurantTvaSummary,
-  createExpenseFromBankStatement,
-  createRestaurantBankStatement,
-  updateRestaurantBankStatement,
-  importRestaurantBankStatementsPdf,
   fetchRestaurantConsumptions,
   fetchRestaurantPriceHistoryComparison,
   fetchRestaurantPlatMappings,
+  syncRestaurantIngredients,
+  fetchEpicerieProducts,
+  updatePlatMapping,
+  deletePlatMapping,
 } from '../api/client.js';
 
 export const useRestaurantCategories = () =>
@@ -163,24 +160,6 @@ export const useRestaurantDashboard = () =>
   useQuery({ queryKey: ['restaurant', 'dashboard'], queryFn: fetchRestaurantDashboard });
 
 
-export const useRestaurantBankStatements = (account) =>
-  useQuery({
-    queryKey: ['restaurant', 'bank-statements', account ?? 'all'],
-    queryFn: () => fetchRestaurantBankStatements(account),
-  });
-
-export const useRestaurantBankStatementSummary = (account, months = 6, grouping = 'default') =>
-  useQuery({
-    queryKey: ['restaurant', 'bank-statements-summary', account ?? 'all', months, grouping],
-    queryFn: () => fetchRestaurantBankStatementSummary({ account, months, grouping }),
-  });
-
-export const useRestaurantBankAccountsOverview = () =>
-  useQuery({
-    queryKey: ['restaurant', 'bank-accounts', 'overview'],
-    queryFn: fetchRestaurantBankAccountsOverview,
-  });
-
 export const useRestaurantForecastOverview = ({ horizonDays = 30, granularity = 'weekly', top = 8 } = {}) =>
   useQuery({
     queryKey: ['restaurant', 'forecasts', horizonDays, granularity, top],
@@ -221,50 +200,30 @@ export const useSyncRestaurantIngredients = () => {
   });
 };
 
-export const useCreateRestaurantBankStatement = () => {
+export const useEpicerieProducts = () =>
+  useQuery({
+    queryKey: ['epicerie', 'products'],
+    queryFn: fetchEpicerieProducts,
+  });
+
+export const useUpdatePlatMapping = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload) => createRestaurantBankStatement(payload),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries(['restaurant', 'bank-statements', variables?.account]);
-      queryClient.invalidateQueries({ queryKey: ['restaurant', 'bank-statements-summary'] });
+    mutationFn: ({ platId, payload }) => updatePlatMapping(platId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'plat-mappings'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'consumptions'] });
     },
   });
 };
 
-export const useUpdateRestaurantBankStatement = () => {
+export const useDeletePlatMapping = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ entryId, payload }) => updateRestaurantBankStatement(entryId, payload),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries(['restaurant', 'bank-statements', variables?.payload?.account]);
-      queryClient.invalidateQueries({ queryKey: ['restaurant', 'bank-statements-summary'] });
-    },
-  });
-};
-
-export const useImportRestaurantBankStatementsPdf = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ account, file }) => importRestaurantBankStatementsPdf(account, file),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries(['restaurant', 'bank-statements', variables?.account]);
-      queryClient.invalidateQueries({ queryKey: ['restaurant', 'bank-statements-summary'] });
-    },
-  });
-};
-
-export const useCreateExpenseFromBankStatement = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ entryId, payload }) => createExpenseFromBankStatement(entryId, payload),
-    onSuccess: (_, variables) => {
-      if (variables?.account) {
-        queryClient.invalidateQueries(['restaurant', 'bank-statements', variables.account]);
-      }
-      queryClient.invalidateQueries({ queryKey: ['restaurant', 'bank-statements-summary'] });
-      queryClient.invalidateQueries(['restaurant', 'expenses']);
-      queryClient.invalidateQueries(['restaurant', 'dashboard']);
+    mutationFn: (platId) => deletePlatMapping(platId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'plat-mappings'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'consumptions'] });
     },
   });
 };

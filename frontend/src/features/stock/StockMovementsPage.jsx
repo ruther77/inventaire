@@ -14,6 +14,7 @@ import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { useProducts } from '../../hooks/useProducts.js';
 import { useStockTimeseries, useRecentMovements, useStockAdjustment } from '../../hooks/useStock.js';
+import StockScannerPanel from './components/StockScannerPanel.jsx';
 
 const numberFormatter = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 });
 
@@ -384,6 +385,12 @@ export default function StockMovementsPage() {
         return (
           <Card className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-slate-900">Ajustement / Inventaire</h3>
+            <StockScannerPanel
+              onProductFound={(product) => {
+                setAdjustProductId(product.id);
+                setTargetQuantity('');
+              }}
+            />
             <div className="grid gap-4 md:grid-cols-3">
               <label className="text-sm text-slate-600">
                 Produit
