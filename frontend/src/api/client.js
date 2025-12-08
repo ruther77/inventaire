@@ -88,6 +88,50 @@ export const syncRestaurantIngredients = async () => {
   return data;
 };
 
+export const updateRestaurantIngredientPrice = async (ingredientId, payload) => {
+  const { data } = await api.patch(`/restaurant/ingredients/${ingredientId}/price`, payload);
+  return data;
+};
+
+export const fetchRestaurantIngredientPriceHistory = async (ingredientId) => {
+  const { data } = await api.get(`/restaurant/ingredients/${ingredientId}/price-history`);
+  return data;
+};
+
+export const updateRestaurantPlatPrice = async (platId, payload) => {
+  const { data } = await api.patch(`/restaurant/plats/${platId}/price`, payload);
+  return data;
+};
+
+export const fetchRestaurantPlatPriceHistory = async (platId) => {
+  const { data } = await api.get(`/restaurant/plats/${platId}/price-history`);
+  return data;
+};
+
+export const fetchRestaurantPriceHistoryOverview = async () => {
+  const { data } = await api.get('/restaurant/price-history/overview');
+  return data;
+};
+
+export const fetchRestaurantForecastOverview = async () => {
+  const { data } = await api.get('/restaurant/forecast/overview');
+  return data;
+};
+
+export const fetchRestaurantTvaSummary = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters.dateTo) params.set('date_to', filters.dateTo);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/restaurant/tva/summary?${query}` : '/restaurant/tva/summary');
+  return data;
+};
+
+export const fetchRestaurantDashboard = async () => {
+  const { data } = await api.get('/restaurant/dashboard');
+  return data;
+};
+
 export const checkoutCart = async (payload) => {
   const { data } = await api.post('/pos/checkout', payload);
   return data;
@@ -249,201 +293,378 @@ export const downloadInvoiceFile = async (invoiceId) => {
   return response;
 };
 
-export const fetchPriceHistory = async (filters = {}) => {
+export const fetchCategories = async () => {
+  const { data } = await api.get('/categories');
+  return data;
+};
+
+export const fetchVendors = async () => {
+  const { data } = await api.get('/vendors');
+  return data;
+};
+
+export const fetchSalesMetrics = async (filters = {}) => {
   const params = new URLSearchParams();
-  if (filters.productId) params.set('product_id', filters.productId);
-  if (filters.code) params.set('code', filters.code);
-  if (filters.supplier) params.set('supplier', filters.supplier);
-  if (filters.search) params.set('search', filters.search);
   if (filters.dateStart) params.set('date_start', filters.dateStart);
   if (filters.dateEnd) params.set('date_end', filters.dateEnd);
-  params.set('limit', filters.limit ?? 500);
-  const query = params.toString();
-  const url = query ? `/prices/history?${query}` : '/prices/history';
-  const { data } = await api.get(url);
-  return data.items ?? [];
-};
-
-export const fetchCapitalOverview = async () => {
-  const { data } = await api.get('/capital/overview');
-  return data;
-};
-
-export const downloadCapitalSnapshotReport = async () => {
-  const response = await api.get('/reports/export/capital_snapshot', {
-    responseType: 'blob',
-  });
-  return response;
-};
-
-export const updateRestaurantIngredientPrice = async (ingredientId, payload) => {
-  const { data } = await api.patch(`/restaurant/ingredients/${ingredientId}/price`, payload);
-  return data;
-};
-
-export const fetchRestaurantIngredientPriceHistory = async (ingredientId) => {
-  const { data } = await api.get(`/restaurant/ingredients/${ingredientId}/price-history`);
-  return data;
-};
-
-export const updateRestaurantPlatPrice = async (platId, payload) => {
-  const { data } = await api.patch(`/restaurant/plats/${platId}/price`, payload);
-  return data;
-};
-
-export const fetchRestaurantPlatPriceHistory = async (platId) => {
-  const { data } = await api.get(`/restaurant/plats/${platId}/price-history`);
-  return data;
-};
-
-export const fetchRestaurantPriceHistoryOverview = async (limit = 12) => {
-  const params = new URLSearchParams();
-  params.set('limit', limit);
-  const query = params.toString();
-  const { data } = await api.get(`/restaurant/prices/history?${query}`);
-  return data;
-};
-
-export const fetchRestaurantBankStatements = async (account) => {
-  const params = new URLSearchParams();
-  if (account) params.set('account', account);
-  const query = params.toString();
-  const { data } = await api.get(query ? `/restaurant/bank-statements?${query}` : '/restaurant/bank-statements');
-  return data;
-};
-
-export const fetchRestaurantBankStatementSummary = async ({ account, months = 6, grouping = 'default' } = {}) => {
-  const params = new URLSearchParams();
-  if (account) params.set('account', account);
-  if (months !== undefined && months !== null) params.set('months', months);
-  if (grouping) params.set('grouping', grouping);
-  const query = params.toString();
-  const { data } = await api.get(`/restaurant/bank-statements/summary?${query}`);
-  return data;
-};
-
-export const fetchRestaurantBankAccountsOverview = async () => {
-  const { data } = await api.get('/restaurant/bank-accounts/overview');
-  return data;
-};
-
-export const fetchRestaurantForecastOverview = async ({
-  horizonDays = 30,
-  granularity = 'weekly',
-  top = 8,
-} = {}) => {
-  const params = new URLSearchParams();
-  params.set('horizon_days', horizonDays);
-  params.set('granularity', granularity);
-  if (top) {
-    params.set('top', top);
+  if (filters.categories) {
+    filters.categories.forEach((category) => {
+      if (category) params.append('categories', category);
+    });
   }
   const query = params.toString();
-  const { data } = await api.get(`/restaurant/forecasts/overview?${query}`);
+  const { data } = await api.get(query ? `/sales/metrics?${query}` : '/sales/metrics');
   return data;
 };
 
-export const fetchRestaurantTvaSummary = async (months = 6) => {
+export const fetchSalesGrowthProjection = async (filters = {}) => {
   const params = new URLSearchParams();
-  params.set('months', months);
+  if (filters.dateStart) params.set('date_start', filters.dateStart);
+  if (filters.dateEnd) params.set('date_end', filters.dateEnd);
+  if (filters.categories) {
+    filters.categories.forEach((category) => {
+      if (category) params.append('categories', category);
+    });
+  }
   const query = params.toString();
-  const { data } = await api.get(`/restaurant/charges/tva-summary?${query}`);
+  const { data } = await api.get(query ? `/sales/growth?${query}` : '/sales/growth');
   return data;
 };
 
-export const createRestaurantBankStatement = async (payload) => {
-  const { data } = await api.post('/restaurant/bank-statements', payload);
+export const fetchRestaurantSales = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.start_date) params.set('start_date', filters.start_date);
+  if (filters.end_date) params.set('end_date', filters.end_date);
+  if (filters.entity_id) params.set('entity_id', filters.entity_id);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/restaurant/sales?${query}` : '/restaurant/sales');
   return data;
 };
 
-export const updateRestaurantBankStatement = async (entryId, payload) => {
-  const { data } = await api.patch(`/restaurant/bank-statements/${entryId}`, payload);
+export const fetchRestaurantTopSellers = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.start_date) params.set('start_date', filters.start_date);
+  if (filters.end_date) params.set('end_date', filters.end_date);
+  if (filters.entity_id) params.set('entity_id', filters.entity_id);
+  if (filters.limit) params.set('limit', filters.limit);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/restaurant/top-sellers?${query}` : '/restaurant/top-sellers');
   return data;
 };
 
-export const importRestaurantBankStatementsPdf = async (account, file) => {
+export const fetchRestaurantCategoryBreakdown = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.start_date) params.set('start_date', filters.start_date);
+  if (filters.end_date) params.set('end_date', filters.end_date);
+  if (filters.entity_id) params.set('entity_id', filters.entity_id);
+  const query = params.toString();
+  const { data } = await api.get(
+    query ? `/restaurant/category-breakdown?${query}` : '/restaurant/category-breakdown'
+  );
+  return data;
+};
+
+export const fetchRestaurantDailyRevenue = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.start_date) params.set('start_date', filters.start_date);
+  if (filters.end_date) params.set('end_date', filters.end_date);
+  if (filters.entity_id) params.set('entity_id', filters.entity_id);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/restaurant/daily-revenue?${query}` : '/restaurant/daily-revenue');
+  return data;
+};
+
+export const fetchPOSSalesOverview = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.start_date) params.set('start_date', filters.start_date);
+  if (filters.end_date) params.set('end_date', filters.end_date);
+  if (filters.entity_id) params.set('entity_id', filters.entity_id);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/pos/sales/overview?${query}` : '/pos/sales/overview');
+  return data;
+};
+
+export const fetchPOSTopProducts = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.start_date) params.set('start_date', filters.start_date);
+  if (filters.end_date) params.set('end_date', filters.end_date);
+  if (filters.entity_id) params.set('entity_id', filters.entity_id);
+  if (filters.limit) params.set('limit', filters.limit);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/pos/sales/top-products?${query}` : '/pos/sales/top-products');
+  return data;
+};
+
+export const fetchPOSHourlySales = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.start_date) params.set('start_date', filters.start_date);
+  if (filters.end_date) params.set('end_date', filters.end_date);
+  if (filters.entity_id) params.set('entity_id', filters.entity_id);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/pos/sales/hourly?${query}` : '/pos/sales/hourly');
+  return data;
+};
+
+export const fetchPOSDailySales = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.start_date) params.set('start_date', filters.start_date);
+  if (filters.end_date) params.set('end_date', filters.end_date);
+  if (filters.entity_id) params.set('entity_id', filters.entity_id);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/pos/sales/daily?${query}` : '/pos/sales/daily');
+  return data;
+};
+
+export const fetchPOSCategorySales = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.start_date) params.set('start_date', filters.start_date);
+  if (filters.end_date) params.set('end_date', filters.end_date);
+  if (filters.entity_id) params.set('entity_id', filters.entity_id);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/pos/sales/by-category?${query}` : '/pos/sales/by-category');
+  return data;
+};
+
+// --- Finance (transactions/catégories refonte) ---
+
+export const searchFinanceTransactions = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.accountId) params.set('account_id', filters.accountId);
+  if (filters.categoryId) params.set('category_id', filters.categoryId);
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters.dateTo) params.set('date_to', filters.dateTo);
+  if (filters.amountMin !== undefined && filters.amountMin !== null) params.set('amount_min', filters.amountMin);
+  if (filters.amountMax !== undefined && filters.amountMax !== null) params.set('amount_max', filters.amountMax);
+  if (filters.q) params.set('q', filters.q);
+  params.set('page', filters.page ?? 1);
+  params.set('size', filters.size ?? 50);
+  params.set('sort', filters.sort ?? '-date_operation');
+  const query = params.toString();
+  const { data } = await api.get(`/finance/transactions/search?${query}`);
+  return data;
+};
+
+export const suggestFinanceAutreTop = async ({ entityId, limit = 50 } = {}) => {
+  const params = new URLSearchParams();
+  if (entityId) params.set('entity_id', entityId);
+  params.set('limit', limit);
+  const query = params.toString();
+  const { data } = await api.get(`/finance/categories/suggestions/autre-top?${query}`);
+  return data;
+};
+
+export const autocompleteFinanceCategories = async ({ q, entityId, limit = 20 }) => {
+  if (!q) return [];
+  const params = new URLSearchParams();
+  params.set('q', q);
+  if (entityId) params.set('entity_id', entityId);
+  params.set('limit', limit);
+  const query = params.toString();
+  const { data } = await api.get(`/finance/categories/suggestions/complete?${query}`);
+  return data;
+};
+
+export const batchCategorizeFinanceTransactions = async (payload) => {
+  const { data } = await api.post('/finance/transactions/batch-categorize', payload);
+  return data;
+};
+
+export const updateTransactionCategory = async ({ transactionId, categoryId }) => {
+  const { data } = await api.post('/finance/transactions/batch-categorize', {
+    transaction_ids: [transactionId],
+    category_id: categoryId,
+  });
+  return data;
+};
+
+export const importFinanceBankStatements = async ({ accountId, file }) => {
+  if (!accountId || !file) throw new Error('accountId et file requis');
   const formData = new FormData();
-  formData.append('account', account);
   formData.append('file', file);
-  const { data } = await api.post('/restaurant/bank-statements/import-pdf', formData, {
+  const { data } = await api.post(`/finance/bank-statements/import?account_id=${accountId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;
 };
 
-export const createExpenseFromBankStatement = async (entryId, payload) => {
-  const { data } = await api.post(`/restaurant/bank-statements/${entryId}/create-expense`, payload);
+export const runFinanceReconciliation = async (payload) => {
+  const { data } = await api.post('/finance/reconciliation/run', payload);
+  return data;
+};
+
+export const refreshFinanceAnomalies = async (payload) => {
+  const { data } = await api.post('/finance/anomalies/refresh', payload);
+  return data;
+};
+
+export const fetchFinanceAnomalies = async (severity) => {
+  const params = new URLSearchParams();
+  if (severity) params.set('severity', severity);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/anomalies?${query}` : '/finance/anomalies');
+  return data;
+};
+
+export const updateFinanceMatchStatus = async ({ matchId, status, note }) => {
+  const { data } = await api.post(`/finance/reconciliation/${matchId}/status`, { status, note });
+  return data;
+};
+
+export const fetchFinanceMatches = async (status) => {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/reconciliation/matches?${query}` : '/finance/reconciliation/matches');
+  return data;
+};
+
+export const fetchFinanceImports = async () => {
+  const { data } = await api.get('/finance/imports');
+  return data;
+};
+
+export const fetchFinanceAccounts = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.isActive !== undefined) params.set('is_active', filters.isActive);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/accounts?${query}` : '/finance/accounts');
+  return data;
+};
+
+export const fetchFinanceCategories = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.type) params.set('type', filters.type);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/categories?${query}` : '/finance/categories');
+  return data;
+};
+
+export const createFinanceCategory = async (payload) => {
+  const { data } = await api.post('/finance/categories', payload);
+  return data;
+};
+
+export const fetchFinanceCostCenters = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.isActive !== undefined) params.set('is_active', filters.isActive);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/cost-centers?${query}` : '/finance/cost-centers');
+  return data;
+};
+
+export const createFinanceCostCenter = async (payload) => {
+  const { data } = await api.post('/finance/cost-centers', payload);
+  return data;
+};
+
+export const fetchFinanceCategoryStats = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters.dateTo) params.set('date_to', filters.dateTo);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/categories/stats?${query}` : '/finance/categories/stats');
+  return data;
+};
+
+export const fetchFinanceAccountsOverview = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters.dateTo) params.set('date_to', filters.dateTo);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/accounts/overview?${query}` : '/finance/accounts/overview');
+  return data;
+};
+
+export const fetchFinanceDashboardSummary = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters.dateTo) params.set('date_to', filters.dateTo);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/dashboard/summary?${query}` : '/finance/dashboard/summary');
+  return data;
+};
+
+export const fetchFinanceTimeline = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.months !== undefined) params.set('months', filters.months);
+  if (filters.granularity) params.set('granularity', filters.granularity);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/stats/timeline?${query}` : '/finance/stats/timeline');
+  return data;
+};
+
+export const fetchFinanceCategoryBreakdown = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.months !== undefined) params.set('months', filters.months);
+  if (filters.direction) params.set('direction', filters.direction);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/stats/category-breakdown?${query}` : '/finance/stats/category-breakdown');
+  return data;
+};
+
+export const fetchFinanceTreasury = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/stats/treasury?${query}` : '/finance/stats/treasury');
+  return data;
+};
+
+export const fetchFinanceRules = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.isActive !== undefined) params.set('is_active', filters.isActive);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/finance/rules?${query}` : '/finance/rules');
+  return data;
+};
+
+export const createFinanceRule = async (payload) => {
+  const { data } = await api.post('/finance/rules', payload);
+  return data;
+};
+
+export const updateFinanceRule = async (id, payload) => {
+  const { data } = await api.patch(`/finance/rules/${id}`, payload);
+  return data;
+};
+
+export const deleteFinanceRule = async (id) => {
+  await api.delete(`/finance/rules/${id}`);
+  return true;
+};
+
+export const fetchPriceHistory = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  if (filters.productId) params.set('product_id', filters.productId);
+  if (filters.supplierId) params.set('supplier_id', filters.supplierId);
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters.dateTo) params.set('date_to', filters.dateTo);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/price-history?${query}` : '/price-history');
+  return data;
+};
+
+export const fetchCapitalOverview = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.entityId) params.set('entity_id', filters.entityId);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/capital/overview?${query}` : '/capital/overview');
   return data;
 };
 
 export const fetchDashboardMetrics = async () => {
   const { data } = await api.get('/dashboard/metrics');
-  return data;
-};
-
-export const fetchReportsOverview = async () => {
-  const { data } = await api.get('/reports/overview');
-  return data;
-};
-
-export const fetchAdminOverview = async () => {
-  const { data } = await api.get('/admin/overview');
-  return data;
-};
-
-export const fetchAdminUsers = async () => {
-  const { data } = await api.get('/admin/users');
-  return data;
-};
-
-export const createBackupRequest = async ({ label } = {}) => {
-  const { data } = await api.post('/admin/backups', label ? { label } : {});
-  return data;
-};
-
-export const restoreBackupRequest = async (filename) => {
-  if (!filename) throw new Error('Nom de sauvegarde requis');
-  const { data } = await api.post(`/admin/backups/${encodeURIComponent(filename)}/restore`);
-  return data;
-};
-
-export const deleteBackupRequest = async (filename) => {
-  if (!filename) throw new Error('Nom de sauvegarde requis');
-  await api.delete(`/admin/backups/${encodeURIComponent(filename)}`);
-  return true;
-};
-
-export const fetchIntegrityReport = async () => {
-  const { data } = await api.get('/admin/backups/integrity');
-  return data;
-};
-
-export const fetchBackupSettings = async () => {
-  const { data } = await api.get('/admin/settings');
-  return data;
-};
-
-export const saveBackupSettingsRequest = async (payload) => {
-  const { data } = await api.put('/admin/settings', payload);
-  return data;
-};
-
-export const updateAdminUserRole = async ({ userId, role }) => {
-  if (!userId) throw new Error('Utilisateur requis');
-  const { data } = await api.post(`/admin/users/${userId}/role`, { role });
-  return data;
-};
-
-export const resetAdminUserPassword = async ({ userId, newPassword }) => {
-  if (!userId) throw new Error('Utilisateur requis');
-  const { data } = await api.post(`/admin/users/${userId}/reset-password`, {
-    new_password: newPassword ?? null,
-  });
-  return data;
-};
-
-export const fetchRestaurantDashboard = async () => {
-  const { data } = await api.get('/restaurant/dashboard/overview');
   return data;
 };
 

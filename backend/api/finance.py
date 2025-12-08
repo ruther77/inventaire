@@ -19,6 +19,7 @@ from backend.services.finance import metrics as finance_metrics
 from backend.services.finance import stats as finance_stats
 from backend.services.finance import dashboard as finance_dashboard
 from backend.services.finance import categories as finance_categories
+from backend.services.finance import cost_centers as finance_cost_centers
 from backend.services.importers import bank_statement_csv
 from backend.schemas.finance import (
     FinanceMatch,
@@ -45,6 +46,8 @@ from backend.schemas.finance import (
     FinanceTransactionSearchResponse,
     FinanceBankStatementSearchResponse,
     FinanceInvoiceSearchResponse,
+    FinanceCategoryCreate,
+    FinanceCostCenterCreate,
 )
 from backend.schemas.finance_rules import FinanceRule, FinanceRuleCreate
 
@@ -249,6 +252,49 @@ def list_categories(
     tenant: Tenant = Depends(get_current_tenant),
 ) -> list[dict]:
     return finance_categories.list_categories(entity_id=entity_id, is_active=is_active)
+
+
+@router.post("/categories")
+def create_category(
+    payload: FinanceCategoryCreate,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_categories.create_category(
+            entity_id=payload.entity_id,
+            code=payload.code,
+            name=payload.name,
+            type_=payload.type,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+# --- Centres de coûts ---
+
+
+@router.get("/cost-centers")
+def list_cost_centers(
+    entity_id: int | None = Query(default=None),
+    is_active: bool | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    return finance_cost_centers.list_cost_centers(entity_id=entity_id, is_active=is_active)
+
+
+@router.post("/cost-centers")
+def create_cost_center(
+    payload: FinanceCostCenterCreate,
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    try:
+        return finance_cost_centers.create_cost_center(
+            entity_id=payload.entity_id,
+            code=payload.code,
+            name=payload.name,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/categories/suggestions/complete")

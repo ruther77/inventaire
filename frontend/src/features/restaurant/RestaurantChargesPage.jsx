@@ -14,36 +14,36 @@ import {
   YAxis,
 } from 'recharts';
 import {
-  useRestaurantCategories,
-  useCreateRestaurantCategory,
-  useRestaurantCostCenters,
-  useCreateRestaurantCostCenter,
-  useRestaurantExpenses,
-  useCreateRestaurantExpense,
-  useRestaurantTvaSummary,
-} from '../../hooks/useRestaurant.js';
+  useFinanceCategories,
+  useCreateFinanceCategory,
+  useFinanceCostCenters,
+  useCreateFinanceCostCenter,
+  useFinanceTimeline,
+} from '../../hooks/useFinanceCategories.js';
+import { useFinanceTransactions } from '../../hooks/useFinance.js';
+
+// Entity IDs pour le multi-tenant
+const ENTITY_IDS = {
+  EPICERIE: 1,
+  RESTO: 2,
+};
 
 const euro = (value) => `${Number(value || 0).toFixed(2)} €`;
 
 export default function RestaurantChargesPage({ context = 'restaurant' }) {
-  const categories = useRestaurantCategories();
-  const costCenters = useRestaurantCostCenters();
-  const expenses = useRestaurantExpenses();
-  const tvaSummary = useRestaurantTvaSummary();
-  const createCategory = useCreateRestaurantCategory();
-  const createCostCenter = useCreateRestaurantCostCenter();
-  const createExpense = useCreateRestaurantExpense();
+  // Déterminer l'entity_id selon le contexte
+  const entityId = context === 'epicerie' ? ENTITY_IDS.EPICERIE : ENTITY_IDS.RESTO;
+
+  // Hooks Finance API avec entity_id
+  const categories = useFinanceCategories({ entityId });
+  const costCenters = useFinanceCostCenters({ entityId });
+  const transactionsQuery = useFinanceTransactions({ entityId, size: 500 });
+  const createCategory = useCreateFinanceCategory();
+  const createCostCenter = useCreateFinanceCostCenter();
 
   const [categoryName, setCategoryName] = useState('');
   const [costCenterName, setCostCenterName] = useState('');
   const [timelineWindow, setTimelineWindow] = useState('6');
-  const [form, setForm] = useState({
-    libelle: '',
-    montant_ht: '',
-    categorie_id: '',
-    cost_center_id: '',
-    date_operation: new Date().toISOString().slice(0, 10),
-  });
 
   const contextLabel = context === 'epicerie' ? 'Épicerie HQ' : 'Restaurant HQ';
   const chargesTitle = context === 'epicerie' ? 'Charges épicerie' : 'Pilotage des dépenses';
@@ -52,7 +52,34 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
       ? 'Analyse consolidée des charges magasins (imports, TVA, centres de coûts).'
       : 'Analyse dynamique basée sur les dépenses importées ou saisies.';
 
-  const expensesList = expenses.data ?? [];
+  // Flatten transactions from paginated query
+  const expensesList = useMemo(() => {
+    const items = transactionsQuery.data?.pages?.flatMap((page) => page.items || []) || [];
+    // Map finance fields to expected format
+    return items.map((tx) => ({
+      id: tx.id,
+      date_operation: tx.date_operation,
+      libelle: tx.label,
+      montant_ht: Math.abs(Number(tx.amount) || 0),
+      categorie: tx.category_name || tx.category_code || '—',
+      categorie_id: tx.category_id,
+      cost_center: tx.cost_center_name || '—',
+      cost_center_id: tx.cost_center_id,
+    }));
+  }, [transactionsQuery.data]);
+
+  // Maps pour lookup rapide
+  const categoryById = useMemo(() => {
+    const map = new Map();
+    (categories.data || []).forEach((c) => map.set(c.id, c));
+    return map;
+  }, [categories.data]);
+
+  const costCenterById = useMemo(() => {
+    const map = new Map();
+    (costCenters.data || []).forEach((cc) => map.set(cc.id, cc));
+    return map;
+  }, [costCenters.data]);
 
   const extractMonthKey = (value) => {
     if (!value) return 'N/A';
@@ -129,73 +156,6 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
       })),
     [filteredMonthly],
   );
-
-  const tvaEntries = tvaSummary.data ?? [];
-  const tvaAggregates = useMemo(() => {
-    if (!tvaEntries.length) {
-      return {
-        totalHt: 0,
-        totalTva: 0,
-        timeline: [],
-        rateBreakdown: [],
-      };
-    }
-    const monthMap = new Map();
-    const rateMap = new Map();
-    let totalHt = 0;
-    let totalTva = 0;
-    tvaEntries.forEach((entry) => {
-      const month = extractMonthKey(entry.periode);
-      const ht = Number(entry.montant_ht) || 0;
-      const tva = Number(entry.montant_tva) || 0;
-      totalHt += ht;
-      totalTva += tva;
-      const bucket = monthMap.get(month) || { label: month, ht: 0, tva: 0, ttc: 0 };
-      bucket.ht += ht;
-      bucket.tva += tva;
-      bucket.ttc += Number(entry.montant_ttc) || ht + tva;
-      monthMap.set(month, bucket);
-      const rateKey = `${entry.taux ?? 0}%`;
-      rateMap.set(rateKey, (rateMap.get(rateKey) || 0) + tva);
-    });
-    return {
-      totalHt,
-      totalTva,
-      timeline: Array.from(monthMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
-      rateBreakdown: Array.from(rateMap.entries())
-        .map(([label, amount]) => ({ label, amount }))
-        .sort((a, b) => b.amount - a.amount),
-    };
-  }, [tvaEntries]);
-  const tvaTableRows = useMemo(
-    () =>
-      [...tvaEntries].sort((a, b) => {
-        const monthDiff = extractMonthKey(a.periode).localeCompare(extractMonthKey(b.periode));
-        if (monthDiff !== 0) return monthDiff;
-        return (a.taux ?? 0) - (b.taux ?? 0);
-      }),
-    [tvaEntries],
-  );
-  const tvaRangeStart = tvaEntries.length ? extractMonthKey(tvaEntries[0].periode) : null;
-  const tvaRangeEnd =
-    tvaEntries.length > 1 ? extractMonthKey(tvaEntries[tvaEntries.length - 1].periode) : tvaRangeStart;
-
-  const handleExpenseSubmit = (event) => {
-    event.preventDefault();
-    if (!form.libelle || !form.montant_ht) return;
-    createExpense.mutate(
-      {
-        libelle: form.libelle,
-        montant_ht: parseFloat(form.montant_ht),
-        categorie_id: form.categorie_id ? Number(form.categorie_id) : undefined,
-        cost_center_id: form.cost_center_id ? Number(form.cost_center_id) : undefined,
-        date_operation: form.date_operation,
-      },
-      {
-        onSuccess: () => setForm({ ...form, libelle: '', montant_ht: '' }),
-      },
-    );
-  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -334,175 +294,6 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
         </Card>
       </div>
 
-      <Card className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Déclarations</p>
-            <h3 className="text-lg font-semibold text-slate-900">TVA collectée</h3>
-          </div>
-          <p className="text-xs text-slate-500">
-            {tvaSummary.isFetching
-              ? 'Calcul en cours…'
-              : tvaRangeStart
-                ? tvaRangeEnd && tvaRangeEnd !== tvaRangeStart
-                  ? `Fenêtre ${tvaRangeStart} → ${tvaRangeEnd}`
-                  : `Fenêtre ${tvaRangeStart}`
-                : 'Fenêtre vide'}
-          </p>
-        </div>
-        {tvaSummary.isLoading ? (
-          <p className="text-sm text-slate-500">Aggregation des montants TVA…</p>
-        ) : !tvaEntries.length ? (
-          <p className="text-sm text-slate-500">Aucune dépense n’est associée à un taux de TVA pour le moment.</p>
-        ) : (
-          <>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Total HT</p>
-                <p className="text-2xl font-semibold text-slate-900">{euro(tvaAggregates.totalHt)}</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">TVA due</p>
-                <p className="text-2xl font-semibold text-rose-600">{euro(tvaAggregates.totalTva)}</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Taux suivis</p>
-                <p className="text-2xl font-semibold text-slate-900">{tvaAggregates.rateBreakdown.length}</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Mois couverts</p>
-                <p className="text-2xl font-semibold text-slate-900">{tvaAggregates.timeline.length}</p>
-              </div>
-            </div>
-            <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-              <div className="h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={tvaAggregates.timeline} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(value, name) => `${Number(value).toFixed(2)} €`} />
-                    <Legend />
-                    <Bar dataKey="ht" name="HT" fill="#0ea5e9" />
-                    <Bar dataKey="tva" name="TVA" fill="#f43f5e" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="space-y-3">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Taux</p>
-                {tvaAggregates.rateBreakdown.map((entry) => (
-                  <div
-                    key={entry.label}
-                    className="flex items-center justify-between rounded-2xl border border-slate-100 px-3 py-2 text-sm text-slate-700"
-                  >
-                    <span>{entry.label}</span>
-                    <span className="font-semibold text-rose-600">{euro(entry.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="overflow-x-auto rounded-2xl border border-slate-100">
-              <table className="min-w-full divide-y divide-slate-100 text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
-                    <th className="px-3 py-2">Mois</th>
-                    <th className="px-3 py-2">Taux</th>
-                    <th className="px-3 py-2">Montant HT</th>
-                    <th className="px-3 py-2">TVA</th>
-                    <th className="px-3 py-2">TTC</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {tvaTableRows.map((entry) => (
-                    <tr key={`${entry.periode}-${entry.taux}`}>
-                      <td className="px-3 py-2 text-slate-600">{extractMonthKey(entry.periode)}</td>
-                      <td className="px-3 py-2 text-slate-600">{`${entry.taux ?? 0}%`}</td>
-                      <td className="px-3 py-2 font-semibold">{euro(entry.montant_ht)}</td>
-                      <td className="px-3 py-2 font-semibold text-rose-600">{euro(entry.montant_tva)}</td>
-                      <td className="px-3 py-2">{euro(entry.montant_ttc)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </Card>
-
-      <Card className="flex flex-col gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">charges</p>
-          <h2 className="text-2xl font-semibold text-slate-900">Saisie rapide</h2>
-        </div>
-        <form className="grid gap-4 md:grid-cols-2" onSubmit={handleExpenseSubmit}>
-          <div className="grid gap-2">
-            <label className="text-sm font-semibold text-slate-700">Libellé</label>
-            <input
-              type="text"
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-              value={form.libelle}
-              onChange={(event) => setForm((prev) => ({ ...prev, libelle: event.target.value }))}
-              required
-            />
-          </div>
-          <div className="grid gap-2">
-            <label className="text-sm font-semibold text-slate-700">Montant HT (€)</label>
-            <input
-              type="number"
-              step="0.01"
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-              value={form.montant_ht}
-              onChange={(event) => setForm((prev) => ({ ...prev, montant_ht: event.target.value }))}
-              required
-            />
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Catégorie</label>
-            <select
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-              value={form.categorie_id}
-              onChange={(event) => setForm((prev) => ({ ...prev, categorie_id: event.target.value }))}
-            >
-              <option value="">Non catégorisée</option>
-              {(categories.data ?? []).map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.nom}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Centre de coût</label>
-            <select
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-              value={form.cost_center_id}
-              onChange={(event) => setForm((prev) => ({ ...prev, cost_center_id: event.target.value }))}
-            >
-              <option value="">Non affecté</option>
-              {(costCenters.data ?? []).map((cc) => (
-                <option key={cc.id} value={cc.id}>
-                  {cc.nom}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Date</label>
-            <input
-              type="date"
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-              value={form.date_operation}
-              onChange={(event) => setForm((prev) => ({ ...prev, date_operation: event.target.value }))}
-            />
-          </div>
-          <div className="flex items-end">
-            <Button type="submit" variant="brand" className="w-full">
-              Enregistrer la dépense
-            </Button>
-          </div>
-        </form>
-      </Card>
-
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="flex flex-col gap-3">
           <h3 className="text-lg font-semibold text-slate-900">Catégories</h3>
@@ -516,12 +307,14 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
             />
             <Button
               variant="ghost"
-              onClick={() =>
-                categoryName &&
-                createCategory.mutate(categoryName, {
-                  onSuccess: () => setCategoryName(''),
-                })
-              }
+              onClick={() => {
+                if (!categoryName) return;
+                const code = categoryName.toUpperCase().replace(/\s+/g, '_').slice(0, 20);
+                createCategory.mutate(
+                  { entity_id: entityId, code, name: categoryName },
+                  { onSuccess: () => setCategoryName('') }
+                );
+              }}
             >
               Ajouter
             </Button>
@@ -529,7 +322,7 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
           <ul className="divide-y divide-slate-100 text-sm">
             {(categories.data ?? []).map((cat) => (
               <li key={cat.id} className="py-1 text-slate-700">
-                {cat.nom}
+                {cat.name}
               </li>
             ))}
           </ul>
@@ -547,12 +340,14 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
             />
             <Button
               variant="ghost"
-              onClick={() =>
-                costCenterName &&
-                createCostCenter.mutate(costCenterName, {
-                  onSuccess: () => setCostCenterName(''),
-                })
-              }
+              onClick={() => {
+                if (!costCenterName) return;
+                const code = costCenterName.toUpperCase().replace(/\s+/g, '_').slice(0, 20);
+                createCostCenter.mutate(
+                  { entity_id: entityId, code, name: costCenterName },
+                  { onSuccess: () => setCostCenterName('') }
+                );
+              }}
             >
               Ajouter
             </Button>
@@ -560,7 +355,7 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
           <ul className="divide-y divide-slate-100 text-sm">
             {(costCenters.data ?? []).map((cc) => (
               <li key={cc.id} className="py-1 text-slate-700">
-                {cc.nom}
+                {cc.name}
               </li>
             ))}
           </ul>
