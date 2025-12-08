@@ -356,8 +356,8 @@ import { CategoryInlineEdit } from '../finance/components/CategoryInlineEdit';
 - [x] Créer nouvelles pages Trésorerie (FinanceAccountsPage créée)
 - [x] Configurer routes avec lazy loading (React.lazy + Suspense)
 - [x] Réorganiser navigation Trésorerie (6 pages distinctes)
-- [ ] Activer CategoryInlineEdit
-- [ ] Implémenter export CSV (TODO existant)
+- [x] Activer CategoryInlineEdit (`f1ae3a8`)
+- [x] Implémenter export CSV (`f1ae3a8`)
 - [ ] Appliquer corrections design-tokens
 - [ ] Tests Cypress e2e
 - [x] Commit : `0681e77` - "feat: Phase 3 - Simplification UX Tresorerie"
