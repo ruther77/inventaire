@@ -109,7 +109,7 @@ export const fetchRestaurantPlatPriceHistory = async (platId) => {
 };
 
 export const fetchRestaurantPriceHistoryOverview = async () => {
-  const { data } = await api.get('/restaurant/price-history/overview');
+  const { data } = await api.get('/restaurant/prices/history');
   return data;
 };
 
