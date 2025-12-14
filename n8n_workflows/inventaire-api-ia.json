@@ -1,0 +1,239 @@
+{
+  "id": "inventaire-api-ia",
+  "name": "Inventaire API + IA locale (amélioré)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyse",
+        "responseMode": "lastNode",
+        "responseData": "autoDetect",
+        "options": {
+          "responseContentType": "application/json",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "Webhook",
+      "name": "Webhook Entrée",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const MAX_QUESTION = 600;\n\nreturn items.map(item => {\n  const payload = item.json || {};\n  const endpointRaw = (payload.endpoint ?? '/inventaire').toString().trim();\n  const sanitizedEndpoint = endpointRaw.startsWith('http')\n    ? '/inventaire'\n    : ('/' + endpointRaw.replace(/^\\/+/, '')).replace(/[^a-zA-Z0-9/_-]/g, '').replace(/\\/+/g, '/');\n\n  const question = (payload.question ?? \"Peux-tu analyser l'inventaire ?\").toString().trim().slice(0, MAX_QUESTION);\n  const user = (payload.user ?? 'anonyme').toString().trim().slice(0, 80);\n\n  return {\n    json: {\n      endpoint: sanitizedEndpoint || '/inventaire',\n      question,\n      user,\n      meta: {\n        receivedAt: new Date().toISOString(),\n        rawEndpoint: endpointRaw\n      }\n    }\n  };\n});\n"
+      },
+      "id": "Valider",
+      "name": "Valider / normaliser",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        460,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=http://api:8000{{$json[\"endpoint\"]}}",
+        "method": "GET",
+        "responseFormat": "json",
+        "jsonParameters": false,
+        "options": {
+          "timeout": 20,
+          "fullResponse": true,
+          "ignoreResponseCode": true
+        }
+      },
+      "id": "API",
+      "name": "Appel API Inventaire",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        690,
+        210
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "Fusion API + entrée",
+      "name": "Fusion API + entrée",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        920,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => {\n  const apiStatus = item.json.statusCode ?? item.json.apiStatus ?? null;\n  const apiPayload = item.json.body ?? item.json.apiResponse ?? item.json;\n  const endpoint = item.json.endpoint ?? '/inventaire';\n  const question = item.json.question ?? '';\n  const preview = JSON.stringify(apiPayload ?? {}, null, 2);\n  const limitedPreview = preview.length > 6000 ? `${preview.slice(0, 6000)}\n…(tronqué)…` : preview;\n\n  const prompt = [\n    \"Tu es un assistant expert en gestion d'inventaire.\",\n    \"Consignes:\",\n    \"- Réponds en français.\",\n    \"- Sois factuel, concis (<=6 phrases) et oriente vers l'action.\",\n    \"- Mets en avant ruptures, surstocks, anomalies et actions prioritaires.\",\n    \"\",\n    `Contexte API (status ${apiStatus ?? '?' } sur ${endpoint}):`,\n    limitedPreview,\n    \"\",\n    `Question utilisateur (${item.json.user ?? 'inconnu'}):`,\n    question,\n    \"\",\n    \"Forme ta réponse avec 2 sections courtes: 1/ Analyse 2/ Actions recommandées.\"\n  ].join(\"\n\");\n\n  return {\n    json: {\n      prompt,\n      apiDataPreview: limitedPreview,\n      apiStatus,\n      endpoint,\n      question,\n      user: item.json.user ?? 'anonyme'\n    }\n  };\n});\n"
+      },
+      "id": "Prompt",
+      "name": "Préparer prompt IA",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1150,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://ollama:11434/api/chat",
+        "method": "POST",
+        "responseFormat": "json",
+        "jsonParameters": true,
+        "options": {
+          "timeout": 120
+        },
+        "bodyParametersJson": "={\n  \"model\": \"llama3.1\",\n  \"messages\": [\n    { \"role\": \"system\", \"content\": \"Tu aides à prendre des décisions d'inventaire. Reste concis, factuel et propose des actions opérationnelles.\" },\n    { \"role\": \"user\", \"content\": $json.prompt }\n  ],\n  \"stream\": false\n}"
+      },
+      "id": "IA",
+      "name": "IA locale (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        210
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "Fusion IA + contexte",
+      "name": "Fusion IA + contexte",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1610,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => {\n  const answer = item.json.message?.content ?? item.json.body?.message?.content ?? item.json.content ?? '';\n  const model = item.json.model ?? 'llama3.1';\n\n  return {\n    json: {\n      answer: answer || 'Réponse vide',\n      endpoint: item.json.endpoint ?? '/inventaire',\n      apiStatus: item.json.apiStatus ?? item.json.statusCode ?? null,\n      model,\n      promptUsed: item.json.prompt ?? undefined,\n      generatedAt: new Date().toISOString()\n    }\n  };\n});\n"
+      },
+      "id": "Réponse",
+      "name": "Formatter réponse finale",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        320
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Entrée": {
+      "main": [
+        [
+          {
+            "node": "Valider / normaliser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valider / normaliser": {
+      "main": [
+        [
+          {
+            "node": "Appel API Inventaire",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fusion API + entrée",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Appel API Inventaire": {
+      "main": [
+        [
+          {
+            "node": "Fusion API + entrée",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fusion API + entrée": {
+      "main": [
+        [
+          {
+            "node": "Préparer prompt IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer prompt IA": {
+      "main": [
+        [
+          {
+            "node": "IA locale (Ollama)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fusion IA + contexte",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "IA locale (Ollama)": {
+      "main": [
+        [
+          {
+            "node": "Fusion IA + contexte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fusion IA + contexte": {
+      "main": [
+        [
+          {
+            "node": "Formatter réponse finale",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionTimeout": 900,
+    "timezone": "Europe/Paris"
+  },
+  "pinData": {},
+  "tags": []
+}

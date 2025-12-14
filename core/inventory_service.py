@@ -1,6 +1,6 @@
 # inventory_service.py  # Module de services pour les stocks (ventes, réceptions, tickets)
 from collections import defaultdict  # Fournit un dict avec valeurs par défaut
-from datetime import datetime  # Gestion des horodatages
+from datetime import datetime, date, time, timezone  # Gestion des horodatages
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP  # Décimaux précis et arrondis
 from typing import Iterable  # Typage des collections
 
@@ -356,6 +356,185 @@ def match_invoice_products(invoice_df: pd.DataFrame, *, tenant_id: int = 1) -> p
     return df  # Retourne le mapping
 
 
+def find_similar_products(
+    product_name: str,
+    *,
+    tenant_id: int = 1,
+    max_results: int = 3,
+    min_similarity: float = 0.3,
+) -> list[dict]:
+    """Trouve des produits similaires par nom en utilisant trigram similarity.
+
+    Utilisé pour suggérer des correspondances quand un produit de facture
+    n'est pas trouvé via code-barres.
+
+    Args:
+        product_name: Nom du produit à rechercher
+        tenant_id: ID du tenant
+        max_results: Nombre max de suggestions
+        min_similarity: Score minimum de similarité (0-1)
+
+    Returns:
+        Liste de dictionnaires avec les produits similaires et leur score
+    """
+    if not product_name or not product_name.strip():
+        return []
+
+    normalized_name = product_name.strip().lower()
+
+    # Utiliser la similarité trigram de PostgreSQL (extension pg_trgm)
+    # Fallback sur LIKE si l'extension n'est pas disponible
+    sql = """
+        SELECT
+            p.id as produit_id,
+            p.nom as produit_nom,
+            p.categorie,
+            COALESCE(p.prix_achat, 0) as prix_achat,
+            COALESCE(p.prix_vente, 0) as prix_vente,
+            pb.code as barcode,
+            SIMILARITY(LOWER(p.nom), :search_name) as similarity_score
+        FROM produits p
+        LEFT JOIN LATERAL (
+            SELECT code FROM produits_barcodes
+            WHERE produit_id = p.id
+            ORDER BY is_principal DESC, id
+            LIMIT 1
+        ) pb ON TRUE
+        WHERE p.tenant_id = :tenant_id
+          AND SIMILARITY(LOWER(p.nom), :search_name) >= :min_similarity
+        ORDER BY similarity_score DESC
+        LIMIT :max_results
+    """
+
+    try:
+        df = query_df(sql, params={
+            "search_name": normalized_name,
+            "tenant_id": int(tenant_id),
+            "min_similarity": min_similarity,
+            "max_results": max_results,
+        })
+    except Exception:
+        # Fallback si pg_trgm n'est pas installé: utiliser LIKE
+        sql_fallback = """
+            SELECT
+                p.id as produit_id,
+                p.nom as produit_nom,
+                p.categorie,
+                COALESCE(p.prix_achat, 0) as prix_achat,
+                COALESCE(p.prix_vente, 0) as prix_vente,
+                pb.code as barcode,
+                0.5 as similarity_score
+            FROM produits p
+            LEFT JOIN LATERAL (
+                SELECT code FROM produits_barcodes
+                WHERE produit_id = p.id
+                ORDER BY is_principal DESC, id
+                LIMIT 1
+            ) pb ON TRUE
+            WHERE p.tenant_id = :tenant_id
+              AND LOWER(p.nom) LIKE :search_pattern
+            ORDER BY p.nom
+            LIMIT :max_results
+        """
+        try:
+            # Chercher des mots clés
+            words = normalized_name.split()
+            main_word = max(words, key=len) if words else normalized_name
+            search_pattern = f"%{main_word}%"
+            df = query_df(sql_fallback, params={
+                "search_pattern": search_pattern,
+                "tenant_id": int(tenant_id),
+                "max_results": max_results,
+            })
+        except Exception:
+            return []
+
+    if df.empty:
+        return []
+
+    results = []
+    for _, row in df.iterrows():
+        results.append({
+            "produit_id": int(row["produit_id"]),
+            "produit_nom": row["produit_nom"],
+            "categorie": row.get("categorie", ""),
+            "prix_achat": float(row.get("prix_achat", 0)),
+            "prix_vente": float(row.get("prix_vente", 0)),
+            "barcode": row.get("barcode", ""),
+            "similarity_score": float(row.get("similarity_score", 0)),
+            "match_type": "name_similarity",
+        })
+
+    return results
+
+
+def suggest_product_matches(
+    invoice_df: pd.DataFrame,
+    *,
+    tenant_id: int = 1,
+) -> pd.DataFrame:
+    """Enrichit les lignes de facture non-matchées avec des suggestions de produits similaires.
+
+    Pour chaque ligne sans produit_id, cherche des produits similaires par nom
+    et ajoute les suggestions.
+
+    Args:
+        invoice_df: DataFrame avec les lignes de facture
+        tenant_id: ID du tenant
+
+    Returns:
+        DataFrame enrichi avec colonnes:
+        - has_suggestion: True si une suggestion existe
+        - suggestion_id: ID du produit suggéré
+        - suggestion_nom: Nom du produit suggéré
+        - suggestion_score: Score de similarité (0-1)
+        - suggestion_type: Type de match (name_similarity)
+    """
+    if not isinstance(invoice_df, pd.DataFrame) or invoice_df.empty:
+        return invoice_df
+
+    result = invoice_df.copy()
+
+    # Initialiser les colonnes de suggestion
+    result["has_suggestion"] = False
+    result["suggestion_id"] = None
+    result["suggestion_nom"] = None
+    result["suggestion_score"] = None
+    result["suggestion_type"] = None
+
+    # Identifier les lignes sans match (produit_id manquant ou 0)
+    if "produit_id" not in result.columns:
+        result["produit_id"] = None
+
+    mask_no_match = result["produit_id"].isna() | (result["produit_id"] == 0)
+
+    if not mask_no_match.any():
+        return result
+
+    # Pour chaque ligne sans match, chercher des suggestions
+    for idx in result[mask_no_match].index:
+        nom = result.at[idx, "nom"] if "nom" in result.columns else None
+        if not nom or not str(nom).strip():
+            continue
+
+        suggestions = find_similar_products(
+            str(nom),
+            tenant_id=tenant_id,
+            max_results=1,
+            min_similarity=0.3,
+        )
+
+        if suggestions:
+            best = suggestions[0]
+            result.at[idx, "has_suggestion"] = True
+            result.at[idx, "suggestion_id"] = best["produit_id"]
+            result.at[idx, "suggestion_nom"] = best["produit_nom"]
+            result.at[idx, "suggestion_score"] = best["similarity_score"]
+            result.at[idx, "suggestion_type"] = best["match_type"]
+
+    return result
+
+
 def register_invoice_reception(
     invoice_df: pd.DataFrame,
     *,
@@ -410,13 +589,37 @@ def register_invoice_reception(
     if valid_df.empty:
         return summary
 
+    def _get_line_date(row):
+        """Récupère la date de la ligne (facture_date) ou fallback sur reception_date."""
+        line_date = getattr(row, "facture_date", None)
+        if line_date is not None and pd.notna(line_date):
+            # Convertir en datetime si c'est une string
+            if isinstance(line_date, str) and line_date.strip():
+                try:
+                    # Format DD-MM-YYYY ou DD/MM/YYYY
+                    import re
+                    match = re.match(r"^(\d{2})[-/](\d{2})[-/](\d{4})", line_date)
+                    if match:
+                        return datetime(int(match.group(3)), int(match.group(2)), int(match.group(1)), tzinfo=timezone.utc)
+                    # Format YYYY-MM-DD
+                    if re.match(r"^\d{4}-\d{2}-\d{2}", line_date):
+                        return datetime.fromisoformat(line_date[:10]).replace(tzinfo=timezone.utc)
+                except Exception:
+                    pass
+            elif isinstance(line_date, (datetime, date)):
+                if isinstance(line_date, datetime):
+                    return line_date if line_date.tzinfo else line_date.replace(tzinfo=timezone.utc)
+                return datetime.combine(line_date, time.min, tzinfo=timezone.utc)
+        return reception_date
+
     payloads: list[dict[str, object]] = [
         {
             "pid": int(row.produit_id_num),
             "qty": row.qty_norm,
             "source": source_label,
             "tenant_id": int(tenant_id),
-            "date_mvt": reception_date,
+            "date_mvt": _get_line_date(row),
+            "type": safe_type,
         }
         for row in valid_df.itertuples()
     ]
@@ -429,11 +632,10 @@ def register_invoice_reception(
         unit_cost = _as_decimal(price_achat) if price_achat is not None else None
         cost_entries.append(
             {
-                "pid": int(row.produit_id_num),
-                "qty": row.qty_norm,
+                "product_id": int(row.produit_id_num),
+                "quantity": row.qty_norm,
                 "unit_cost": unit_cost,
                 "tenant_id": int(tenant_id),
-                "received_at": reception_date,
             }
         )
 
@@ -441,6 +643,7 @@ def register_invoice_reception(
         return summary  # Retourne le bilan
 
     eng = get_engine()  # Récupère l'engine
+    inserted_movements = []  # Liste de tuples (movement_id, cost_entry_index) - initialisé ici pour accès après le bloc
     try:
         with eng.begin() as conn:  # Démarre une transaction
             product_ids = sorted({item["pid"] for item in payloads})  # Ensemble des IDs produits concernés
@@ -471,28 +674,55 @@ def register_invoice_reception(
             if not payloads:  # Si plus rien à insérer
                 return summary  # Retourne le bilan
 
-            result = conn.execute(
-                text(
-                    """
-                    INSERT INTO mouvements_stock (produit_id, type, quantite, source, date_mvt, tenant_id)
-                    VALUES (:pid, :type, :qty, :source, COALESCE(:date_mvt, now()), :tenant_id)
-                    RETURNING id
-                    """
-                ),
-                payloads,
-            )  # Insère les mouvements d'entrée
-            inserted_ids = [row.id for row in result]  # IDs des mouvements insérés
+            # Vérification anti-doublon: on vérifie si des mouvements identiques existent déjà
+            check_duplicate_sql = text(
+                """
+                SELECT produit_id, date_mvt::date, quantite
+                FROM mouvements_stock
+                WHERE tenant_id = :tenant_id
+                  AND source = :source
+                  AND produit_id = :pid
+                  AND date_mvt::date = CAST(:date_mvt AS date)
+                  AND quantite = :qty
+                LIMIT 1
+                """
+            )
 
-            for entry, movement_id in zip(cost_entries, inserted_ids):  # Aligne chaque coût avec un mouvement
+            # Insert mouvements un par un pour récupérer les IDs (SQLAlchemy 2.0 batch RETURNING issue)
+            insert_sql = text(
+                """
+                INSERT INTO mouvements_stock (produit_id, type, quantite, source, date_mvt, tenant_id)
+                VALUES (:pid, :type, :qty, :source, COALESCE(:date_mvt, now()), :tenant_id)
+                RETURNING id
+                """
+            )
+            skipped_duplicates = 0
+            for idx, payload in enumerate(payloads):
+                # Vérifie si ce mouvement existe déjà
+                existing = conn.execute(check_duplicate_sql, payload).fetchone()
+                if existing:
+                    skipped_duplicates += 1
+                    continue  # Skip ce doublon
+                result = conn.execute(insert_sql, payload)
+                row = result.fetchone()
+                if row:
+                    inserted_movements.append((row.id, idx))
+
+            if skipped_duplicates > 0:
+                summary["skipped_duplicates"] = skipped_duplicates
+                summary["errors"].append(f"{skipped_duplicates} mouvement(s) ignoré(s) car déjà existant(s)")
+
+            for movement_id, idx in inserted_movements:  # Aligne chaque coût avec un mouvement
+                entry = cost_entries[idx]
                 inventory_costing.add_cost_layer(
                     conn,
-                    tenant_id=entry["tenant_id"],
-                    product_id=entry["pid"],
-                    quantity=entry["qty"],
+                    tenant_id=int(tenant_id),
+                    product_id=entry["product_id"],
+                    quantity=entry["quantity"],
                     unit_cost=entry["unit_cost"],
                     movement_id=movement_id,
                     source=source_label,
-                    received_at=entry["received_at"],
+                    received_at=entry.get("received_at"),
                 )  # Ajoute la couche de coût
     except sa_exc.IntegrityError as exc:  # Violations de contraintes
         summary["errors"].append(f"Erreur d'intégrité lors de l'enregistrement: {exc.orig}")  # Ajoute l'erreur
@@ -501,8 +731,8 @@ def register_invoice_reception(
         summary["errors"].append(str(exc))  # Ajoute le message
         return summary  # Retourne le bilan
 
-    summary["movements_created"] = len(payloads)  # Nombre de mouvements créés
-    summary["quantity_total"] = float(sum(item["qty"] for item in payloads))  # Quantité totale mouvementée
+    summary["movements_created"] = len(inserted_movements)  # Nombre de mouvements réellement créés
+    summary["quantity_total"] = float(sum(payloads[idx]["qty"] for _, idx in inserted_movements))  # Quantité totale mouvementée
     return summary  # Retourne le bilan final
 
 # Ajoutez d'autres fonctions de service ici (ex: adjust_stock, create_product_with_barcode)  # Commentaire de rappel

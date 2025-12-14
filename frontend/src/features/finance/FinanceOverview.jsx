@@ -14,13 +14,13 @@ import {
 } from '../../hooks/useFinanceCategories.js';
 import { roundAmount } from '../../utils/banking.js';
 
-const Stat = ({ label, value, hint, icon: Icon, accent = 'text-slate-900', bgColor = 'bg-white', borderColor = 'border-slate-200' }) => (
-  <div className={`rounded-2xl border ${borderColor} ${bgColor} p-4 transition-all hover:shadow-md`}>
-    <div className="flex items-center gap-2 text-slate-500 text-xs uppercase tracking-[0.3em]">
+const Stat = ({ label, value, hint, icon: Icon, accent = 'text-white', bgColor = 'bg-white/5', borderColor = 'border-white/10' }) => (
+  <div className={`rounded-2xl border ${borderColor} ${bgColor} p-4 transition-all hover:border-white/20`}>
+    <div className="flex items-center gap-2 text-slate-400 text-xs uppercase tracking-[0.3em]">
       {Icon && <Icon className="w-4 h-4" />} {label}
     </div>
     <p className={`mt-1 text-2xl font-semibold ${accent}`}>{value}</p>
-    {hint && <p className="text-xs text-slate-500 mt-1">{hint}</p>}
+    {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
   </div>
 );
 
@@ -43,17 +43,17 @@ export default function FinanceOverview() {
   const treasuryQuery = useFinanceTreasury({});
 
   // Données extraites des requêtes
-  const rules = rulesQuery.data ?? [];
-  const categories = catQuery.data ?? [];
-  const catStatsData = catStats.data ?? [];
-  const accounts = accountsStats.data ?? [];
-  const pendingMatches = matchesQuery.data ?? [];
-  const anomalies = anomaliesQuery.data ?? [];
+  const rules = Array.isArray(rulesQuery.data) ? rulesQuery.data : [];
+  const categories = Array.isArray(catQuery.data) ? catQuery.data : [];
+  const catStatsData = Array.isArray(catStats.data) ? catStats.data : [];
+  const accounts = Array.isArray(accountsStats.data) ? accountsStats.data : [];
+  const pendingMatches = Array.isArray(matchesQuery.data) ? matchesQuery.data : [];
+  const anomalies = Array.isArray(anomaliesQuery.data) ? anomaliesQuery.data : [];
   const treasury = treasuryQuery.data ?? {};
 
   // Timeline depuis l'API (déjà agrégée côté serveur)
   const treasuryTimeline = useMemo(() => {
-    const data = timelineQuery.data ?? [];
+    const data = Array.isArray(timelineQuery.data) ? timelineQuery.data : [];
     return data.map((item) => ({
       month: item.period,
       balance: item.cumulative_balance,
@@ -80,14 +80,14 @@ export default function FinanceOverview() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Finance overview</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Trésorerie & catégorisation</h1>
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Finance overview</p>
+          <h1 className="text-2xl font-semibold text-orange-400">Trésorerie & catégorisation</h1>
         </div>
         <div className="flex items-center gap-2">
           <select
             value={months}
             onChange={(e) => setMonths(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
           >
             <option value="all">Tout l'historique</option>
             {[3, 6, 12, 24, 36].map((m) => (
@@ -114,36 +114,36 @@ export default function FinanceOverview() {
           value={`${roundAmount(totals.entrees)} €`}
           hint="Total entrées"
           icon={ArrowDownCircle}
-          accent="text-emerald-600"
-          bgColor="bg-emerald-50"
-          borderColor="border-emerald-200"
+          accent="text-emerald-400"
+          bgColor="bg-emerald-500/10"
+          borderColor="border-emerald-500/30"
         />
         <Stat
           label="Cash-out"
           value={`${roundAmount(totals.sorties)} €`}
           hint="Total sorties"
           icon={ArrowUpCircle}
-          accent="text-rose-600"
-          bgColor="bg-rose-50"
-          borderColor="border-rose-200"
+          accent="text-rose-400"
+          bgColor="bg-rose-500/10"
+          borderColor="border-rose-500/30"
         />
         <Stat
           label="Net"
           value={`${roundAmount(totals.net)} €`}
           hint="Solde de la période"
           icon={Wallet}
-          accent={totals.net >= 0 ? 'text-emerald-700' : 'text-rose-700'}
-          bgColor={totals.net >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}
-          borderColor={totals.net >= 0 ? 'border-emerald-200' : 'border-rose-200'}
+          accent={totals.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}
+          bgColor={totals.net >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10'}
+          borderColor={totals.net >= 0 ? 'border-emerald-500/30' : 'border-rose-500/30'}
         />
         <Stat
           label="Alertes"
           value={`${anomalies.length} / ${pendingMatches.length}`}
           hint="Anomalies / Reco en attente"
           icon={Activity}
-          accent={anomalies.length > 0 ? 'text-rose-600' : 'text-emerald-600'}
-          bgColor={anomalies.length > 0 ? 'bg-rose-50' : 'bg-white'}
-          borderColor={anomalies.length > 0 ? 'border-rose-200' : 'border-slate-200'}
+          accent={anomalies.length > 0 ? 'text-rose-400' : 'text-emerald-400'}
+          bgColor={anomalies.length > 0 ? 'bg-rose-500/10' : 'bg-white/5'}
+          borderColor={anomalies.length > 0 ? 'border-rose-500/30' : 'border-white/10'}
         />
       </div>
 
@@ -152,7 +152,7 @@ export default function FinanceOverview() {
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Soldes par compte</p>
-            <h3 className="text-lg font-semibold text-slate-900">Vue d'ensemble des comptes</h3>
+            <h3 className="text-lg font-semibold text-amber-400">Vue d'ensemble des comptes</h3>
           </div>
           <Button variant="ghost" onClick={() => accountsStats.refetch()}>
             Rafraîchir
@@ -160,30 +160,30 @@ export default function FinanceOverview() {
         </div>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {accounts.map((acc) => (
-            <div key={acc.id} className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 hover:shadow-md transition-shadow">
+            <div key={acc.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:border-white/20 transition-colors">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold text-slate-900">{acc.label}</p>
-                <Wallet className={`w-5 h-5 ${acc.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} />
+                <p className="text-sm font-semibold text-white">{acc.label}</p>
+                <Wallet className={`w-5 h-5 ${acc.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`} />
               </div>
               <div className="space-y-1">
-                <div className="flex justify-between text-xs text-slate-600">
+                <div className="flex justify-between text-xs text-slate-300">
                   <span className="flex items-center gap-1">
-                    <ArrowDownCircle className="w-3 h-3 text-emerald-600" />
+                    <ArrowDownCircle className="w-3 h-3 text-emerald-400" />
                     Entrées
                   </span>
-                  <span className="font-semibold">{roundAmount(acc.inflow)} €</span>
+                  <span className="font-semibold text-emerald-400">{roundAmount(acc.inflow)} €</span>
                 </div>
-                <div className="flex justify-between text-xs text-slate-600">
+                <div className="flex justify-between text-xs text-slate-300">
                   <span className="flex items-center gap-1">
-                    <ArrowUpCircle className="w-3 h-3 text-rose-600" />
+                    <ArrowUpCircle className="w-3 h-3 text-rose-400" />
                     Sorties
                   </span>
-                  <span className="font-semibold">{roundAmount(acc.outflow)} €</span>
+                  <span className="font-semibold text-rose-400">{roundAmount(acc.outflow)} €</span>
                 </div>
-                <div className="h-px bg-slate-200 my-2"></div>
+                <div className="h-px bg-white/10 my-2"></div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-semibold text-slate-700">Solde</span>
-                  <span className={`text-lg font-bold ${acc.balance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  <span className="text-xs font-semibold text-slate-400">Solde</span>
+                  <span className={`text-lg font-bold ${acc.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {roundAmount(acc.balance)} €
                   </span>
                 </div>
@@ -191,7 +191,7 @@ export default function FinanceOverview() {
             </div>
           ))}
           {accounts.length === 0 && (
-            <div className="col-span-full text-center py-8 text-slate-500">
+            <div className="col-span-full text-center py-8 text-slate-400">
               <Wallet className="w-12 h-12 mx-auto mb-2 opacity-30" />
               <p>Aucun compte disponible</p>
             </div>
@@ -204,7 +204,7 @@ export default function FinanceOverview() {
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Évolution</p>
-            <h3 className="text-lg font-semibold text-slate-900">Trésorerie cumulée</h3>
+            <h3 className="text-lg font-semibold text-amber-400">Trésorerie cumulée</h3>
           </div>
           <div className="text-xs text-slate-500">
             {treasuryTimeline.length > 0 && (
@@ -233,10 +233,11 @@ export default function FinanceOverview() {
                   formatter={(value) => [`${roundAmount(value)} €`, 'Solde cumulé']}
                   labelFormatter={(label) => `Mois: ${label}`}
                   contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e2e8f0',
+                    backgroundColor: '#1a1a24',
+                    border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: '8px',
-                    fontSize: '12px'
+                    fontSize: '12px',
+                    color: '#fff'
                   }}
                 />
                 <Line
@@ -251,7 +252,7 @@ export default function FinanceOverview() {
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="h-64 flex items-center justify-center text-slate-500">
+          <div className="h-64 flex items-center justify-center text-slate-400">
             <div className="text-center">
               <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-30" />
               <p>Aucune donnée de trésorerie disponible</p>
@@ -261,22 +262,22 @@ export default function FinanceOverview() {
       </Card>
 
       {/* Alerts Summary */}
-      <Card className={`p-4 ${anomalies.length > 0 ? 'border-amber-200 bg-amber-50' : ''}`}>
+      <Card className={`p-4 ${anomalies.length > 0 ? 'border-amber-500/30 bg-amber-500/10' : ''}`}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Alertes système</p>
-            <h3 className="text-lg font-semibold text-slate-900">
+            <h3 className="text-lg font-semibold text-white">
               {anomalies.length === 0 && '✓ Tout est OK'}
               {anomalies.length > 0 && `${anomalies.length} anomalie(s) détectée(s)`}
             </h3>
             {pendingMatches.length > 0 && (
-              <p className="text-sm text-slate-600 mt-2">
-                <span className="font-semibold">{pendingMatches.length}</span> rapprochement(s) en attente
+              <p className="text-sm text-slate-300 mt-2">
+                <span className="font-semibold text-amber-400">{pendingMatches.length}</span> rapprochement(s) en attente
               </p>
             )}
           </div>
           {anomalies.length > 0 && (
-            <div className="rounded-xl bg-rose-100 border border-rose-300 px-4 py-2 text-rose-900 text-sm font-semibold">
+            <div className="rounded-xl bg-rose-500/20 border border-rose-500/30 px-4 py-2 text-rose-400 text-sm font-semibold">
               <Activity className="w-4 h-4 inline mr-1" />
               {anomalies.length} anomalie{anomalies.length > 1 ? 's' : ''}
             </div>
@@ -288,7 +289,7 @@ export default function FinanceOverview() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Catégories</p>
-            <h3 className="text-lg font-semibold text-slate-900">Répartition par catégorie</h3>
+            <h3 className="text-lg font-semibold text-amber-400">Répartition par catégorie</h3>
           </div>
           <Button variant="ghost" onClick={() => catQuery.refetch()}>
             Rafraîchir
@@ -297,7 +298,7 @@ export default function FinanceOverview() {
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="text-left text-slate-500">
+              <tr className="text-left text-slate-400">
                 <th className="px-3 py-2">Catégorie</th>
                 <th className="px-3 py-2 text-right">Entrées</th>
                 <th className="px-3 py-2 text-right">Sorties</th>
@@ -306,16 +307,16 @@ export default function FinanceOverview() {
             </thead>
             <tbody>
               {catStatsData.map((cat) => (
-                <tr key={cat.id || cat.code} className="border-t border-slate-100">
-                  <td className="px-3 py-2 font-semibold text-slate-900">{cat.name || cat.code || 'Sans catégorie'}</td>
-                  <td className="px-3 py-2 text-right">{roundAmount(cat.inflow || 0)} €</td>
-                  <td className="px-3 py-2 text-right">{roundAmount(cat.outflow || 0)} €</td>
-                  <td className="px-3 py-2 text-right">{cat.lines || 0}</td>
+                <tr key={cat.id || cat.code} className="border-t border-white/10">
+                  <td className="px-3 py-2 font-semibold text-white">{cat.name || cat.code || 'Sans catégorie'}</td>
+                  <td className="px-3 py-2 text-right text-emerald-400">{roundAmount(cat.inflow || 0)} €</td>
+                  <td className="px-3 py-2 text-right text-rose-400">{roundAmount(cat.outflow || 0)} €</td>
+                  <td className="px-3 py-2 text-right text-slate-300">{cat.lines || 0}</td>
                 </tr>
               ))}
               {catStatsData.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-4 text-center text-slate-500">
+                  <td colSpan={4} className="px-3 py-4 text-center text-slate-400">
                     Aucune catégorie
                   </td>
                 </tr>
@@ -329,26 +330,26 @@ export default function FinanceOverview() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Règles</p>
-            <h3 className="text-lg font-semibold text-slate-900">Règles de catégorisation</h3>
-            <p className="text-sm text-slate-600">Liste des règles actives et mots-clés associés.</p>
+            <h3 className="text-lg font-semibold text-amber-400">Règles de catégorisation</h3>
+            <p className="text-sm text-slate-400">Liste des règles actives et mots-clés associés.</p>
           </div>
           <Button variant="ghost" onClick={() => rulesQuery.refetch()}>
             Rafraîchir
           </Button>
         </div>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {rulesQuery.isLoading && <p className="text-sm text-slate-500">Chargement des règles...</p>}
+          {rulesQuery.isLoading && <p className="text-sm text-slate-400">Chargement des règles...</p>}
           {rulesQuery.isError && (
-            <p className="text-sm text-rose-500">
+            <p className="text-sm text-rose-400">
               Erreur: {rulesQuery.error?.message || 'Impossible de charger les règles'}
             </p>
           )}
           {rules.map((rule) => (
-            <div key={rule.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-              <p className="text-sm font-semibold text-slate-900">{rule.name}</p>
-              <p className="text-xs text-slate-500">
-                Catégorie: {rule.category_name || categoryById.get(rule.category_id)?.name || rule.category_id} · Active:{' '}
-                {rule.is_active ? 'oui' : 'non'}
+            <div key={rule.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+              <p className="text-sm font-semibold text-white">{rule.name}</p>
+              <p className="text-xs text-slate-400">
+                Catégorie: <span className="text-amber-400">{rule.category_name || categoryById.get(rule.category_id)?.name || rule.category_id}</span> · Active:{' '}
+                <span className={rule.is_active ? 'text-emerald-400' : 'text-slate-500'}>{rule.is_active ? 'oui' : 'non'}</span>
               </p>
               <p className="text-xs text-slate-500 truncate">
                 Mots-clés: {(rule.keywords || []).length ? (rule.keywords || []).join(', ') : '—'}
@@ -356,7 +357,7 @@ export default function FinanceOverview() {
             </div>
           ))}
           {!rulesQuery.isLoading && !rulesQuery.isError && rules.length === 0 && (
-            <p className="text-sm text-slate-500">Aucune règle configurée</p>
+            <p className="text-sm text-slate-400">Aucune règle configurée</p>
           )}
         </div>
       </Card>

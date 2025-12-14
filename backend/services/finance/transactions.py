@@ -324,9 +324,9 @@ def search_transactions(
           FROM finance_bank_statement_lines b2
           JOIN finance_bank_statements bs ON bs.id = b2.statement_id
           WHERE (
-            (t.ref_externe LIKE 'stmtline:%' AND b2.id = CAST(substring(t.ref_externe FROM 'stmtline:(\\d+)') AS BIGINT))
+            (t.ref_externe LIKE 'stmtline:%' AND b2.checksum = substring(t.ref_externe FROM 'stmtline:(.+)'))
             OR (
-              (t.ref_externe IS NULL OR t.ref_externe = '' OR t.ref_externe NOT LIKE 'stmtline:%')
+              (t.ref_externe IS NULL OR t.ref_externe = '')
               AND bs.account_id = t.account_id
               AND b2.date_operation = t.date_operation
               AND ABS(ABS(b2.montant) - t.amount) < 0.01

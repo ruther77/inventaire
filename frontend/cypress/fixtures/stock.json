@@ -1,0 +1,112 @@
+{
+  "summary": {
+    "total_products": 245,
+    "total_value": 45230.50,
+    "low_stock_count": 12,
+    "out_of_stock_count": 3,
+    "overstock_count": 8
+  },
+  "movements": {
+    "data": [
+      {
+        "id": 1,
+        "product_id": 1,
+        "product_name": "Tomates",
+        "movement_type": "in",
+        "quantity": 50,
+        "unit_price": 2.50,
+        "total": 125.00,
+        "date": "2025-12-10",
+        "reference": "REC-2025-0145",
+        "supplier": "Metro"
+      },
+      {
+        "id": 2,
+        "product_id": 2,
+        "product_name": "Huile d'olive",
+        "movement_type": "out",
+        "quantity": 10,
+        "unit_price": 8.00,
+        "total": 80.00,
+        "date": "2025-12-10",
+        "reference": "VENTE-2025-0892"
+      },
+      {
+        "id": 3,
+        "product_id": 3,
+        "product_name": "Pain",
+        "movement_type": "in",
+        "quantity": 100,
+        "unit_price": 0.80,
+        "total": 80.00,
+        "date": "2025-12-09",
+        "reference": "REC-2025-0144",
+        "supplier": "Boulangerie Locale"
+      },
+      {
+        "id": 4,
+        "product_id": 1,
+        "product_name": "Tomates",
+        "movement_type": "out",
+        "quantity": 25,
+        "unit_price": 2.50,
+        "total": 62.50,
+        "date": "2025-12-09",
+        "reference": "VENTE-2025-0891"
+      },
+      {
+        "id": 5,
+        "product_id": 4,
+        "product_name": "Fromage Comté",
+        "movement_type": "adjustment",
+        "quantity": -2,
+        "unit_price": 15.00,
+        "total": -30.00,
+        "date": "2025-12-08",
+        "reference": "ADJ-2025-0023",
+        "reason": "Inventaire"
+      }
+    ],
+    "total": 156,
+    "page": 1,
+    "pageSize": 20
+  },
+  "timeseries": [
+    { "date": "2025-12-01", "in_value": 1250.00, "out_value": 980.00, "net": 270.00 },
+    { "date": "2025-12-02", "in_value": 890.00, "out_value": 1100.00, "net": -210.00 },
+    { "date": "2025-12-03", "in_value": 1520.00, "out_value": 1350.00, "net": 170.00 },
+    { "date": "2025-12-04", "in_value": 750.00, "out_value": 920.00, "net": -170.00 },
+    { "date": "2025-12-05", "in_value": 1100.00, "out_value": 1050.00, "net": 50.00 },
+    { "date": "2025-12-06", "in_value": 680.00, "out_value": 890.00, "net": -210.00 },
+    { "date": "2025-12-07", "in_value": 1400.00, "out_value": 1200.00, "net": 200.00 }
+  ],
+  "alerts": [
+    {
+      "id": 1,
+      "product_id": 1,
+      "product_name": "Tomates",
+      "alert_type": "low_stock",
+      "current_stock": 5,
+      "threshold": 15,
+      "severity": "critical"
+    },
+    {
+      "id": 2,
+      "product_id": 2,
+      "product_name": "Huile d'olive",
+      "alert_type": "low_stock",
+      "current_stock": 8,
+      "threshold": 12,
+      "severity": "warning"
+    },
+    {
+      "id": 3,
+      "product_id": 45,
+      "product_name": "Sauce spéciale",
+      "alert_type": "dead_stock",
+      "days_inactive": 100,
+      "stock_value": 125.00,
+      "severity": "info"
+    }
+  ]
+}

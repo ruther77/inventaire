@@ -19,5 +19,23 @@ class TokenResponse(BaseModel):
     user: AuthenticatedUserPayload
 
 
-__all__ = ["AuthenticatedUserPayload", "TokenResponse"]
+class CookieTokenResponse(BaseModel):
+    """Response for cookie-based authentication (no token in body)."""
+    message: str = "Authentification reussie"
+    expires_in: int
+    user: AuthenticatedUserPayload
+
+
+class RefreshResponse(BaseModel):
+    """Response for token refresh."""
+    message: str = "Token rafraichi"
+    expires_in: int
+
+
+__all__ = [
+    "AuthenticatedUserPayload",
+    "TokenResponse",
+    "CookieTokenResponse",
+    "RefreshResponse",
+]
 

@@ -112,6 +112,48 @@ export {
 export { default as SectionHeader } from './SectionHeader.jsx';
 export { default as MegaSectionNav } from './MegaSectionNav.jsx';
 
+// Navigation
+export { default as TabView, useTabView } from './TabView.jsx';
+
+// Phase 4 - Composants Pro-actifs
+export {
+  default as EditableCell,
+  InlineTextEditor,
+  InlineNumberEditor,
+  InlineSelectEditor,
+  InlineEditorRow,
+} from './InlineEditor.jsx';
+
+export {
+  default as CardExpandable,
+  CardExpandableGroup,
+  RecommendationCard,
+  AlertCard,
+} from './CardExpandable.jsx';
+
+export {
+  default as SmartTable,
+  columnHelpers,
+} from './SmartTable.jsx';
+
+export {
+  default as AIConfidenceBadge,
+  ConfidenceIndicator,
+  ConfidenceRing,
+  AISuggestionWrapper,
+} from './AIConfidenceBadge.jsx';
+
+// Next-Gen 2025 Components
+export { default as GlassCard, GlassCardHeader, GlassCardContent, GlassCardFooter } from './GlassCard.jsx';
+export { default as StatCard, StatCardGrid, MiniStat } from './StatCard.jsx';
+export {
+  Sparkline,
+  MiniBarChart,
+  ProgressRing,
+  TrendIndicator,
+  MiniPie,
+} from './MiniChart.jsx';
+
 // Design System - Tokens complets
 export {
   default as designTokens,

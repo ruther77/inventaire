@@ -68,7 +68,7 @@ export default function MegaSectionNav({ sections, activeItemId, onSelect }) {
       onMouseLeave={handleMouseLeave}
       onBlur={handleNavBlur}
     >
-      <ul className="flex items-center gap-6 text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">
+      <ul className="flex items-center gap-6 text-sm font-semibold uppercase tracking-[0.3em] text-slate-200">
         {sections.map((section) => (
           <li key={section.id}>
             <button
@@ -78,7 +78,7 @@ export default function MegaSectionNav({ sections, activeItemId, onSelect }) {
               onClick={() => handleSectionSelect(section)}
               className={clsx(
                 'px-2 py-1 transition-colors focus:outline-none',
-                section.id === activeSection?.id ? 'text-slate-900' : 'hover:text-slate-700',
+                section.id === activeSection?.id ? 'text-white' : 'hover:text-slate-100',
               )}
             >
               {section.label}
@@ -87,11 +87,11 @@ export default function MegaSectionNav({ sections, activeItemId, onSelect }) {
         ))}
       </ul>
       {openedSection && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-3 rounded-3xl border border-slate-100 bg-white/95 p-8 shadow-2xl backdrop-blur">
+        <div className="absolute left-0 right-0 top-full z-30 mt-3 rounded-3xl border border-white/10 bg-slate-900/95 p-8 shadow-2xl backdrop-blur">
           <div className="grid gap-6 lg:grid-cols-3">
             {openedSection.groups?.map((group) => (
               <div key={group.title}>
-                <p className="text-xs uppercase tracking-[0.4em] text-slate-400">{group.title}</p>
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-300">{group.title}</p>
                 <ul className="mt-3 flex flex-col gap-2">
                   {group.items?.map((item) => {
                     const isActive = item.id === activeItemId;
@@ -102,13 +102,13 @@ export default function MegaSectionNav({ sections, activeItemId, onSelect }) {
                           className={clsx(
                             'w-full rounded-2xl border px-3 py-2 text-left transition focus:outline-none',
                             isActive
-                              ? 'border-brand-300 bg-brand-50 text-slate-900 shadow'
-                              : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50',
+                              ? 'border-brand-400 bg-brand-500/10 text-white shadow'
+                              : 'border-transparent text-slate-200 hover:border-white/10 hover:bg-white/5',
                           )}
                           onClick={() => handleItemSelect(item.id)}
                         >
                           <p className="text-sm font-semibold">{item.label}</p>
-                          {item.description && <p className="text-xs text-slate-500">{item.description}</p>}
+                          {item.description && <p className="text-sm text-slate-300">{item.description}</p>}
                         </button>
                       </li>
                     );

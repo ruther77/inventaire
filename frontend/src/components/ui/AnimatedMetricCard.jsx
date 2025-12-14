@@ -21,21 +21,21 @@ export default function AnimatedMetricCard({ label, value, hint, trend }) {
         'shadow-xl scale-105': pulse,
       })}
     >
-      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</p>
+      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-200">{label}</p>
       <div className="flex items-end gap-3">
-        <p className="text-3xl font-semibold text-slate-900">{value}</p>
+        <p className="text-3xl font-semibold text-white">{value}</p>
         {trend && (
           <span
             className={clsx(
-              'rounded-full px-2 py-1 text-xs font-semibold',
-              trend.startsWith('-') ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600',
+              'rounded-full px-3 py-1 text-xs font-semibold',
+              trend.startsWith('-') ? 'bg-rose-500/15 text-rose-200' : 'bg-emerald-500/15 text-emerald-200',
             )}
           >
             {trend}
           </span>
         )}
       </div>
-      {hint && <p className="text-sm text-slate-500">{hint}</p>}
+      {hint && <p className="text-[15px] leading-6 text-slate-200">{hint}</p>}
     </div>
   );
 }

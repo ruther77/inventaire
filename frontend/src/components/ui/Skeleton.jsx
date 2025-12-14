@@ -12,10 +12,11 @@ import clsx from 'clsx';
 
 const baseClasses = 'rounded';
 
+// Dark theme variants
 const variantClasses = {
-  pulse: 'animate-pulse bg-slate-200',
-  shimmer: 'skeleton-shimmer',
-  static: 'bg-slate-200',
+  pulse: 'animate-pulse bg-white/10',
+  shimmer: 'skeleton',
+  static: 'bg-white/10',
 };
 
 export function Skeleton({
@@ -149,7 +150,7 @@ export function ListItemSkeleton({ className, variant = 'shimmer' }) {
   return (
     <div
       className={clsx(
-        'flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3',
+        'flex items-center justify-between rounded-xl border border-white/10 px-4 py-3',
         className
       )}
     >
@@ -199,7 +200,7 @@ export function ChartSkeleton({ className, variant = 'shimmer' }) {
 
 export function ProductCardSkeleton({ className, variant = 'shimmer' }) {
   return (
-    <div className={clsx('rounded-2xl border border-slate-100 p-4', className)}>
+    <div className={clsx('rounded-2xl border border-white/10 bg-white/5 p-4', className)}>
       <Skeleton variant={variant} className="h-48 w-full rounded-xl mb-4" />
       <Skeleton variant={variant} className="h-4 w-3/4 mb-2" />
       <Skeleton variant={variant} className="h-3 w-1/2 mb-3" />
@@ -306,6 +307,102 @@ export function PageSkeleton({ className }) {
       </div>
 
       {/* Content */}
+      <CardSkeleton />
+    </div>
+  );
+}
+
+/**
+ * IntelligenceSkeleton - Skeleton pour la page Intelligence
+ */
+export function IntelligenceSkeleton({ className }) {
+  return (
+    <div className={clsx('space-y-6', className)}>
+      {/* Header */}
+      <div>
+        <Skeleton variant="shimmer" className="h-3 w-20 mb-2" />
+        <Skeleton variant="shimmer" className="h-8 w-40 mb-1" />
+        <Skeleton variant="shimmer" className="h-4 w-80" />
+      </div>
+
+      {/* Score + KPIs row */}
+      <div className="grid gap-4 md:grid-cols-5">
+        <div className="rounded-2xl border border-white/10 p-6 text-center">
+          <Skeleton variant="shimmer" className="h-3 w-24 mx-auto mb-2" />
+          <Skeleton variant="shimmer" className="h-12 w-16 mx-auto mb-1" />
+          <Skeleton variant="shimmer" className="h-3 w-8 mx-auto" />
+        </div>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <MetricCardSkeleton key={i} />
+        ))}
+      </div>
+
+      {/* Forecasts */}
+      <CardSkeleton />
+
+      {/* Anomalies + Suppliers */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * TransactionsSkeleton - Skeleton pour la page Transactions
+ */
+export function TransactionsSkeleton({ className }) {
+  return (
+    <div className={clsx('space-y-6', className)}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton variant="shimmer" className="h-3 w-16 mb-2" />
+          <Skeleton variant="shimmer" className="h-8 w-56" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton variant="shimmer" className="h-10 w-28 rounded-xl" />
+          <Skeleton variant="shimmer" className="h-10 w-24 rounded-xl" />
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} variant="shimmer" className="h-10 w-32 rounded-xl" />
+        ))}
+      </div>
+
+      {/* Table */}
+      <div className="glass-panel p-0">
+        <TableSkeleton rows={10} columns={6} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * InvoiceImportSkeleton - Skeleton pour la page Import factures
+ */
+export function InvoiceImportSkeleton({ className }) {
+  return (
+    <div className={clsx('space-y-6', className)}>
+      {/* Upload area */}
+      <div className="rounded-2xl border-2 border-dashed border-white/20 p-12 text-center">
+        <Skeleton variant="shimmer" className="h-16 w-16 mx-auto mb-4 rounded-full" />
+        <Skeleton variant="shimmer" className="h-5 w-48 mx-auto mb-2" />
+        <Skeleton variant="shimmer" className="h-4 w-64 mx-auto" />
+      </div>
+
+      {/* Document selector */}
+      <div className="flex gap-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} variant="shimmer" className="h-10 w-28 rounded-xl" />
+        ))}
+      </div>
+
+      {/* Lines editor */}
       <CardSkeleton />
     </div>
   );

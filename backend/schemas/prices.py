@@ -2,49 +2,41 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel
-
-
-class PriceHistoryItem(BaseModel):
-    id: Optional[int] = None
-    produit_id: Optional[int] = None
-    code: Optional[str] = None
-    nom: Optional[str] = None
-    ean: Optional[str] = None
-    fournisseur: Optional[str] = None
-    prix_achat: float
-    prev_prix_achat: Optional[float] = None
-    prev_facture_date: Optional[datetime] = None
-    delta_prix: Optional[float] = None
-    delta_pct: Optional[float] = None
-    prix_vente: Optional[float] = None
-    marge_unitaire: Optional[float] = None
-    marge_pct: Optional[float] = None
-    margin_alert: Optional[bool] = None
-    stock_alert: Optional[bool] = None
-    stockout_repeated: Optional[bool] = None
-    stockout_events: Optional[int] = None
-    stock_actuel: Optional[float] = None
-    seuil_alerte: Optional[float] = None
-    quantite: Optional[float] = None
-    montant: Optional[float] = None
-    facture_date: datetime
-    source_context: Optional[str] = None
+from pydantic import Field
 
 
 class PriceHistoryResponse(BaseModel):
-    items: List[PriceHistoryItem]
-
-
-class LatestPriceEntry(PriceHistoryItem):
-    """Vue simplifiée du dernier prix connu par code."""
+    items: List[dict[str, Any]]
 
 
 class LatestPriceResponse(BaseModel):
-    items: List[LatestPriceEntry]
+    items: List[dict[str, Any]]
 
 
-__all__ = ["PriceHistoryItem", "PriceHistoryResponse", "LatestPriceEntry", "LatestPriceResponse"]
+class PriceCorrectionItem(BaseModel):
+    product_id: Optional[int] = Field(None, description="ID produit cible (sinon code_barre)")
+    code: Optional[str] = Field(None, description="Code-barres pour retrouver le produit")
+    prix_achat: Optional[float] = Field(None, ge=0)
+    prix_vente: Optional[float] = Field(None, ge=0)
+    tva: Optional[float] = Field(None, ge=0)
+
+
+class BulkPriceCorrectionRequest(BaseModel):
+    items: List[PriceCorrectionItem]
+
+
+class BulkPriceCorrectionResponse(BaseModel):
+    updated: int
+    skipped: List[dict[str, Any]]
+
+
+__all__ = [
+    "PriceHistoryResponse",
+    "LatestPriceResponse",
+    "PriceCorrectionItem",
+    "BulkPriceCorrectionRequest",
+    "BulkPriceCorrectionResponse",
+]

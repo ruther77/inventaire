@@ -50,19 +50,19 @@ export default function EmptyState({
     >
       <div
         className={clsx(
-          'rounded-full bg-slate-100 text-slate-400 mb-4',
+          'rounded-full bg-white/5 border border-white/10 text-amber-400 mb-4',
           s.iconContainer
         )}
       >
         <Icon className={s.icon} strokeWidth={1.5} aria-hidden="true" />
       </div>
 
-      <h3 className={clsx('font-semibold text-slate-900', s.title)}>
+      <h3 className={clsx('font-semibold text-white', s.title)}>
         {title}
       </h3>
 
       {description && (
-        <p className={clsx('mt-1 text-slate-500 max-w-sm', s.description)}>
+        <p className={clsx('mt-2 text-slate-300 max-w-sm', s.description)}>
           {description}
         </p>
       )}

@@ -1,0 +1,92 @@
+{
+  "overview": {
+    "total_reports": 12,
+    "last_generated": "2025-12-10T15:30:00Z",
+    "scheduled_reports": 3
+  },
+  "available_reports": [
+    {
+      "id": "stock-valuation",
+      "name": "Valorisation du Stock",
+      "description": "Rapport de valorisation complète du stock",
+      "category": "stock",
+      "last_run": "2025-12-10T15:30:00Z",
+      "frequency": "weekly"
+    },
+    {
+      "id": "margin-analysis",
+      "name": "Analyse des Marges",
+      "description": "Analyse détaillée des marges par produit et catégorie",
+      "category": "finance",
+      "last_run": "2025-12-09T10:00:00Z",
+      "frequency": "monthly"
+    },
+    {
+      "id": "supplier-performance",
+      "name": "Performance Fournisseurs",
+      "description": "Évaluation de la performance des fournisseurs",
+      "category": "suppliers",
+      "last_run": "2025-12-08T14:00:00Z",
+      "frequency": "monthly"
+    },
+    {
+      "id": "inventory-turnover",
+      "name": "Rotation des Stocks",
+      "description": "Analyse de la rotation des stocks par produit",
+      "category": "stock",
+      "last_run": "2025-12-07T09:00:00Z",
+      "frequency": "weekly"
+    },
+    {
+      "id": "cash-flow",
+      "name": "Flux de Trésorerie",
+      "description": "Rapport sur les flux de trésorerie",
+      "category": "finance",
+      "last_run": "2025-12-10T08:00:00Z",
+      "frequency": "daily"
+    }
+  ],
+  "recent_exports": [
+    {
+      "id": 1,
+      "report_id": "stock-valuation",
+      "report_name": "Valorisation du Stock",
+      "format": "xlsx",
+      "generated_at": "2025-12-10T15:30:00Z",
+      "size_bytes": 125000,
+      "download_url": "/api/reports/exports/1"
+    },
+    {
+      "id": 2,
+      "report_id": "margin-analysis",
+      "report_name": "Analyse des Marges",
+      "format": "pdf",
+      "generated_at": "2025-12-09T10:00:00Z",
+      "size_bytes": 89000,
+      "download_url": "/api/reports/exports/2"
+    }
+  ],
+  "schedules": [
+    {
+      "id": 1,
+      "report_id": "cash-flow",
+      "report_name": "Flux de Trésorerie",
+      "frequency": "daily",
+      "time": "08:00",
+      "recipients": ["admin@epicerie.fr"],
+      "format": "pdf",
+      "active": true
+    },
+    {
+      "id": 2,
+      "report_id": "stock-valuation",
+      "report_name": "Valorisation du Stock",
+      "frequency": "weekly",
+      "day": "monday",
+      "time": "09:00",
+      "recipients": ["admin@epicerie.fr", "manager@epicerie.fr"],
+      "format": "xlsx",
+      "active": true
+    }
+  ]
+}

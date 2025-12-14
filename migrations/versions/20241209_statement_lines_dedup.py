@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy import inspect, text
 
 revision: str = "20241209_statement_lines_dedup"
-down_revision: Union[str, Sequence[str], None] = "20241208_finance_ui_indexes"
+down_revision: Union[str, Sequence[str], None] = "20241208_finance_ui_idx"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   db:
     image: public.ecr.aws/docker/library/postgres:16
@@ -61,27 +59,6 @@ services:
     networks:
       - inventaire-net
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: inventaire-app
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-    ports:
-      - "8501:8501"  # Streamlit front (Expose)
-      - "3000:3000"  # Front web si utilisé
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - inventaire-net
-    volumes:
-      - .:/app
-
   backup:
     image: public.ecr.aws/docker/library/postgres:16
     container_name: inventaire-backup
@@ -112,6 +89,8 @@ services:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      NEWCMS_ALLOW_ANON: "1"            # mode démo pour newCMS (pas d'auth requise)
+      NEWCMS_DEFAULT_TENANT_ID: "2"     # tenant par défaut pour newCMS (restaurant)
     depends_on:
       db:
         condition: service_healthy
@@ -137,19 +116,45 @@ services:
       - "5175:80"
     networks:
       - inventaire-net
-
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - ./backend:/app/backend:rw
-      - ./requirements.txt:/app/requirements.txt:ro
-    ports:
-      - "8003:8000"
-    environment:
-      - PYTHONUNBUFFERED=1
+  
+  n8n:
+    image: n8nio/n8n
+    container_name: inventaire-n8n
     restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - GENERIC_TIMEZONE=Europe/Paris
+      - N8N_IMPORT_EXPORT_DIR=/home/node/.n8n/import
+      - N8N_IMPORT_EXPORT_AUTO_IMPORT=all
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-true}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-changeme}
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+      - ./n8n_workflows:/home/node/.n8n/import:ro
+    networks:
+      - inventaire-net
+    depends_on:
+      api:
+        condition: service_started
+      ollama:
+        condition: service_started
+
+  ollama:
+    image: ollama/ollama
+    container_name: inventaire-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_data:/root/.ollama
+    networks:
+      - inventaire-net
+
 
 volumes:
   db_data:

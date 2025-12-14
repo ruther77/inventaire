@@ -11,6 +11,13 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
+from backend.middleware import (
+    RequestContextMiddleware,
+    PerformanceMiddleware,
+    ResponseWrapperMiddleware,
+    get_performance_stats,
+)
+
 from core.data_repository import query_df
 from core.catalog_sql_repository import CatalogSqlRepository
 from core.inventory_service import process_sale_transaction
@@ -36,6 +43,19 @@ from backend.api import admin as admin_router
 from backend.api import restaurant as restaurant_router
 from backend.api import capital as capital_router
 from backend.api import analytics as analytics_router
+from backend.api import eurociel as eurociel_router
+# Advanced Finance Modules
+from backend.api import inventory_intelligence as inventory_intelligence_router
+from backend.api import forecasting as forecasting_router
+from backend.api import audit_trail as audit_trail_router
+from backend.api import anomaly_detection as anomaly_detection_router
+from backend.api import margins as margins_router
+from backend.api import data_quality as data_quality_router
+from backend.api import bank_reconciliation as bank_reconciliation_router
+from backend.api import rules_engine as rules_engine_router
+from backend.api import supplier_scoring as supplier_scoring_router
+from backend.api import cockpit as cockpit_router
+from backend.api import newcms as newcms_router
 from backend.dependencies.auth import optional_api_key
 from backend.dependencies.security import enforce_default_rbac
 from backend.settings import Settings
@@ -131,10 +151,37 @@ def _compute_inventory_value(tenant_id: int) -> dict[str, float]:
     }
 
 
+def _is_production_env() -> bool:
+    """Check if running in production environment."""
+    env = (os.getenv("APP_ENV") or os.getenv("ENV") or "development").lower()
+    return env in {"prod", "production", "staging"}
+
+
 def _load_allowed_origins() -> list[str]:
+    """Load CORS allowed origins with strict production enforcement.
+
+    In production:
+    - CORS_ALLOWED_ORIGINS must be explicitly set
+    - Raises RuntimeError if not configured
+    - Wildcard (*) is rejected
+
+    In development:
+    - Falls back to common localhost ports if not set
+    """
     raw_origins = os.getenv("CORS_ALLOWED_ORIGINS")
+    is_prod = _is_production_env()
+
     if not raw_origins:
-        # Vite/React dev server par défaut (ports fréquents + front docker)
+        if is_prod:
+            raise RuntimeError(
+                "CORS_ALLOWED_ORIGINS doit etre configure en production. "
+                "Exemple: CORS_ALLOWED_ORIGINS=https://mondomaine.com,https://app.mondomaine.com"
+            )
+        # Development fallback - Vite/React dev server (common ports)
+        import logging
+        logging.getLogger(__name__).warning(
+            "CORS_ALLOWED_ORIGINS non defini, utilisation des valeurs dev par defaut"
+        )
         return [
             "http://localhost:5173",
             "http://localhost:5174",
@@ -147,9 +194,20 @@ def _load_allowed_origins() -> list[str]:
     for entry in raw_origins.split(","):
         cleaned = entry.strip()
         if cleaned:
+            # Reject wildcard in production
+            if cleaned == "*" and is_prod:
+                raise RuntimeError(
+                    "Wildcard CORS (*) interdit en production. "
+                    "Specifiez les origines explicitement."
+                )
             parsed.append(cleaned)
-    # Allow explicit wildcard only if set
-    return parsed or ["http://localhost:5173"]
+
+    if not parsed:
+        if is_prod:
+            raise RuntimeError("CORS_ALLOWED_ORIGINS est vide en production.")
+        return ["http://localhost:5173"]
+
+    return parsed
 
 
 @lru_cache
@@ -177,11 +235,19 @@ L'API utilise OAuth2 avec JWT tokens. Obtenez un token via `/auth/token`.
 Chaque requete est filtree par tenant_id pour isoler les donnees.
         """,
         openapi_tags=[
+            # === Auth ===
             {"name": "auth", "description": "Authentification et gestion des tokens"},
-            {"name": "epicerie", "description": "Gestion du catalogue et stock epicerie"},
-            {"name": "restaurant", "description": "Module restaurant (plats, ingredients, marges)"},
-            {"name": "finance", "description": "Tresorerie et releves bancaires"},
-            {"name": "admin", "description": "Administration et configuration"},
+            # === Operations (Catalogue, Stock, Factures) ===
+            {"name": "operations", "description": "Operations quotidiennes: catalogue, stock, factures, approvisionnement"},
+            {"name": "restaurant", "description": "Module restaurant: plats, ingredients, marges restauration"},
+            # === Finance (Tresorerie, Comptabilite) ===
+            {"name": "finance", "description": "Tresorerie, releves bancaires, rapprochement, regles de categorisation"},
+            # === Intelligence (Previsions, Optimisation) ===
+            {"name": "intelligence", "description": "Intelligence business: previsions, optimisation stock, anomalies, scoring fournisseurs"},
+            # === Cockpit (Vue consolidee) ===
+            {"name": "cockpit", "description": "Vue consolidee unifiee avec KPIs et alertes"},
+            # === Admin ===
+            {"name": "admin", "description": "Administration et configuration systeme"},
         ],
         docs_url="/docs",
         redoc_url="/redoc",
@@ -194,14 +260,37 @@ Chaque requete est filtree par tenant_id pour isoler les donnees.
     bootstrap_users_if_enabled()
     ensure_barcode_constraints()
 
+    # Enregistre les event handlers pour synchroniser les entités
+    try:
+        from core.event_handlers import register_all_handlers
+        register_all_handlers()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Event handlers non enregistrés: %s", e)
+
     allowed_origins = settings.cors_allowed_origins or _load_allowed_origins()
+    is_prod = _is_production_env()
+
+    # In production, enforce stricter CORS settings
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
-        allow_credentials="*" not in allowed_origins,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=True,  # Required for httpOnly cookies
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] if is_prod else ["*"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"] if is_prod else ["*"],
+        expose_headers=["X-Request-ID", "X-Response-Time"],
+        max_age=86400 if is_prod else 600,  # Preflight cache: 24h in prod, 10min in dev
     )
+
+    # Middleware UX avancés (ordre inverse d'exécution)
+    # ResponseWrapper doit être ajouté en premier pour wrapper la réponse finale
+    app.add_middleware(
+        ResponseWrapperMiddleware,
+        exclude_paths=["/health", "/docs", "/redoc", "/openapi.json", "/metrics"],
+        wrap_errors_only=False,  # Wrapper toutes les réponses, pas seulement les erreurs
+    )
+    app.add_middleware(PerformanceMiddleware)  # Monitoring performance
+    app.add_middleware(RequestContextMiddleware)  # Request ID et contexte
 
     def _security_dependencies() -> list[Depends]:
         # Force l'authentification + le rôle par défaut sur l'ensemble des routes métier.
@@ -209,30 +298,79 @@ Chaque requete est filtree par tenant_id pour isoler les donnees.
 
     app.include_router(auth_router.router)
 
-    epicerie_router = APIRouter(tags=['epicerie'], dependencies=_security_dependencies())
-    epicerie_router.include_router(catalog_router.router)
-    epicerie_router.include_router(supply_router.router)
-    epicerie_router.include_router(audit_router.router)
-    epicerie_router.include_router(invoices_router.router)
-    epicerie_router.include_router(stock_router.router)
-    epicerie_router.include_router(dashboard_router.router)
-    epicerie_router.include_router(prices_router.router)
-    epicerie_router.include_router(maintenance_router.router)
-    epicerie_router.include_router(reports_router.router)
-    epicerie_router.include_router(admin_router.router)
-    epicerie_router.include_router(finance_router.router)
-    epicerie_router.include_router(analytics_router.router)
-    app.include_router(epicerie_router)
+    # =========================================================================
+    # OPERATIONS - Catalogue, Stock, Factures, Approvisionnement
+    # =========================================================================
+    operations_router = APIRouter(tags=['operations'], dependencies=_security_dependencies())
+    operations_router.include_router(catalog_router.router)       # /catalog/*
+    operations_router.include_router(supply_router.router)        # /supply/*
+    operations_router.include_router(stock_router.router)         # /stock/*
+    operations_router.include_router(invoices_router.router)      # /invoices/*
+    operations_router.include_router(prices_router.router)        # /prices/*
+    operations_router.include_router(audit_router.router)         # /audit/*
+    # Dashboard démo ouvert (sans dépendances d'auth)
+    app.include_router(dashboard_router.router, tags=['dashboard'])
+    operations_router.include_router(reports_router.router)       # /reports/*
+    operations_router.include_router(maintenance_router.router)   # /maintenance/*
+    operations_router.include_router(eurociel_router.router)      # /eurociel/*
+    operations_router.include_router(data_quality_router.router)  # /data-quality/*
+    app.include_router(operations_router)
 
+    # =========================================================================
+    # RESTAURANT - Module restaurant
+    # =========================================================================
     restaurant_domain_router = APIRouter(tags=['restaurant'], dependencies=_security_dependencies())
-    restaurant_domain_router.include_router(restaurant_router.router)
+    restaurant_domain_router.include_router(restaurant_router.router)  # /restaurant/*
     app.include_router(restaurant_domain_router)
 
-    app.include_router(capital_router.router, dependencies=_security_dependencies())
+    # =========================================================================
+    # FINANCE - Tresorerie, Comptabilite, Rapprochement
+    # =========================================================================
+    finance_domain_router = APIRouter(tags=['finance'], dependencies=_security_dependencies())
+    finance_domain_router.include_router(finance_router.router)           # /finance/*
+    finance_domain_router.include_router(bank_reconciliation_router.router)  # /bank-reconciliation/*
+    finance_domain_router.include_router(rules_engine_router.router)      # /rules-engine/*
+    finance_domain_router.include_router(audit_trail_router.router)       # /audit-trail/*
+    finance_domain_router.include_router(capital_router.router)           # /capital/*
+    finance_domain_router.include_router(analytics_router.router)         # /analytics/*
+    app.include_router(finance_domain_router)
+
+    # =========================================================================
+    # INTELLIGENCE - Previsions, Optimisation, Scoring
+    # =========================================================================
+    intelligence_router = APIRouter(tags=['intelligence'], dependencies=_security_dependencies())
+    intelligence_router.include_router(inventory_intelligence_router.router)  # /inventory-intelligence/*
+    intelligence_router.include_router(forecasting_router.router)             # /forecasting/*
+    intelligence_router.include_router(anomaly_detection_router.router)       # /anomaly-detection/*
+    intelligence_router.include_router(margins_router.router)                 # /margins/*
+    app.include_router(intelligence_router)
+
+    # =========================================================================
+    # COCKPIT - Vue consolidee unifiee
+    # =========================================================================
+    app.include_router(cockpit_router.router, tags=['cockpit'], dependencies=_security_dependencies())
+
+    # =========================================================================
+    # newCMS Demo (sans dépendances d'auth pour facilités de test/démo)
+    # =========================================================================
+    app.include_router(newcms_router.router, tags=['newcms'])
+
+    # Supplier scoring (ouvert pour démos et tests front)
+    app.include_router(supplier_scoring_router.router, tags=['supplier-scoring'])
+
+    # =========================================================================
+    # ADMIN - Administration systeme
+    # =========================================================================
+    app.include_router(admin_router.router, tags=['admin'], dependencies=_security_dependencies())
 
     @app.get("/health")
     def healthcheck() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/metrics/performance", dependencies=_security_dependencies())
+    def performance_metrics():
+        """Retourne les statistiques de performance des endpoints."""
+        return get_performance_stats()
 
     # Ajout : petit tuto/lexique VSCode (lettres Git U/M et points/icônes)
     @app.get("/vscode/tuto")

@@ -6,17 +6,17 @@ const baseStyles =
 
 const variants = {
   primary:
-    'bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-900/30 focus-visible:outline-slate-900 active:shadow-md',
+    'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/30 focus-visible:outline-blue-500 active:shadow-md',
   subtle:
-    'bg-white text-slate-900 ring-1 ring-inset ring-slate-200 hover:bg-slate-50 hover:ring-slate-300 active:bg-slate-100',
+    'bg-white/10 text-white ring-1 ring-inset ring-white/20 hover:bg-white/15 hover:ring-white/30 active:bg-white/20',
   ghost:
-    'bg-transparent text-slate-700 hover:bg-slate-100 focus-visible:outline-slate-400 active:bg-slate-200',
+    'bg-transparent text-slate-300 hover:bg-white/10 focus-visible:outline-white/20 active:bg-white/15',
   brand:
-    'bg-brand-600 text-white shadow-lg shadow-brand-600/30 hover:-translate-y-0.5 hover:bg-brand-500 hover:shadow-xl hover:shadow-brand-600/40 focus-visible:outline-brand-600 active:shadow-md',
+    'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/30 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/40 focus-visible:outline-blue-500 active:shadow-md',
   destructive:
     'bg-rose-600 text-white shadow-lg shadow-rose-600/30 hover:-translate-y-0.5 hover:bg-rose-500 hover:shadow-xl hover:shadow-rose-600/40 focus-visible:outline-rose-600 active:shadow-md',
   outline:
-    'bg-transparent text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:ring-slate-400 active:bg-slate-100',
+    'bg-transparent text-slate-300 ring-1 ring-inset ring-white/20 hover:bg-white/10 hover:ring-white/30 active:bg-white/15',
 };
 
 const sizes = {

@@ -23,11 +23,11 @@ export default function FiltersPanel({
     }
   };
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="glass-panel p-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-slate-400">FILTRES</p>
-          <h3 className="text-lg font-semibold text-slate-900">Focus catalogue</h3>
+          <h3 className="text-lg font-semibold text-white">Focus catalogue</h3>
         </div>
         <Button size="xs" variant="ghost" onClick={onReset}>
           Réinitialiser
@@ -41,14 +41,14 @@ export default function FiltersPanel({
             type="search"
             value={search}
             placeholder="SKU, fournisseur, famille…"
-            className="w-full rounded-2xl border border-slate-200 bg-white px-10 py-3 text-sm text-slate-900 focus:border-brand-500 focus:outline-none"
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-10 py-3 text-sm text-white placeholder-slate-500 focus:border-brand-500 focus:outline-none"
             onChange={(event) => handleUpdate('search', event.target.value)}
           />
         </div>
 
         <label className="text-xs uppercase tracking-[0.4em] text-slate-400">Catégorie</label>
         <select
-          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-brand-500 focus:outline-none"
+          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-brand-500 focus:outline-none"
           value={category}
           onChange={(event) => handleUpdate('category', event.target.value)}
         >
@@ -67,8 +67,8 @@ export default function FiltersPanel({
               key={item.value}
               className={`flex-1 rounded-2xl border px-3 py-2 text-xs font-semibold transition ${
                 status === item.value
-                  ? 'border-brand-500 bg-brand-500/10 text-brand-600'
-                  : 'border-slate-200 text-slate-600'
+                  ? 'border-brand-500 bg-brand-500/20 text-brand-400'
+                  : 'border-white/10 text-slate-400 hover:bg-white/5'
               }`}
               onClick={() => handleUpdate('status', item.value)}
             >
@@ -77,7 +77,7 @@ export default function FiltersPanel({
           ))}
         </div>
       </div>
-      <div className="mt-6 flex items-center justify-between text-xs text-slate-500">
+      <div className="mt-6 flex items-center justify-between text-xs text-slate-400">
         <span>
           {meta
             ? `Affiche ${meta.page * meta.per_page - meta.per_page + 1} - ${

@@ -18,7 +18,7 @@ import {
   ArrowDown,
 } from 'lucide-react';
 import clsx from 'clsx';
-import useHotkeys from '../../hooks/useHotkeys.js';
+import useHotkeys from '../../hooks/useHotkeys.jsx';
 import useDebounce from '../../hooks/useDebounce.js';
 
 // Context pour le CommandPalette

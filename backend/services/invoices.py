@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from datetime import date, datetime, time, timezone
 
@@ -11,11 +12,90 @@ from sqlalchemy import text
 
 from backend.services.invoice_utils import prepare_invoice_dataframe
 from core import invoice_extractor, products_loader
+from core.parsers import parse_invoice
 from core.data_repository import exec_sql, query_df
-from core.inventory_service import match_invoice_products, register_invoice_reception
+from core.inventory_service import match_invoice_products, register_invoice_reception, suggest_product_matches
 from core.pdf_utils import split_pdf_into_invoices
 from core.price_history_service import record_price_history
 from sqlalchemy import text as sa_text
+
+
+# Mapping pour harmoniser les noms de fournisseurs
+# Les clés sont des patterns (regex) et les valeurs sont les noms normalisés
+SUPPLIER_NORMALIZATION_MAP = {
+    r"metro": "METRO",
+    r"eurociel|euro\s*ciel": "EUROCIEL",
+    r"tai\s*yat|taiyat": "TAIYAT",
+    r"pomona|passionfroid|passion\s*froid": "POMONA",
+    r"transgourmet|trans\s*gourmet": "TRANSGOURMET",
+    r"promocash|promo\s*cash": "PROMOCASH",
+    r"carrefour": "CARREFOUR",
+    r"auchan": "AUCHAN",
+    r"sysco": "SYSCO",
+    r"brake": "BRAKE",
+}
+
+
+def normalize_supplier_name(supplier: str | None) -> str:
+    """Normalise le nom d'un fournisseur selon les conventions standard.
+
+    Exemples:
+        - "METRO" -> "METRO"
+        - "euro ciel" -> "EUROCIEL"
+        - "TAI YAT DISTRIBUTION" -> "TAIYAT"
+        - "L'INCONTOURNABLE" -> "TAIYAT" (si détecté comme facture TAIYAT)
+        - "Inconnu" -> "Inconnu"
+    """
+    if not supplier:
+        return "Inconnu"
+
+    cleaned = supplier.strip()
+    if not cleaned:
+        return "Inconnu"
+
+    lowered = cleaned.lower()
+
+    # Vérifie chaque pattern de normalisation
+    for pattern, normalized_name in SUPPLIER_NORMALIZATION_MAP.items():
+        if re.search(pattern, lowered, re.IGNORECASE):
+            return normalized_name
+
+    # Si pas de match, retourne le nom nettoyé en majuscules
+    return cleaned.upper()
+
+
+def detect_supplier_from_invoice(invoice_df: pd.DataFrame, raw_text: str | None = None) -> str:
+    """Détecte automatiquement le fournisseur à partir des données de facture.
+
+    Priorité de détection :
+    1. Préfixe de l'invoice_id (EURO-, TAIYAT-, INV-)
+    2. Contenu du texte brut (si fourni)
+    3. Fallback sur "Inconnu"
+    """
+    # 1. Détection par préfixe d'invoice_id
+    if isinstance(invoice_df, pd.DataFrame) and "invoice_id" in invoice_df.columns:
+        invoice_ids = invoice_df["invoice_id"].dropna().astype(str).tolist()
+        for inv_id in invoice_ids:
+            inv_upper = inv_id.upper()
+            if inv_upper.startswith("EURO-") or inv_upper.startswith("EUROCIEL"):
+                return "EUROCIEL"
+            if inv_upper.startswith("TAIYAT-"):
+                return "TAIYAT"
+            if inv_upper.startswith("POMONA-"):
+                return "POMONA"
+            if inv_upper.startswith("TRANS-") or inv_upper.startswith("TRANSGOURMET"):
+                return "TRANSGOURMET"
+            # INV-XXX est typiquement METRO
+            if inv_upper.startswith("INV-"):
+                return "METRO"
+
+    # 2. Détection par contenu du texte brut
+    if raw_text:
+        format_detected = invoice_extractor.detect_invoice_format(raw_text)
+        if format_detected and format_detected != "generic":
+            return normalize_supplier_name(format_detected)
+
+    return "Inconnu"
 
 
 def _normalize_invoice_datetime(value: datetime | date | None) -> datetime | None:
@@ -27,24 +107,203 @@ def _normalize_invoice_datetime(value: datetime | date | None) -> datetime | Non
     return datetime.combine(value, time.min, tzinfo=timezone.utc)
 
 
+def get_last_invoice_sequence(tenant_id: int = 1) -> int:
+    """Récupère le dernier numéro de séquence INV-XXX depuis la base."""
+    import re
+    sql = text(
+        """
+        SELECT invoice_id FROM processed_invoices
+        WHERE tenant_id = :tenant_id AND invoice_id LIKE 'INV-%'
+        ORDER BY invoice_id DESC
+        LIMIT 1
+        """
+    )
+    df = query_df(sql, {"tenant_id": tenant_id})
+    if df.empty:
+        return 0
+    last_id = df.iloc[0]["invoice_id"]
+    # Extrait le numéro de INV-XXX
+    match = re.search(r"INV-(\d+)", last_id)
+    if match:
+        return int(match.group(1))
+    return 0
+
+
 def extract_invoice_lines(
     text: str,
     *,
     margin_percent: float = 40.0,
     supplier_hint: str | None = None,
+    tenant_id: int = 1,
 ) -> pd.DataFrame:
     """Extract structured lines from raw invoice text."""
 
     if not text.strip():
         return pd.DataFrame()
 
+    # Récupère le dernier numéro de séquence pour continuer la numérotation
+    last_sequence = get_last_invoice_sequence(tenant_id)
+
     # Passage marge (%) -> taux pour le calcul du prix de vente proposé
     margin_rate = max(0.0, margin_percent) / 100.0
-    return invoice_extractor.extract_products(
+    normalized_df = parse_invoice(
         text,
         supplier_hint=supplier_hint,
         margin_rate=margin_rate,
+        start_sequence=last_sequence,
     )
+    return normalized_df
+
+
+def _detect_price_anomalies(
+    df: pd.DataFrame,
+    *,
+    tenant_id: int = 1,
+    threshold_pct: float = 15.0,
+) -> pd.DataFrame:
+    """Détecte les anomalies de prix en comparant avec l'historique et le catalogue.
+
+    Marque les lignes avec:
+    - is_anomaly: True si anomalie détectée
+    - price_anomaly: Type d'anomalie (increase/decrease/new_price)
+    - price_anomaly_pct: Pourcentage de variation
+    - price_anomaly_description: Description lisible
+    - last_price: Dernier prix d'achat connu
+    - suggestion: Suggestion IA basée sur l'historique
+
+    Args:
+        df: DataFrame avec les lignes de facture
+        tenant_id: ID du tenant
+        threshold_pct: Seuil de variation pour détecter une anomalie (défaut: 15%)
+
+    Returns:
+        DataFrame enrichi avec les colonnes d'anomalie
+    """
+    if df.empty:
+        return df
+
+    result = df.copy()
+
+    # Initialiser les colonnes d'anomalie
+    result["is_anomaly"] = False
+    result["price_anomaly"] = None
+    result["price_anomaly_pct"] = None
+    result["price_anomaly_description"] = None
+    result["last_price"] = None
+    result["suggestion"] = None
+
+    # Récupérer les produits avec un produit_id valide
+    if "produit_id" not in result.columns:
+        return result
+    valid_product_ids = result["produit_id"].dropna().astype(int).unique().tolist()
+    if not valid_product_ids:
+        return result
+
+    # Récupérer l'historique des prix pour ces produits
+    placeholders = ", ".join(f":pid{i}" for i in range(len(valid_product_ids)))
+    params = {f"pid{i}": pid for i, pid in enumerate(valid_product_ids)}
+    params["tenant_id"] = int(tenant_id)
+
+    # Query pour obtenir le dernier prix d'achat connu par produit
+    history_sql = f"""
+        WITH latest_prices AS (
+            SELECT DISTINCT ON (produit_id)
+                produit_id,
+                prix_achat as last_price,
+                facture_date as recorded_at
+            FROM produits_price_history
+            WHERE produit_id IN ({placeholders})
+            ORDER BY produit_id, facture_date DESC
+        )
+        SELECT
+            p.id as produit_id,
+            COALESCE(lp.last_price, p.prix_achat) as last_price,
+            p.prix_achat as catalogue_price,
+            lp.recorded_at as last_price_date
+        FROM produits p
+        LEFT JOIN latest_prices lp ON lp.produit_id = p.id
+        WHERE p.id IN ({placeholders})
+          AND p.tenant_id = :tenant_id
+    """
+
+    try:
+        price_history = query_df(history_sql, params=params)
+    except Exception as e:
+        logging.warning(f"Erreur lors de la récupération de l'historique des prix: {e}")
+        return result
+
+    if price_history.empty:
+        return result
+
+    # Créer un dictionnaire de lookup pour les prix historiques
+    price_lookup = {}
+    for _, row in price_history.iterrows():
+        pid = int(row["produit_id"])
+        price_lookup[pid] = {
+            "last_price": float(row["last_price"] or 0),
+            "catalogue_price": float(row["catalogue_price"] or 0),
+            "last_price_date": row.get("last_price_date"),
+        }
+
+    # Analyser chaque ligne
+    for idx, row in result.iterrows():
+        produit_id = row.get("produit_id")
+        if pd.isna(produit_id):
+            continue
+
+        try:
+            pid = int(produit_id)
+        except (ValueError, TypeError):
+            continue
+
+        if pid not in price_lookup:
+            continue
+
+        prix_facture = float(row.get("prix_achat", 0) or 0)
+        prix_historique = price_lookup[pid]["last_price"]
+        prix_catalogue = price_lookup[pid]["catalogue_price"]
+
+        # Si pas de prix de référence, marquer comme nouveau prix
+        if prix_historique <= 0 and prix_catalogue <= 0:
+            if prix_facture > 0:
+                result.at[idx, "is_anomaly"] = True
+                result.at[idx, "price_anomaly"] = "new_price"
+                result.at[idx, "price_anomaly_description"] = "Premier prix enregistré"
+                result.at[idx, "suggestion"] = "Vérifiez que ce prix correspond au marché"
+            continue
+
+        # Utiliser le prix le plus récent comme référence
+        prix_reference = prix_historique if prix_historique > 0 else prix_catalogue
+        result.at[idx, "last_price"] = prix_reference
+
+        # Calculer la variation
+        if prix_reference > 0 and prix_facture > 0:
+            variation_pct = ((prix_facture - prix_reference) / prix_reference) * 100
+
+            if abs(variation_pct) >= threshold_pct:
+                result.at[idx, "is_anomaly"] = True
+                result.at[idx, "price_anomaly_pct"] = round(variation_pct, 1)
+
+                if variation_pct > 0:
+                    result.at[idx, "price_anomaly"] = "increase"
+                    result.at[idx, "price_anomaly_description"] = (
+                        f"Hausse de {variation_pct:.1f}% vs dernier achat ({prix_reference:.2f}€ → {prix_facture:.2f}€)"
+                    )
+                    # Suggestion contextuelle
+                    if variation_pct > 30:
+                        result.at[idx, "suggestion"] = "Variation importante - Vérifiez avec le fournisseur"
+                    elif variation_pct > 20:
+                        result.at[idx, "suggestion"] = "Possible hausse saisonnière ou rupture marché"
+                    else:
+                        result.at[idx, "suggestion"] = "Légère hausse - À surveiller sur les prochains achats"
+                else:
+                    result.at[idx, "price_anomaly"] = "decrease"
+                    result.at[idx, "price_anomaly_description"] = (
+                        f"Baisse de {abs(variation_pct):.1f}% vs dernier achat ({prix_reference:.2f}€ → {prix_facture:.2f}€)"
+                    )
+                    result.at[idx, "suggestion"] = "Bonne opportunité - Vérifiez la qualité du produit"
+
+    return result
 
 
 def enrich_lines_with_catalog(
@@ -73,10 +332,11 @@ def enrich_lines_with_catalog(
             }
         )
         df = df.merge(matches_df, on="_code_lower", how="left")
-        if "produit_id" not in df.columns:
-            df["produit_id"] = df["catalogue_id"]
-        else:
-            df["produit_id"] = df["produit_id"].fillna(df["catalogue_id"])
+        if "catalogue_id" in df.columns:
+            if "produit_id" not in df.columns:
+                df["produit_id"] = df["catalogue_id"]
+            else:
+                df["produit_id"] = df["produit_id"].fillna(df["catalogue_id"])
 
     # Rattrapage par nom (utile pour les factures Eurociel sans code-barres ou avec codes TVA type C2/C07)
     # On associe sur lower(nom) et on récupère le code principal du produit.
@@ -154,6 +414,19 @@ def enrich_lines_with_catalog(
     for column in ("catalogue_id", "catalogue_nom", "catalogue_categorie"):
         if column not in df.columns:
             df[column] = None
+
+    # ==========================================================================
+    # DÉTECTION ANOMALIES DE PRIX
+    # Compare le prix d'achat facture vs prix catalogue et historique
+    # ==========================================================================
+    df = _detect_price_anomalies(df, tenant_id=tenant_id)
+
+    # ==========================================================================
+    # SUGGESTIONS IA POUR PRODUITS NON-MATCHÉS
+    # Trouve des produits similaires par nom pour les lignes sans produit_id
+    # ==========================================================================
+    df = suggest_product_matches(df, tenant_id=tenant_id)
+
     # Finalise les totaux/marges et colonnes numériques normalisées
     margin_rate = max(0.0, margin_percent) / 100.0
     return prepare_invoice_dataframe(df, margin_rate)
@@ -268,6 +541,8 @@ __all__ = [
     "persist_invoice_documents",
     "list_processed_invoices",
     "get_processed_invoice_file",
+    "normalize_supplier_name",
+    "detect_supplier_from_invoice",
 ]
 LOGGER = logging.getLogger(__name__)
 INVOICE_ARCHIVE_DIR = Path("data/processed_invoices")
@@ -338,7 +613,11 @@ def record_processed_invoices(invoice_df: pd.DataFrame, *, supplier: str | None,
     groups = _collect_invoice_groups(invoice_df)
     if not groups:
         return
-    supplier_label = (supplier or "Inconnu").strip() or "Inconnu"
+    # Normalise ou détecte automatiquement le fournisseur
+    if supplier:
+        supplier_label = normalize_supplier_name(supplier)
+    else:
+        supplier_label = detect_supplier_from_invoice(invoice_df)
     sql = text(
         """
         INSERT INTO processed_invoices (tenant_id, invoice_id, supplier, facture_date, line_count, file_path)

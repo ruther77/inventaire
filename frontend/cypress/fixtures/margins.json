@@ -1,0 +1,55 @@
+{
+  "summary": {
+    "avg_gross_margin_pct": 32.5,
+    "avg_operating_margin_pct": 18.2,
+    "total_revenue": 125000,
+    "total_cost": 84375,
+    "products_below_threshold": 8,
+    "margin_trend": "stable"
+  },
+  "product_margins": [
+    {
+      "product_id": 1,
+      "product_name": "Tomates",
+      "category": "Légumes",
+      "purchase_cost": 2.50,
+      "selling_price": 4.00,
+      "gross_margin": 1.50,
+      "gross_margin_pct": 37.5,
+      "quantity_sold": 150
+    },
+    {
+      "product_id": 2,
+      "product_name": "Huile d'olive",
+      "category": "Épicerie",
+      "purchase_cost": 8.00,
+      "selling_price": 12.00,
+      "gross_margin": 4.00,
+      "gross_margin_pct": 33.3,
+      "quantity_sold": 45
+    }
+  ],
+  "category_margins": [
+    {
+      "category": "Légumes",
+      "avg_margin_pct": 35.2,
+      "total_revenue": 25000,
+      "products_count": 45
+    },
+    {
+      "category": "Épicerie",
+      "avg_margin_pct": 28.5,
+      "total_revenue": 18000,
+      "products_count": 120
+    }
+  ],
+  "alerts": [
+    {
+      "product_id": 15,
+      "product_name": "Beurre premium",
+      "current_margin_pct": 12.5,
+      "threshold_pct": 20,
+      "reason": "Marge sous le seuil critique"
+    }
+  ]
+}

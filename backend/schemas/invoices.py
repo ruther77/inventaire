@@ -100,6 +100,56 @@ class InvoiceCatalogImportSummary(BaseModel):
     rejected_csv: Optional[str]
 
 
+# === LIGNES (liaison / création produit / validation stock) ===
+
+
+class InvoiceLineLinkRequest(BaseModel):
+    line: InvoiceLine
+    product_id: int
+
+
+class InvoiceLineLinkResponse(BaseModel):
+    line: InvoiceLine
+
+
+class InvoiceLineCreateProductRequest(BaseModel):
+    line: InvoiceLine
+    supplier: Optional[str] = None
+    initialize_stock: bool = Field(default=False)
+    invoice_date: Optional[date] = None
+
+
+class InvoiceLineCreateProductResponse(BaseModel):
+    summary: InvoiceCatalogImportSummary
+
+
+class InvoiceStockConfirmRequest(BaseModel):
+    lines: List[InvoiceLine]
+    movement_type: str = Field(default="ENTREE")
+    supplier: Optional[str] = None
+    invoice_date: Optional[date] = None
+    username: Optional[str] = None
+
+
+class ZeroClickJobStatus(BaseModel):
+    job_id: str
+    status: str  # pending, processing, completed, failed
+    filename: Optional[str] = None
+    supplier_hint: Optional[str] = None
+    margin_percent: float = 40.0
+    auto_confirm: bool = True
+    summary: Optional[InvoiceImportSummary] = None
+    error: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
+class ZeroClickJobListResponse(BaseModel):
+    items: List[ZeroClickJobStatus]
+    total: int
+
+
 __all__ = [
     "InvoiceExtractRequest",
     "InvoiceExtractResponse",
@@ -109,4 +159,11 @@ __all__ = [
     "InvoiceImportSummary",
     "InvoiceCatalogImportRequest",
     "InvoiceCatalogImportSummary",
+    "InvoiceLineLinkRequest",
+    "InvoiceLineLinkResponse",
+    "InvoiceLineCreateProductRequest",
+    "InvoiceLineCreateProductResponse",
+    "InvoiceStockConfirmRequest",
+    "ZeroClickJobStatus",
+    "ZeroClickJobListResponse",
 ]

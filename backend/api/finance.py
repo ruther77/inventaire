@@ -18,9 +18,13 @@ from backend.services.finance import imports as finance_imports
 from backend.services.finance import metrics as finance_metrics
 from backend.services.finance import stats as finance_stats
 from backend.services.finance import dashboard as finance_dashboard
+from backend.services.finance import dedupe as finance_dedupe
 from backend.services.finance import categories as finance_categories
 from backend.services.finance import cost_centers as finance_cost_centers
+from backend.services.finance import transaction_lines as finance_tx_lines
 from backend.services.importers import bank_statement_csv
+from core.parsers.releve_pdf import parse_bank_pdf  # fallback parser PDF
+from core.parsers.releve_pdf import parse_bank_pdf
 from backend.schemas.finance import (
     FinanceMatch,
     FinanceMatchStatusRequest,
@@ -76,6 +80,14 @@ def list_accounts(
     tenant: Tenant = Depends(get_current_tenant),
 ) -> list[dict]:
     return finance_accounts.list_accounts(entity_id=entity_id, is_active=is_active)
+
+
+@router.get("/accounts/overview")
+def accounts_overview(
+    entity_id: int | None = Query(default=None),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> list[dict]:
+    return finance_stats.accounts_overview(entity_id=entity_id)
 
 
 @router.get("/accounts/{account_id}")
@@ -334,11 +346,13 @@ def create_cost_center(
 
 @router.get("/categories/suggestions/complete")
 def autocomplete_categories(
-    q: str = Query(..., min_length=1),
+    q: str = Query(default="", description="Search query for category suggestions"),
     entity_id: int | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     tenant: Tenant = Depends(get_current_tenant),
 ) -> list[dict]:
+    if not q:
+        return []
     return finance_transactions.autocomplete_categories(q=q, entity_id=entity_id, limit=limit)
 
 
@@ -395,6 +409,23 @@ def list_imports(tenant: Tenant = Depends(get_current_tenant)) -> list[dict]:
     return finance_imports.list_imports()
 
 
+@router.post("/deduplicate")
+def deduplicate_finance(tenant: Tenant = Depends(get_current_tenant)) -> dict:
+    """Supprime les doublons (date+montant) sur transactions et lignes de relevés."""
+    tx = finance_dedupe.dedupe_transactions()
+    stmt = finance_dedupe.dedupe_statement_lines()
+    return {"transactions_deleted": tx["deleted"], "statement_lines_deleted": stmt["deleted"]}
+
+
+@router.post("/transactions/mark-incomplete")
+def mark_transactions_incomplete(
+    transaction_ids: list[int],
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    """Crée des transaction_lines par défaut et marque les transactions comme 'incomplètes' (data_quality_flags)."""
+    return finance_tx_lines.mark_incomplete(transaction_ids)
+
+
 # --- Stats catégories / comptes ---
 
 
@@ -404,14 +435,6 @@ def categories_stats(
     tenant: Tenant = Depends(get_current_tenant),
 ) -> list[dict]:
     return finance_stats.categories_stats(entity_id=entity_id)
-
-
-@router.get("/accounts/overview")
-def accounts_overview(
-    entity_id: int | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
-) -> list[dict]:
-    return finance_stats.accounts_overview(entity_id=entity_id)
 
 
 @router.get("/dashboard/summary")
@@ -543,6 +566,43 @@ async def import_bank_statements(
         return summary
     except ValueError as exc:
         finance_rules.record_import(account_id=account_id, file_name=file.filename or "CSV", summary=None, error=str(exc))
+        finance_metrics.record_import_metrics(
+            account_id=account_id,
+            inserted=None,
+            total=None,
+            status="ERROR",
+            error=str(exc),
+        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/bank-statements/import-pdf")
+async def import_bank_statements_pdf(
+    account_id: int = Query(..., description="ID du compte finance_accounts"),
+    file: UploadFile = File(...),
+    tenant: Tenant = Depends(get_current_tenant),
+) -> dict:
+    """Import best-effort d'un relevé PDF (parse minimal) dans finance_bank_statements/lines."""
+    try:
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
+            tmp.write(await file.read())
+            tmp.flush()
+            summary = bank_statement_csv.import_pdf_best_effort(tmp.name, account_id=account_id, source=file.filename or "PDF")
+        finance_rules.record_import(account_id=account_id, file_name=file.filename or "PDF", summary=summary, error=None)
+        finance_metrics.record_import_metrics(
+            account_id=account_id,
+            inserted=summary.get("inserted"),
+            total=summary.get("total"),
+            status="DONE",
+            error=None,
+        )
+        return summary
+    except ImportError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"dépendance manquante: {exc}") from exc
+    except ValueError as exc:
+        finance_rules.record_import(account_id=account_id, file_name=file.filename or "PDF", summary=None, error=str(exc))
         finance_metrics.record_import_metrics(
             account_id=account_id,
             inserted=None,

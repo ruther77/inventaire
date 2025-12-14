@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class BarcodeList(BaseModel):
@@ -10,13 +10,20 @@ class BarcodeList(BaseModel):
 
 
 class ProductBase(BaseModel):
-    nom: str = Field(..., min_length=1, max_length=255)
-    prix_achat: float = Field(0, ge=0)
-    prix_vente: float = Field(0, ge=0)
-    tva: float = Field(0, ge=0)
-    categorie: Optional[str] = Field(default=None, max_length=120)
-    seuil_alerte: float = Field(0, ge=0)
+    nom: str = Field(..., min_length=1, max_length=255, description="Nom du produit")
+    prix_achat: float = Field(0, ge=0, le=100000, description="Prix d'achat HT")
+    prix_vente: float = Field(0, ge=0, le=100000, description="Prix de vente TTC")
+    tva: float = Field(0, ge=0, le=100, description="Taux de TVA en %")
+    categorie: Optional[str] = Field(default=None, max_length=120, description="Catégorie produit")
+    seuil_alerte: float = Field(0, ge=0, le=10000, description="Seuil d'alerte stock")
     actif: bool = True
+
+    @field_validator("nom")
+    @classmethod
+    def nom_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Le nom du produit ne peut pas être vide")
+        return v.strip()
 
 
 class ProductCreate(ProductBase):

@@ -84,6 +84,7 @@ def _import_single_file(
         text_content,
         margin_percent=margin_percent,
         supplier_hint=supplier,
+        tenant_id=tenant_id,
     )
     if extracted_df.empty:
         print("  → Aucune ligne détectée, fichier ignoré.")
@@ -128,19 +129,23 @@ def _import_single_file(
         tenant_id=tenant_id,
     )
 
-    consolidation_summary = sync_invoice_dataframe(
-        enriched_df,
-        tenant_id=tenant_id,
-        supplier_name=supplier,
-        invoice_reference=_infer_invoice_reference(path),
-        invoice_date=(inferred_datetime.date() if isinstance(inferred_datetime, datetime) else None),
-    )
-
-    print(
-        f"  → {len(enriched_df)} ligne(s) importées, "
-        f"{consolidation_summary['lines_inserted']} ligne(s) consolidées."
-    )
-    return {"lines": len(enriched_df), **consolidation_summary}
+    # La consolidation est optionnelle et nécessite des tables supplémentaires
+    try:
+        consolidation_summary = sync_invoice_dataframe(
+            enriched_df,
+            tenant_id=tenant_id,
+            supplier_name=supplier,
+            invoice_reference=_infer_invoice_reference(path),
+            invoice_date=(inferred_datetime.date() if isinstance(inferred_datetime, datetime) else None),
+        )
+        print(
+            f"  → {len(enriched_df)} ligne(s) importées, "
+            f"{consolidation_summary['lines_inserted']} ligne(s) consolidées."
+        )
+        return {"lines": len(enriched_df), **consolidation_summary}
+    except Exception as e:
+        print(f"  → {len(enriched_df)} ligne(s) importées (consolidation ignorée: {e})")
+        return {"lines": len(enriched_df)}
 
 
 def main() -> None:

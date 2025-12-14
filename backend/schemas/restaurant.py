@@ -370,3 +370,260 @@ class RestaurantDashboardOverview(BaseModel):
 class RestaurantPriceHistoryOverview(BaseModel):
     ingredients: List[RestaurantIngredientPriceHistoryEntry]
     plats: List[RestaurantPlatPriceHistoryEntry]
+
+
+# === NEW SCHEMAS FOR SCÉNARIO UX 4.7 ===
+
+
+class RestaurantOverviewMetrics(BaseModel):
+    """Métriques globales du restaurant."""
+    revenue: float = Field(default=0.0, description="Chiffre d'affaires période")
+    food_cost_pct: float = Field(default=0.0, description="Food cost % global")
+    active_plats_count: int = Field(default=0, description="Nombre de plats actifs")
+    total_plats_count: int = Field(default=0, description="Nombre total de plats")
+    avg_margin_pct: float = Field(default=0.0, description="Marge moyenne %")
+
+
+class RestaurantTopPlat(BaseModel):
+    """Plat dans le top ventes."""
+    plat_id: int
+    nom: str
+    sales_count: int = Field(default=0, description="Nombre de ventes")
+    revenue: float = Field(default=0.0, description="CA généré")
+    margin_pct: float = Field(default=0.0, description="Marge %")
+
+
+class RestaurantOverviewAlert(BaseModel):
+    """Alerte condensée pour overview."""
+    alert_type: str
+    severity: str
+    message: str
+    count: int = Field(default=1, description="Nombre d'items concernés")
+
+
+class RestaurantOverview(BaseModel):
+    """Vue d'ensemble restaurant - Endpoint principal."""
+    period: str = Field(default="30d", description="Période analysée")
+    metrics: RestaurantOverviewMetrics
+    top_plats: List[RestaurantTopPlat] = Field(default_factory=list)
+    alerts: List[RestaurantOverviewAlert] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now())
+
+
+class PlatListItem(BaseModel):
+    """Plat dans la liste avec filtres."""
+    id: int
+    nom: str
+    categorie: Optional[str] = None
+    selling_price: float = Field(..., alias="prix_vente_ttc")
+    cost: float = Field(..., alias="cout_matiere")
+    margin: float = Field(..., alias="marge_brute")
+    margin_pct: float = Field(..., alias="marge_pct")
+    food_cost_pct: float = Field(default=0.0, description="Food cost %")
+    is_active: bool = Field(..., alias="actif")
+    sales_count: Optional[int] = Field(default=None, description="Nombre de ventes")
+
+    class Config:
+        populate_by_name = True
+
+
+class PlatListResponse(BaseModel):
+    """Réponse paginée de la liste de plats."""
+    items: List[PlatListItem]
+    total: int
+    page: int = 1
+    page_size: int = 50
+
+
+class PlatIngredientDetail(BaseModel):
+    """Ingrédient avec coût dans un plat."""
+    ingredient_id: int
+    nom: str
+    quantite: float
+    unite: Optional[str] = None
+    unit_price: float = Field(default=0.0, description="Prix unitaire")
+    total_cost: float = Field(default=0.0, description="Coût total = quantite * unit_price")
+    cost_percentage: float = Field(default=0.0, description="% du coût total du plat")
+
+
+class PlatDetail(BaseModel):
+    """Détails complets d'un plat."""
+    id: int
+    nom: str
+    categorie: Optional[str] = None
+    selling_price: float
+    cost: float
+    margin: float
+    margin_pct: float
+    food_cost_pct: float
+    is_active: bool
+    ingredients: List[PlatIngredientDetail] = Field(default_factory=list)
+    price_history: List[RestaurantPlatPriceHistoryEntry] = Field(default_factory=list)
+
+
+class CostBreakdownItem(BaseModel):
+    """Item dans la décomposition du coût."""
+    ingredient_id: int
+    nom: str
+    cost: float
+    cost_percentage: float
+    price_trend_30d: Optional[float] = Field(default=None, description="Tendance prix sur 30j en %")
+
+
+class CostBreakdownResponse(BaseModel):
+    """Décomposition du coût d'un plat."""
+    plat_id: int
+    plat_nom: str
+    total_cost: float
+    items: List[CostBreakdownItem]
+
+
+class IngredientListItem(BaseModel):
+    """Ingrédient dans la liste."""
+    id: int
+    nom: str
+    unit: str = Field(..., alias="unite_base")
+    unit_price: float = Field(..., alias="cout_unitaire")
+    stock_qty: float = Field(..., alias="stock_actuel")
+    main_supplier: Optional[str] = Field(default=None, description="Fournisseur principal")
+    price_trend_30d: Optional[float] = Field(default=None, description="Tendance prix 30j en %")
+
+    class Config:
+        populate_by_name = True
+
+
+class IngredientPriceHistoryResponse(BaseModel):
+    """Historique des prix d'un ingrédient."""
+    ingredient_id: int
+    ingredient_nom: str
+    history: List[RestaurantIngredientPriceHistoryEntry]
+
+
+class FoodCostByCategoryItem(BaseModel):
+    """Food cost par catégorie."""
+    categorie: str
+    avg_food_cost_pct: float
+    plat_count: int
+    total_revenue: float = Field(default=0.0)
+
+
+class FoodCostTrendItem(BaseModel):
+    """Évolution du food cost."""
+    period: str
+    food_cost_pct: float
+    revenue: float = Field(default=0.0)
+
+
+class FoodCostRecommendation(BaseModel):
+    """Recommandation IA."""
+    priority: str = Field(..., description="high, medium, low")
+    category: str = Field(..., description="pricing, cost, supplier, etc.")
+    message: str
+    estimated_impact: Optional[float] = Field(default=None, description="Impact estimé en €")
+
+
+class FoodCostAnalysis(BaseModel):
+    """Analyse complète du food cost."""
+    period: str = Field(default="30d")
+    global_food_cost_pct: float
+    target_food_cost_pct: float = Field(default=30.0)
+    by_category: List[FoodCostByCategoryItem] = Field(default_factory=list)
+    trend: List[FoodCostTrendItem] = Field(default_factory=list)
+    recommendations: List[FoodCostRecommendation] = Field(default_factory=list)
+
+
+class PriceSimulationInput(BaseModel):
+    """Input pour simulation de prix."""
+    new_price: Optional[float] = Field(default=None, ge=0)
+    target_margin_pct: Optional[float] = Field(default=None, ge=0, le=100)
+
+
+class PriceSimulationCurrent(BaseModel):
+    """État actuel."""
+    selling_price: float
+    cost: float
+    margin: float
+    margin_pct: float
+    food_cost_pct: float
+
+
+class PriceSimulationSimulated(BaseModel):
+    """État simulé."""
+    selling_price: float
+    cost: float
+    margin: float
+    margin_pct: float
+    food_cost_pct: float
+
+
+class PriceSimulationImpact(BaseModel):
+    """Impact du changement."""
+    margin_change: float = Field(..., description="Changement de marge en €")
+    margin_pct_change: float = Field(..., description="Changement de marge en %")
+    food_cost_change: float = Field(..., description="Changement de food cost en %")
+    annual_impact: float = Field(default=0.0, description="Impact annuel estimé en €")
+
+
+class PriceSimulation(BaseModel):
+    """Simulation de changement de prix."""
+    plat_id: int
+    plat_nom: str
+    current: PriceSimulationCurrent
+    simulated: PriceSimulationSimulated
+    impact: PriceSimulationImpact
+
+
+class RestaurantAlertDetail(BaseModel):
+    """Alerte détaillée."""
+    id: int
+    alert_type: str
+    severity: str
+    message: str
+    plat_id: Optional[int] = None
+    plat_nom: Optional[str] = None
+    ingredient_id: Optional[int] = None
+    ingredient_nom: Optional[str] = None
+    current_value: Optional[float] = None
+    threshold: Optional[float] = None
+    created_at: datetime
+
+
+# === NEW SCHEMAS FOR SCÉNARIO 3.6 (Menus & Coûts) ===
+
+
+class RestaurantMenuPlatCost(BaseModel):
+    plat_id: int
+    nom: str
+    prix_vente_ttc: float
+    cout_matiere: float
+    food_cost_pct: float
+    marge_pct: float
+
+
+class RestaurantMenuTopPlat(BaseModel):
+    plat_id: int
+    nom: str
+    marge_pct: float
+    prix_vente_ttc: float
+    cout_matiere: float
+
+
+class RestaurantMenuMetrics(BaseModel):
+    total_plats: int
+    avg_food_cost_pct: float
+    alerts_count: int
+    top_plats: list[RestaurantMenuTopPlat]
+
+
+class RestaurantMenuIngredientAlert(BaseModel):
+    ingredient_id: int
+    nom: str
+    stock_actuel: float
+    cout_unitaire: float
+    status: str
+
+
+class RestaurantMenuOverview(BaseModel):
+    metrics: RestaurantMenuMetrics
+    plat_costs: list[RestaurantMenuPlatCost]
+    ingredient_alerts: list[RestaurantMenuIngredientAlert]

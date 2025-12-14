@@ -169,40 +169,40 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
       <Card className="flex flex-col gap-6">
         <div className="flex flex-col gap-1">
           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{contextLabel}</p>
-          <h2 className="text-2xl font-semibold text-slate-900">{chargesTitle}</h2>
-          <p className="text-sm text-slate-500">{chargesSubtitle}</p>
+          <h2 className="text-2xl font-semibold text-white">{chargesTitle}</h2>
+          <p className="text-sm text-slate-400">{chargesSubtitle}</p>
         </div>
         <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Total HT</p>
-            <p className="text-2xl font-semibold text-slate-900">{totalHT.toFixed(2)} €</p>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Total HT</p>
+            <p className="text-2xl font-semibold text-white">{totalHT.toFixed(2)} €</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Moyenne mensuelle</p>
-            <p className="text-2xl font-semibold text-slate-900">{avgMonthly.toFixed(2)} €</p>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Moyenne mensuelle</p>
+            <p className="text-2xl font-semibold text-white">{avgMonthly.toFixed(2)} €</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Catégories actives</p>
-            <p className="text-2xl font-semibold text-slate-900">{Object.keys(categoryTotals).length}</p>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Catégories actives</p>
+            <p className="text-2xl font-semibold text-white">{Object.keys(categoryTotals).length}</p>
           </div>
         </div>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-semibold text-slate-700">Évolution des charges HT</p>
-              <p className="text-xs text-slate-500">Fenêtre glissante sur les derniers mois</p>
+              <p className="text-sm font-semibold text-slate-200">Évolution des charges HT</p>
+              <p className="text-xs text-slate-400">Fenêtre glissante sur les derniers mois</p>
             </div>
-            <div className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="flex items-center gap-2 text-sm text-slate-300">
               <span>Fenêtre :</span>
               <select
-                className="rounded-full border border-slate-200 px-3 py-1 text-sm"
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white"
                 value={timelineWindow}
                 onChange={(event) => setTimelineWindow(event.target.value)}
               >
                 <option value="3">3 mois</option>
                 <option value="6">6 mois</option>
                 <option value="12">12 mois</option>
-                <option value="all">Tout l’historique</option>
+                <option value="all">Tout l'historique</option>
               </select>
             </div>
           </div>
@@ -216,16 +216,20 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
                       <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(value) => `${Number(value).toFixed(2)} €`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                  <Tooltip
+                    formatter={(value) => `${Number(value).toFixed(2)} €`}
+                    contentStyle={{ backgroundColor: 'rgba(15,15,25,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                    labelStyle={{ color: '#e2e8f0' }}
+                  />
                   <Area type="monotone" dataKey="total" stroke="#f97316" fill="url(#chargesGradient)" name="Total HT" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Aucune charge à afficher pour la période sélectionnée.</p>
+            <p className="text-sm text-slate-400">Aucune charge à afficher pour la période sélectionnée.</p>
           )}
         </div>
       </Card>
@@ -235,7 +239,7 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Répartition</p>
-              <h3 className="text-lg font-semibold text-slate-900">Top catégories</h3>
+              <h3 className="text-lg font-semibold text-white">Top catégories</h3>
             </div>
           </div>
           {topCategories.length ? (
@@ -243,26 +247,30 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topCategories} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(value) => `${Number(value).toFixed(2)} €`} />
-                    <Legend />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <Tooltip
+                      formatter={(value) => `${Number(value).toFixed(2)} €`}
+                      contentStyle={{ backgroundColor: 'rgba(15,15,25,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                      labelStyle={{ color: '#e2e8f0' }}
+                    />
+                    <Legend wrapperStyle={{ color: '#e2e8f0' }} />
                     <Bar dataKey="amount" fill="#fb7185" name="Montant HT" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="grid gap-2 text-sm text-slate-600">
+              <div className="grid gap-2 text-sm text-slate-300">
                 {topCategories.map((entry) => (
-                  <div key={entry.label} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
+                  <div key={entry.label} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
                     <span>{entry.label}</span>
-                    <span className="font-semibold">{entry.amount.toFixed(2)} €</span>
+                    <span className="font-semibold text-white">{entry.amount.toFixed(2)} €</span>
                   </div>
                 ))}
               </div>
             </>
           ) : (
-            <p className="text-sm text-slate-500">Aucune catégorie renseignée sur cette période.</p>
+            <p className="text-sm text-slate-400">Aucune catégorie renseignée sur cette période.</p>
           )}
         </Card>
 
@@ -270,7 +278,7 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Analyse</p>
-              <h3 className="text-lg font-semibold text-slate-900">Centres de coûts</h3>
+              <h3 className="text-lg font-semibold text-white">Centres de coûts</h3>
             </div>
           </div>
           {topCostCenters.length ? (
@@ -278,37 +286,41 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topCostCenters} layout="vertical" margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                    <YAxis dataKey="label" type="category" tick={{ fontSize: 11 }} width={120} />
-                    <Tooltip formatter={(value) => `${Number(value).toFixed(2)} €`} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <YAxis dataKey="label" type="category" tick={{ fontSize: 11, fill: '#94a3b8' }} width={120} />
+                    <Tooltip
+                      formatter={(value) => `${Number(value).toFixed(2)} €`}
+                      contentStyle={{ backgroundColor: 'rgba(15,15,25,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                      labelStyle={{ color: '#e2e8f0' }}
+                    />
                     <Bar dataKey="amount" fill="#38bdf8" name="Montant HT" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="grid gap-2 text-sm text-slate-600">
+              <div className="grid gap-2 text-sm text-slate-300">
                 {topCostCenters.map((entry) => (
-                  <div key={entry.label} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
+                  <div key={entry.label} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
                     <span>{entry.label}</span>
-                    <span className="font-semibold">{entry.amount.toFixed(2)} €</span>
+                    <span className="font-semibold text-white">{entry.amount.toFixed(2)} €</span>
                   </div>
                 ))}
               </div>
             </>
           ) : (
-            <p className="text-sm text-slate-500">Aucun centre de coût utilisé sur cette période.</p>
+            <p className="text-sm text-slate-400">Aucun centre de coût utilisé sur cette période.</p>
           )}
         </Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="flex flex-col gap-3">
-          <h3 className="text-lg font-semibold text-slate-900">Catégories</h3>
+          <h3 className="text-lg font-semibold text-white">Catégories</h3>
           <div className="flex gap-2">
             <input
               type="text"
               placeholder="Électricité, Eau…"
-              className="flex-1 rounded-2xl border border-slate-200 px-4 py-2 text-sm"
+              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-slate-500"
               value={categoryName}
               onChange={(event) => setCategoryName(event.target.value)}
             />
@@ -326,9 +338,9 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
               Ajouter
             </Button>
           </div>
-          <ul className="divide-y divide-slate-100 text-sm">
+          <ul className="divide-y divide-white/10 text-sm">
             {(categories.data ?? []).map((cat) => (
-              <li key={cat.id} className="py-1 text-slate-700">
+              <li key={cat.id} className="py-1 text-slate-300">
                 {cat.name}
               </li>
             ))}
@@ -336,12 +348,12 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
         </Card>
 
         <Card className="flex flex-col gap-3">
-          <h3 className="text-lg font-semibold text-slate-900">Centres de coûts</h3>
+          <h3 className="text-lg font-semibold text-white">Centres de coûts</h3>
           <div className="flex gap-2">
             <input
               type="text"
               placeholder="Cuisine, Bar…"
-              className="flex-1 rounded-2xl border border-slate-200 px-4 py-2 text-sm"
+              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-slate-500"
               value={costCenterName}
               onChange={(event) => setCostCenterName(event.target.value)}
             />
@@ -359,9 +371,9 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
               Ajouter
             </Button>
           </div>
-          <ul className="divide-y divide-slate-100 text-sm">
+          <ul className="divide-y divide-white/10 text-sm">
             {(costCenters.data ?? []).map((cc) => (
-              <li key={cc.id} className="py-1 text-slate-700">
+              <li key={cc.id} className="py-1 text-slate-300">
                 {cc.name}
               </li>
             ))}
@@ -372,13 +384,13 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
       <Card className="flex flex-col gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">journal</p>
-          <h3 className="text-lg font-semibold text-slate-900">Dépenses récentes</h3>
+          <h3 className="text-lg font-semibold text-white">Dépenses récentes</h3>
         </div>
         {scopedExpenses.length ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100 text-sm">
+            <table className="min-w-full divide-y divide-white/10 text-sm">
               <thead>
-                <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
+                <tr className="text-left text-xs uppercase tracking-widest text-slate-400">
                   <th className="px-3 py-2">Date</th>
                   <th className="px-3 py-2">Libellé</th>
                   <th className="px-3 py-2">Catégorie</th>
@@ -386,14 +398,14 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
                   <th className="px-3 py-2 text-right">Montant HT</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-white/10">
                 {scopedExpenses.map((expense) => (
-                  <tr key={expense.id}>
-                    <td className="px-3 py-2 text-slate-500">{expense.date_operation}</td>
-                    <td className="px-3 py-2 text-slate-900">{expense.libelle}</td>
-                    <td className="px-3 py-2 text-slate-500">{expense.categorie || '—'}</td>
-                    <td className="px-3 py-2 text-slate-500">{expense.cost_center || '—'}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                  <tr key={expense.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-3 py-2 text-slate-400">{expense.date_operation}</td>
+                    <td className="px-3 py-2 text-white">{expense.libelle}</td>
+                    <td className="px-3 py-2 text-slate-400">{expense.categorie || '—'}</td>
+                    <td className="px-3 py-2 text-slate-400">{expense.cost_center || '—'}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-white">
                       {(Number(expense.montant_ht) || 0).toFixed(2)} €
                     </td>
                   </tr>
@@ -402,7 +414,7 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
             </table>
           </div>
         ) : (
-          <p className="text-sm text-slate-500">Aucune dépense sur la période sélectionnée.</p>
+          <p className="text-sm text-slate-400">Aucune dépense sur la période sélectionnée.</p>
         )}
       </Card>
     </div>

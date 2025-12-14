@@ -5,12 +5,14 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+from pathlib import Path
 from datetime import date
 from typing import Any, Iterable
 
 from sqlalchemy import text
 
 from core.data_repository import get_engine, query_df
+from core.parsers.releve_pdf import parse_bank_pdf
 
 
 def _parse_amount(value: str) -> float:
@@ -61,7 +63,9 @@ def parse_csv(content: bytes | str) -> list[dict[str, Any]]:
     reader = csv.DictReader(stream)
     rows: list[dict[str, Any]] = []
     for raw in reader:
-        libelle = (raw.get("libelle") or raw.get("label") or "").strip()
+        libelle_raw = (raw.get("libelle") or raw.get("label") or "").strip()
+        ref_raw = (raw.get("ref") or raw.get("reference") or "").strip() or None
+        libelle = libelle_raw or ref_raw or "Inconnu"
         montant = raw.get("montant") or raw.get("amount") or "0"
         date_raw = raw.get("date") or raw.get("date_operation") or raw.get("operation_date")
         if not date_raw:
@@ -70,14 +74,15 @@ def parse_csv(content: bytes | str) -> list[dict[str, Any]]:
             "date_operation": _parse_date(date_raw),
             "libelle_banque": libelle,
             "montant": _parse_amount(str(montant)),
-            "ref_banque": (raw.get("ref") or raw.get("reference") or "").strip() or None,
+            "ref_banque": ref_raw,
         }
         rows.append(parsed)
     return rows
 
 
 def _checksum(account_id: int, entry: dict[str, Any]) -> str:
-    base = f"{account_id}|{entry['date_operation']}|{entry['montant']}|{entry['libelle_banque']}"
+    ref = (entry.get("ref_banque") or "").strip().lower()
+    base = f"{account_id}|{entry['date_operation']}|{abs(entry['montant'])}|{ref}"
     return hashlib.sha1(base.encode("utf-8")).hexdigest()
 
 
@@ -208,3 +213,112 @@ def import_csv(content: bytes | str, account_id: int, *, source: str = "CSV") ->
             inserted += 1
 
     return {"inserted": inserted, "duplicates": duplicates, "total": len(entries)}
+
+
+def import_pdf_best_effort(path: str | Path, account_id: int, *, source: str = "PDF") -> dict[str, int]:
+    """Convertit un PDF (best-effort) en lignes et réutilise la logique d'insertion."""
+    entries = parse_bank_pdf(path)
+    if not entries:
+        return {"inserted": 0, "duplicates": 0, "total": 0}
+
+    # Harmonise les champs pour l'import
+    normalized = []
+    for e in entries:
+        date_op = e.get("date_operation")
+        if isinstance(date_op, str):
+            try:
+                date_op = _parse_date(date_op.replace("/", "-"))
+            except Exception:
+                continue
+        libelle = e.get("label") or e.get("libelle_banque") or e.get("ref_banque") or "Inconnu"
+        normalized.append(
+            {
+                "date_operation": date_op,
+                "libelle_banque": libelle,
+                "montant": float(e.get("amount") if "amount" in e else e.get("montant", 0) or 0),
+                "ref_banque": e.get("ref_banque"),
+            }
+        )
+
+    content_hash = hashlib.sha1(str(path).encode("utf-8")).hexdigest()
+    period_start = min(e["date_operation"] for e in normalized)
+    period_end = max(e["date_operation"] for e in normalized)
+    inserted = 0
+    duplicates = 0
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        stmt_row = conn.execute(
+            text(
+                """
+                INSERT INTO finance_bank_statements (account_id, period_start, period_end, source, file_name, hash)
+                VALUES (:account_id, :period_start, :period_end, :source, :file_name, :hash)
+                ON CONFLICT (hash) DO UPDATE SET source = EXCLUDED.source
+                RETURNING id
+                """
+            ),
+            {
+                "account_id": account_id,
+                "period_start": period_start,
+                "period_end": period_end,
+                "source": source,
+                "file_name": Path(path).name,
+                "hash": content_hash,
+            },
+        ).fetchone()
+        statement_id = int(stmt_row[0])
+
+        for entry in normalized:
+            checksum = _checksum(account_id, entry)
+            dup = conn.execute(
+                text(
+                    """
+                    SELECT 1 FROM finance_bank_statement_lines l
+                    JOIN finance_bank_statements s ON s.id = l.statement_id
+                    WHERE s.account_id = :account_id
+                      AND (l.checksum = :checksum OR (l.ref_banque IS NOT DISTINCT FROM :ref_banque AND l.ref_banque IS NOT NULL))
+                    LIMIT 1
+                    """
+                ),
+                {"account_id": account_id, "checksum": checksum, "ref_banque": entry.get("ref_banque")},
+            ).fetchone()
+            if dup:
+                duplicates += 1
+                continue
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO finance_bank_statement_lines (
+                        statement_id,
+                        account_id,
+                        date_operation,
+                        date_valeur,
+                        libelle_banque,
+                        montant,
+                        ref_banque,
+                        checksum
+                    ) VALUES (
+                        :statement_id,
+                        :account_id,
+                        :date_operation,
+                        :date_operation,
+                        :libelle_banque,
+                        :montant,
+                        :ref_banque,
+                        :checksum
+                    )
+                    """
+                ),
+                {
+                    "statement_id": statement_id,
+                    "account_id": account_id,
+                    "date_operation": entry["date_operation"],
+                    "libelle_banque": entry["libelle_banque"],
+                    "montant": entry["montant"],
+                    "ref_banque": entry.get("ref_banque"),
+                    "checksum": checksum,
+                },
+            )
+            inserted += 1
+
+    return {"inserted": inserted, "duplicates": duplicates, "total": len(normalized)}

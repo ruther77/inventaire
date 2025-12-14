@@ -16,6 +16,9 @@ class FinanceRuleCreate(BaseModel):
     keywords: List[str] = Field(default_factory=list, description="Liste de mots-clés")
     apply_to_autre_only: bool = True
     is_active: bool = True
+    amount_min: float | None = Field(default=None, description="Montant min absolu pour matcher")
+    amount_max: float | None = Field(default=None, description="Montant max absolu pour matcher")
+    regex_pattern: str | None = Field(default=None, description="Regex appliquée sur libellé/note/IBAN")
 
 
 class FinanceRule(BaseModel):
@@ -26,6 +29,9 @@ class FinanceRule(BaseModel):
     keywords: List[str]
     apply_to_autre_only: bool
     is_active: bool
+    amount_min: float | None = None
+    amount_max: float | None = None
+    regex_pattern: str | None = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     category_name: Optional[str] = None

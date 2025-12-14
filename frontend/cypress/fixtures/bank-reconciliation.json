@@ -1,0 +1,56 @@
+{
+  "summary": {
+    "total_bank_transactions": 150,
+    "total_invoices": 85,
+    "matched_count": 72,
+    "unmatched_bank": 15,
+    "unmatched_invoices": 13,
+    "match_rate": 0.85
+  },
+  "unmatched_transactions": [
+    {
+      "id": 1,
+      "date": "2025-12-01",
+      "label": "VIR FOURNISSEUR METRO",
+      "amount": -1250.50,
+      "suggested_matches": [
+        {
+          "invoice_id": 45,
+          "supplier": "Metro",
+          "amount": -1250.50,
+          "confidence": 0.95
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "date": "2025-12-03",
+      "label": "PRLV LOYER DEC",
+      "amount": -800.00,
+      "suggested_matches": []
+    }
+  ],
+  "unmatched_invoices": [
+    {
+      "id": 101,
+      "supplier": "Pomona",
+      "date": "2025-12-02",
+      "amount": -520.30,
+      "invoice_number": "INV-2025-1201"
+    }
+  ],
+  "supplier_aliases": [
+    {
+      "id": 1,
+      "bank_pattern": "VIR METRO",
+      "supplier_name": "Metro",
+      "match_count": 45
+    },
+    {
+      "id": 2,
+      "bank_pattern": "PRLV POMONA",
+      "supplier_name": "Pomona",
+      "match_count": 30
+    }
+  ]
+}

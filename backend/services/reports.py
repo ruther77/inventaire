@@ -203,7 +203,7 @@ def fetch_latest_capital_snapshot(*, tenant_id: int) -> dict[str, object]:
         ORDER BY snapshot_date DESC
         LIMIT 1
     """
-    df = query_df(text(sql), params={"tenant_id": int(tenant_id)})
+    df = query_df(sql, params={"tenant_id": int(tenant_id)})
     if df.empty:
         return {"stock_value": 0, "bank_balance": 0, "cash_balance": 0, "total_assets": 0, "snapshot_date": None}
     row = df.iloc[0]

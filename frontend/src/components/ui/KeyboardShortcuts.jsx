@@ -1,7 +1,7 @@
 import { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
 import clsx from 'clsx';
 import { Command, Keyboard } from 'lucide-react';
-import useHotkeys, { useHotkeysMap } from '../../hooks/useHotkeys.js';
+import useHotkeys, { useHotkeysMap } from '../../hooks/useHotkeys.jsx';
 import Modal from './Modal.jsx';
 
 // Context pour les raccourcis
@@ -63,7 +63,7 @@ export function ShortcutsProvider({ children, shortcuts = [] }) {
 /**
  * ShortcutsHelpModal - Modal d'aide des raccourcis clavier
  */
-function ShortcutsHelpModal({ open, onClose, shortcuts }) {
+export function ShortcutsHelpModal({ open, onClose, shortcuts }) {
   // Grouper les raccourcis par catégorie
   const groupedShortcuts = useMemo(() => {
     const groups = {};

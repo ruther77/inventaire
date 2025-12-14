@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import logging
+import uuid
 from typing import Any
 
 import pandas as pd
@@ -21,8 +22,16 @@ from backend.schemas.invoices import (
     InvoiceImportRequest,
     InvoiceImportSummary,
     InvoiceLine,
+    InvoiceLineCreateProductRequest,
+    InvoiceLineCreateProductResponse,
+    InvoiceLineLinkRequest,
+    InvoiceLineLinkResponse,
+    InvoiceStockConfirmRequest,
+    ZeroClickJobListResponse,
+    ZeroClickJobStatus,
 )
 from backend.services import invoices as invoices_service
+from backend.services import zero_click_jobs as job_service
 from core.invoice_extractor import extract_text_from_file
 from backend.dependencies.tenant import Tenant, get_current_tenant
 
@@ -53,11 +62,33 @@ EXPORTED_COLUMNS = [
     "catalogue_categorie",
     "facture_date",
     "invoice_id",
+    # Colonnes d'anomalie de prix
+    "is_anomaly",
+    "price_anomaly",
+    "price_anomaly_pct",
+    "price_anomaly_description",
+    "last_price",
+    "suggestion",
+    # Colonnes de suggestion IA pour produits non-matchés
+    "has_suggestion",
+    "suggestion_id",
+    "suggestion_nom",
+    "suggestion_score",
+    "suggestion_type",
 ]
-TEXT_COLUMNS = {"nom", "codes", "numero_article", "catalogue_nom", "catalogue_categorie", "facture_date", "invoice_id"}
+TEXT_COLUMNS = {
+    "nom", "codes", "numero_article", "catalogue_nom", "catalogue_categorie",
+    "facture_date", "invoice_id", "price_anomaly", "price_anomaly_description",
+    "suggestion", "suggestion_nom", "suggestion_type"
+}
+BOOL_COLUMNS = {"is_anomaly", "has_suggestion"}
 
 
-def _ensure_valid_invoice_lines(lines: list[InvoiceLine], tenant_id: int | None = None) -> None:
+def _ensure_valid_invoice_lines(
+    lines: list[InvoiceLine],
+    tenant_id: int | None = None,
+    require_invoice_id: bool = True,
+) -> None:
     errors = []
     invoice_ids: set[str] = set()
     for idx, line in enumerate(lines, start=1):
@@ -67,9 +98,9 @@ def _ensure_valid_invoice_lines(lines: list[InvoiceLine], tenant_id: int | None 
         if line.prix_achat < 0:
             errors.append(f"Ligne {idx}: prix d'achat négatif signalé.")
         invoice_id = (line.invoice_id or "").strip() if hasattr(line, "invoice_id") else ""
-        if not invoice_id:
+        if require_invoice_id and not invoice_id:
             errors.append(f"Ligne {idx}: identifiant facture manquant (invoice_id).")
-        else:
+        elif invoice_id:
             invoice_ids.add(invoice_id)
     if errors:
         raise HTTPException(status_code=400, detail="; ".join(errors))
@@ -92,14 +123,23 @@ def _serialize_minimal(df: pd.DataFrame) -> list[dict[str, Any]]:
         if column not in working.columns:
             if column in TEXT_COLUMNS:
                 working[column] = ""
+            elif column in BOOL_COLUMNS:
+                working[column] = False
             else:
                 working[column] = 0
 
     working = working[EXPORTED_COLUMNS]
+
+    # Traiter les colonnes texte
     for column in TEXT_COLUMNS:
         working[column] = working[column].fillna("")
 
-    numeric_columns = [col for col in EXPORTED_COLUMNS if col not in TEXT_COLUMNS]
+    # Traiter les colonnes booléennes
+    for column in BOOL_COLUMNS:
+        working[column] = working[column].fillna(False).astype(bool)
+
+    # Traiter les colonnes numériques (tout sauf texte et bool)
+    numeric_columns = [col for col in EXPORTED_COLUMNS if col not in TEXT_COLUMNS and col not in BOOL_COLUMNS]
     for column in numeric_columns:
         working[column] = pd.to_numeric(working[column], errors="coerce").fillna(0)
 
@@ -147,6 +187,114 @@ def _group_items_by_invoice(
     return documents
 
 
+def _process_zero_click_bytes(
+    *,
+    file_bytes: bytes,
+    filename: str,
+    margin_percent: float,
+    supplier_hint: str | None,
+    auto_confirm: bool,
+    tenant: Tenant,
+) -> InvoiceImportSummary | dict[str, Any]:
+    buffer = io.BytesIO(file_bytes)
+    buffer.name = filename  # type: ignore[attr-defined]
+
+    # 1. Extraction du texte
+    text = extract_text_from_file(buffer)
+
+    # 2. Stockage du document source
+    invoices_service.persist_invoice_documents(
+        file_bytes,
+        tenant_id=tenant.id,
+        supplier=supplier_hint or tenant.name,
+    )
+
+    # 3. Extraction des lignes
+    lines_df = invoices_service.extract_invoice_lines(
+        text,
+        margin_percent=margin_percent,
+        supplier_hint=supplier_hint,
+        tenant_id=tenant.id,
+    )
+
+    if lines_df.empty:
+        raise HTTPException(status_code=400, detail="Aucune ligne extraite du PDF")
+
+    # 4. Enrichissement avec le catalogue
+    enriched = invoices_service.enrich_lines_with_catalog(
+        lines_df,
+        margin_percent=margin_percent,
+        tenant_id=tenant.id,
+    )
+
+    # 5. Analyse de qualité (optionnel)
+    quality_report = None
+    try:
+        from core.import_analyzer import analyze_invoice_import
+
+        quality_report = analyze_invoice_import(enriched, filename or "upload")
+    except Exception:
+        quality_report = None
+
+    if auto_confirm:
+        # Déterminer le fournisseur depuis le hint ou le nom de fichier
+        supplier = supplier_hint or "Import"
+        if not supplier_hint and filename:
+            filename_upper = (filename or "").upper()
+            if "METRO" in filename_upper:
+                supplier = "METRO"
+            elif "EUROCIEL" in filename_upper:
+                supplier = "EUROCIEL"
+            elif "TAIYAT" in filename_upper or "TAI" in filename_upper:
+                supplier = "TAIYAT"
+
+        summary = invoices_service.apply_invoice_import(
+            enriched,
+            username="zero_click",
+            supplier=supplier,
+            movement_type="ENTREE",
+            invoice_date=None,  # Sera inféré
+            tenant_id=tenant.id,
+        )
+
+        # 6. Synchroniser vers fact_invoices
+        try:
+            from core.consolidation_loader import sync_invoice_dataframe
+
+            invoice_ref = (
+                enriched["invoice_id"].iloc[0]
+                if "invoice_id" in enriched.columns and not enriched.empty
+                else None
+            )
+            sync_result = sync_invoice_dataframe(
+                enriched,
+                tenant_id=tenant.id,
+                supplier_name=supplier,
+                invoice_reference=invoice_ref,
+                analyze=False,  # Déjà fait ci-dessus
+            )
+            summary["fact_invoices_lines"] = sync_result.get("lines_inserted", 0)
+        except Exception as sync_exc:
+            LOGGER.warning("Sync fact_invoices échoué: %s", sync_exc)
+            summary["fact_invoices_lines"] = 0
+
+        # Ajouter le rapport de qualité
+        if quality_report:
+            summary["quality_score"] = quality_report.quality_score
+            summary["quality_flags"] = quality_report.quality_flags
+
+        return InvoiceImportSummary(**summary)
+
+    # Mode preview : renvoyer les items
+    items = _serialize_minimal(enriched)
+    return {
+        "mode": "preview",
+        "line_count": len(items),
+        "items": items,
+        "quality_score": quality_report.quality_score if quality_report else None,
+    }
+
+
 @router.post("/extract", response_model=InvoiceExtractResponse)
 def extract_invoice(payload: InvoiceExtractRequest, tenant: Tenant = Depends(get_current_tenant)):
     try:
@@ -154,6 +302,7 @@ def extract_invoice(payload: InvoiceExtractRequest, tenant: Tenant = Depends(get
             payload.text,
             margin_percent=payload.margin_percent,
             supplier_hint=payload.supplier_hint,
+            tenant_id=tenant.id,
         )
         enriched = invoices_service.enrich_lines_with_catalog(
             lines_df,
@@ -191,6 +340,7 @@ if MULTIPART_AVAILABLE:
                 text,
                 margin_percent=margin_percent,
                 supplier_hint=supplier_hint,
+                tenant_id=tenant.id,
             )
             enriched = invoices_service.enrich_lines_with_catalog(
                 lines_df,
@@ -235,7 +385,8 @@ def import_catalog(payload: InvoiceCatalogImportRequest, tenant: Tenant = Depend
     if not payload.lines:
         raise HTTPException(status_code=400, detail="Aucune ligne fournie.")
 
-    _ensure_valid_invoice_lines(payload.lines, tenant_id=tenant.id)
+    # Pour l'import catalogue, invoice_id n'est pas obligatoire
+    _ensure_valid_invoice_lines(payload.lines, tenant_id=tenant.id, require_invoice_id=False)
 
     df = pd.DataFrame([line.model_dump() for line in payload.lines])
     try:
@@ -250,6 +401,236 @@ def import_catalog(payload: InvoiceCatalogImportRequest, tenant: Tenant = Depend
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return InvoiceCatalogImportSummary(**summary)
+
+
+@router.post("/lines/link", response_model=InvoiceLineLinkResponse)
+def link_invoice_line(payload: InvoiceLineLinkRequest, tenant: Tenant = Depends(get_current_tenant)):
+    """Associe une ligne extraite à un produit existant et renvoie la ligne enrichie."""
+    df = pd.DataFrame([payload.line.model_dump()])
+    df["produit_id"] = payload.product_id
+    enriched = invoices_service.enrich_lines_with_catalog(df, margin_percent=40.0, tenant_id=tenant.id)
+    if enriched.empty:
+        raise HTTPException(status_code=400, detail="Ligne invalide")
+    line_dict = enriched.iloc[0].to_dict()
+    return InvoiceLineLinkResponse(line=InvoiceLine.model_validate(line_dict))
+
+
+@router.post("/lines/create-product", response_model=InvoiceLineCreateProductResponse)
+def create_product_from_line(payload: InvoiceLineCreateProductRequest, tenant: Tenant = Depends(get_current_tenant)):
+    """Crée un produit à partir d'une ligne de facture, optionnellement avec stock initial."""
+    df = pd.DataFrame([payload.line.model_dump()])
+    summary = invoices_service.import_catalog_from_invoice(
+        df,
+        supplier=payload.supplier,
+        initialize_stock=payload.initialize_stock,
+        invoice_date=payload.invoice_date,
+        tenant_id=tenant.id,
+    )
+    return InvoiceLineCreateProductResponse(summary=InvoiceCatalogImportSummary(**summary))
+
+
+@router.post("/lines/confirm-stock", response_model=InvoiceImportSummary)
+def confirm_invoice_stock(payload: InvoiceStockConfirmRequest, tenant: Tenant = Depends(get_current_tenant)):
+    """Valide les mouvements de stock pour des lignes sélectionnées."""
+    if not payload.lines:
+        raise HTTPException(status_code=400, detail="Aucune ligne fournie.")
+
+    _ensure_valid_invoice_lines(payload.lines, tenant_id=tenant.id, require_invoice_id=False)
+    df = pd.DataFrame([line.model_dump() for line in payload.lines])
+    summary = invoices_service.apply_invoice_import(
+        df,
+        username=payload.username or "ui",
+        supplier=payload.supplier,
+        movement_type=payload.movement_type,
+        invoice_date=payload.invoice_date,
+        tenant_id=tenant.id,
+    )
+    return InvoiceImportSummary(**summary)
+if MULTIPART_AVAILABLE:
+
+    @router.post("/zero-click", response_model=InvoiceImportSummary)
+    async def zero_click_import(
+        file: UploadFile = File(...),
+        margin_percent: float = Form(40.0),
+        supplier_hint: str | None = Form(default=None),
+        auto_confirm: bool = Form(default=True),
+        tenant: Tenant = Depends(get_current_tenant),
+    ):
+        try:
+            content = await file.read()
+            return _process_zero_click_bytes(
+                file_bytes=content,
+                filename=file.filename or "upload",
+                margin_percent=margin_percent,
+                supplier_hint=supplier_hint,
+                auto_confirm=auto_confirm,
+                tenant=tenant,
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            LOGGER.exception("Zero-click import failed: %s", file.filename)
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+    @router.post("/zero-click/jobs", response_model=ZeroClickJobStatus)
+    async def zero_click_job(
+        file: UploadFile = File(...),
+        margin_percent: float = Form(40.0),
+        supplier_hint: str | None = Form(default=None),
+        auto_confirm: bool = Form(default=True),
+        tenant: Tenant = Depends(get_current_tenant),
+    ):
+        """Lance un job zero-click async et retourne immédiatement le job_id pour polling."""
+        job_id = str(uuid.uuid4())
+
+        # Créer le job en base avec statut "pending"
+        try:
+            job_service.create_job(
+                job_id=job_id,
+                tenant_id=tenant.id,
+                filename=file.filename,
+                supplier_hint=supplier_hint,
+                margin_percent=margin_percent,
+                auto_confirm=auto_confirm,
+            )
+        except Exception as exc:
+            LOGGER.exception("Échec de création du job %s", job_id)
+            raise HTTPException(status_code=500, detail=f"Échec de création du job: {exc}") from exc
+
+        # Marquer le job comme "processing"
+        job_service.update_job_status(job_id, "processing")
+
+        # Traiter le fichier de manière synchrone (pour cette version)
+        # Dans une vraie implémentation async, on utiliserait Celery/RQ/Background Tasks
+        try:
+            content = await file.read()
+            result = _process_zero_click_bytes(
+                file_bytes=content,
+                filename=file.filename or "upload",
+                margin_percent=margin_percent,
+                supplier_hint=supplier_hint,
+                auto_confirm=auto_confirm,
+                tenant=tenant,
+            )
+
+            # Convertir le résultat en dict pour le stockage JSON
+            if isinstance(result, InvoiceImportSummary):
+                result_dict = result.model_dump()
+            else:
+                result_dict = result
+
+            # Mettre à jour le job avec le résultat
+            job_service.update_job_status(job_id, "completed", result=result_dict)
+
+            # Récupérer et retourner le job complet
+            job_data = job_service.get_job(job_id, tenant_id=tenant.id)
+            if not job_data:
+                raise HTTPException(status_code=404, detail="Job introuvable après traitement")
+
+            # Reconstruire le summary depuis result
+            summary = None
+            if job_data.get("result"):
+                summary = InvoiceImportSummary(**job_data["result"])
+
+            return ZeroClickJobStatus(
+                job_id=job_data["job_id"],
+                status=job_data["status"],
+                filename=job_data.get("filename"),
+                supplier_hint=job_data.get("supplier_hint"),
+                margin_percent=job_data.get("margin_percent", 40.0),
+                auto_confirm=job_data.get("auto_confirm", True),
+                summary=summary,
+                error=job_data.get("error"),
+                created_at=job_data.get("created_at"),
+                updated_at=job_data.get("updated_at"),
+                completed_at=job_data.get("completed_at"),
+            )
+
+        except HTTPException as exc:
+            job_service.update_job_status(job_id, "failed", error=str(exc.detail))
+            raise
+        except Exception as exc:  # pragma: no cover - runtime
+            LOGGER.exception("Zero-click job failed: %s", file.filename)
+            job_service.update_job_status(job_id, "failed", error=str(exc))
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/zero-click/jobs", response_model=ZeroClickJobListResponse)
+def list_zero_click_jobs(
+    status: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """Liste les jobs zero-click récents pour le tenant courant."""
+    jobs_data, total = job_service.list_jobs(
+        tenant_id=tenant.id,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
+
+    items = []
+    for job_data in jobs_data:
+        # Reconstruire le summary depuis result si disponible
+        summary = None
+        if job_data.get("result"):
+            try:
+                summary = InvoiceImportSummary(**job_data["result"])
+            except Exception as exc:
+                LOGGER.warning("Impossible de reconstruire le summary pour job %s: %s", job_data["job_id"], exc)
+
+        items.append(
+            ZeroClickJobStatus(
+                job_id=job_data["job_id"],
+                status=job_data["status"],
+                filename=job_data.get("filename"),
+                supplier_hint=job_data.get("supplier_hint"),
+                margin_percent=job_data.get("margin_percent", 40.0),
+                auto_confirm=job_data.get("auto_confirm", True),
+                summary=summary,
+                error=job_data.get("error"),
+                created_at=job_data.get("created_at"),
+                updated_at=job_data.get("updated_at"),
+                completed_at=job_data.get("completed_at"),
+            )
+        )
+
+    return ZeroClickJobListResponse(items=items, total=total)
+
+
+@router.get("/zero-click/jobs/{job_id}", response_model=ZeroClickJobStatus)
+def get_zero_click_job(job_id: str, tenant: Tenant = Depends(get_current_tenant)):
+    """Récupère le statut d'un job zero-click par son ID."""
+    job_data = job_service.get_job(job_id, tenant_id=tenant.id)
+
+    if not job_data:
+        raise HTTPException(status_code=404, detail="Job introuvable")
+
+    # Reconstruire le summary depuis result si disponible
+    summary = None
+    if job_data.get("result"):
+        try:
+            summary = InvoiceImportSummary(**job_data["result"])
+        except Exception as exc:
+            LOGGER.warning("Impossible de reconstruire le summary pour job %s: %s", job_id, exc)
+
+    return ZeroClickJobStatus(
+        job_id=job_data["job_id"],
+        status=job_data["status"],
+        filename=job_data.get("filename"),
+        supplier_hint=job_data.get("supplier_hint"),
+        margin_percent=job_data.get("margin_percent", 40.0),
+        auto_confirm=job_data.get("auto_confirm", True),
+        summary=summary,
+        error=job_data.get("error"),
+        created_at=job_data.get("created_at"),
+        updated_at=job_data.get("updated_at"),
+        completed_at=job_data.get("completed_at"),
+    )
+
+
 @router.get("/history", response_model=InvoiceHistoryResponse)
 def get_invoice_history(
     supplier: str | None = None,

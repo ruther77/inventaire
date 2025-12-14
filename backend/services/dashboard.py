@@ -11,18 +11,28 @@ from core.data_repository import query_df
 
 
 def fetch_kpis(tenant_id: int) -> dict[str, float | int]:
-    sql = """
+    # Compte des produits et alertes depuis la table produits
+    sql_produits = """
         SELECT
             COUNT(id) AS total_produits,
-            COALESCE(SUM(stock_actuel * prix_vente), 0) AS valeur_stock_ht,
-            COALESCE(SUM(stock_actuel), 0) AS quantite_stock_total,
             COALESCE(SUM(CASE WHEN stock_actuel <= 5 AND stock_actuel > 0 THEN 1 ELSE 0 END), 0) AS alerte_stock_bas,
             COALESCE(SUM(CASE WHEN stock_actuel = 0 THEN 1 ELSE 0 END), 0) AS stock_epuise
         FROM produits
         WHERE tenant_id = :tenant_id
     """
-    df = query_df(sql, params={"tenant_id": int(tenant_id)})
-    if df.empty:
+    df_produits = query_df(sql_produits, params={"tenant_id": int(tenant_id)})
+
+    # Valeur du stock depuis latest_price_history (plus fiable)
+    sql_stock = """
+        SELECT
+            COALESCE(SUM(prix_achat * COALESCE(quantite, 1)), 0) AS valeur_stock_ht,
+            COALESCE(SUM(COALESCE(quantite, 1)), 0) AS quantite_stock_total
+        FROM latest_price_history
+        WHERE tenant_id = :tenant_id
+    """
+    df_stock = query_df(sql_stock, params={"tenant_id": int(tenant_id)})
+
+    if df_produits.empty:
         return {
             'total_produits': 0,
             'valeur_stock_ht': 0.0,
@@ -30,22 +40,29 @@ def fetch_kpis(tenant_id: int) -> dict[str, float | int]:
             'alerte_stock_bas': 0,
             'stock_epuise': 0,
         }
-    row = df.iloc[0]
+
+    row_produits = df_produits.iloc[0]
+    row_stock = df_stock.iloc[0] if not df_stock.empty else {}
+
     return {
-        'total_produits': int(row.get('total_produits', 0) or 0),
-        'valeur_stock_ht': float(row.get('valeur_stock_ht', 0) or 0),
-        'quantite_stock_total': float(row.get('quantite_stock_total', 0) or 0),
-        'alerte_stock_bas': int(row.get('alerte_stock_bas', 0) or 0),
-        'stock_epuise': int(row.get('stock_epuise', 0) or 0),
+        'total_produits': int(row_produits.get('total_produits', 0) or 0),
+        'valeur_stock_ht': float(row_stock.get('valeur_stock_ht', 0) or 0),
+        'quantite_stock_total': float(row_stock.get('quantite_stock_total', 0) or 0),
+        'alerte_stock_bas': int(row_produits.get('alerte_stock_bas', 0) or 0),
+        'stock_epuise': int(row_produits.get('stock_epuise', 0) or 0),
     }
 
 
 def fetch_top_stock_value(*, tenant_id: int, limit: int = 5) -> List[dict[str, Any]]:
+    """Top produits par valeur de stock (prix_achat * stock_actuel)."""
     sql = """
-        SELECT nom, (stock_actuel * prix_vente) AS valeur_stock
-        FROM produits
-        WHERE tenant_id = :tenant_id
-        ORDER BY valeur_stock DESC
+        SELECT
+            p.nom,
+            (COALESCE(p.prix_achat, 0) * COALESCE(p.stock_actuel, 0)) AS valeur_stock
+        FROM produits p
+        WHERE p.tenant_id = :tenant_id
+          AND p.stock_actuel > 0
+        ORDER BY valeur_stock DESC NULLS LAST
         LIMIT :limit
     """
     df = query_df(sql, params={'limit': limit, 'tenant_id': int(tenant_id)})

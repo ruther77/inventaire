@@ -14,10 +14,10 @@ def list_rules(entity_id: int | None = None, is_active: bool | None = None) -> L
     clauses: List[str] = []
     params: Dict[str, Any] = {}
     if entity_id is not None:
-        clauses.append("entity_id = :entity_id")
+        clauses.append("r.entity_id = :entity_id")
         params["entity_id"] = int(entity_id)
     if is_active is not None:
-        clauses.append("is_active = :is_active")
+        clauses.append("r.is_active = :is_active")
         params["is_active"] = bool(is_active)
     where_sql = ""
     if clauses:
@@ -31,12 +31,15 @@ def list_rules(entity_id: int | None = None, is_active: bool | None = None) -> L
               r.category_id,
               r.name,
               r.keywords,
-              r.apply_to_autre_only,
-              r.is_active,
-              r.created_at,
-              r.updated_at,
-              c.name AS category_name,
-              c.code AS category_code
+            r.apply_to_autre_only,
+            r.is_active,
+            r.amount_min,
+            r.amount_max,
+            r.regex_pattern,
+            r.created_at,
+            r.updated_at,
+            c.name AS category_name,
+            c.code AS category_code
             FROM finance_rules r
             LEFT JOIN finance_categories c ON c.id = r.category_id
             {where_sql}
@@ -45,7 +48,13 @@ def list_rules(entity_id: int | None = None, is_active: bool | None = None) -> L
         ),
         params=params or None,
     )
-    return df.where(df.notna(), None).to_dict("records") if not df.empty else []
+    if df.empty:
+        return []
+    # Convertir les colonnes datetime en strings ISO pour la sérialisation JSON
+    for col in ["created_at", "updated_at"]:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda x: x.isoformat() if hasattr(x, "isoformat") else x)
+    return df.where(df.notna(), None).to_dict("records")
 
 
 def create_rule(payload: FinanceRuleCreate) -> dict:
@@ -54,9 +63,9 @@ def create_rule(payload: FinanceRuleCreate) -> dict:
         row = conn.execute(
             text(
                 """
-                INSERT INTO finance_rules (entity_id, category_id, name, keywords, apply_to_autre_only, is_active)
-                VALUES (:entity_id, :category_id, :name, :keywords, :apply_to_autre_only, :is_active)
-                RETURNING id, entity_id, category_id, name, keywords, apply_to_autre_only, is_active, created_at, updated_at
+                INSERT INTO finance_rules (entity_id, category_id, name, keywords, apply_to_autre_only, is_active, amount_min, amount_max, regex_pattern)
+                VALUES (:entity_id, :category_id, :name, :keywords, :apply_to_autre_only, :is_active, :amount_min, :amount_max, :regex_pattern)
+                RETURNING id, entity_id, category_id, name, keywords, apply_to_autre_only, is_active, amount_min, amount_max, regex_pattern, created_at, updated_at
                 """
             ),
             {
@@ -66,13 +75,16 @@ def create_rule(payload: FinanceRuleCreate) -> dict:
                 "keywords": payload.keywords,
                 "apply_to_autre_only": payload.apply_to_autre_only,
                 "is_active": payload.is_active,
+                "amount_min": payload.amount_min,
+                "amount_max": payload.amount_max,
+                "regex_pattern": payload.regex_pattern,
             },
         ).fetchone()
     return dict(row._mapping)
 
 
 def update_rule(rule_id: int, fields: Dict[str, Any]) -> dict:
-    allowed = {"name", "keywords", "apply_to_autre_only", "is_active", "category_id"}
+    allowed = {"name", "keywords", "apply_to_autre_only", "is_active", "category_id", "amount_min", "amount_max", "regex_pattern"}
     updates = []
     params: Dict[str, Any] = {"id": int(rule_id)}
     for key, value in fields.items():

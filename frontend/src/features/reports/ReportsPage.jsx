@@ -4,8 +4,7 @@ import { Download, RefreshCw } from 'lucide-react';
 import Card from '../../components/ui/Card.jsx';
 import MetricCard from '../../components/ui/MetricCard.jsx';
 import Button from '../../components/ui/Button.jsx';
-import api from '../../api/client.js';
-import { useReportsOverview } from '../../hooks/useReports.js';
+import { useReportsOverview, useExportReport } from '../../hooks/useReports.js';
 
 const chartColors = ['#2563eb', '#0891b2', '#16a34a', '#f97316', '#f43f5e', '#c026d3'];
 
@@ -18,9 +17,9 @@ const exportConfigs = [
 
 export default function ReportsPage() {
   const overviewQuery = useReportsOverview();
+  const exportMutation = useExportReport();
   const data = overviewQuery.data;
   const [exportingType, setExportingType] = useState('');
-  const [exportError, setExportError] = useState('');
 
   const kpis = data?.kpis ?? {
     total_products: 0,
@@ -30,37 +29,11 @@ export default function ReportsPage() {
     negative_count: 0,
   };
 
-  const resolveFilename = (header, fallback) => {
-    if (!header) return fallback;
-    const match = /filename="?([^"]+)"?/i.exec(header);
-    return match?.[1] ?? fallback;
-  };
-
-  const handleExport = async (type) => {
-    setExportError('');
+  const handleExport = (type) => {
     setExportingType(type);
-    try {
-      const response = await api.get(`/reports/export/${type}`, {
-        responseType: 'blob',
-      });
-      const filename = resolveFilename(
-        response.headers?.['content-disposition'],
-        `rapport_${type}.csv`,
-      );
-      const blob = new Blob([response.data], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      setExportError("Impossible d'exporter ce rapport. Vérifiez la connexion API.");
-    } finally {
-      setExportingType('');
-    }
+    exportMutation.mutate(type, {
+      onSettled: () => setExportingType(''),
+    });
   };
 
   return (
@@ -271,7 +244,7 @@ export default function ReportsPage() {
             </Button>
           ))}
         </div>
-        {exportError && <p className="text-sm text-rose-600">{exportError}</p>}
+        {exportMutation.isError && <p className="text-sm text-rose-600">Impossible d&apos;exporter ce rapport. Vérifiez la connexion API.</p>}
       </Card>
     </div>
   );

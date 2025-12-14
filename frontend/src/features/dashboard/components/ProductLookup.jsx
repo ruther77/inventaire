@@ -96,10 +96,10 @@ export default function ProductLookup({ onLookup, loading = false }) {
         <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
           Fiches produit
         </p>
-        <h3 className="text-lg font-semibold text-slate-900">
+        <h3 className="text-lg font-semibold text-white">
           Recherche par code EAN
         </h3>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-slate-400 mt-1">
           Identifiez rapidement un produit et consultez ses informations.
         </p>
       </div>
@@ -147,7 +147,7 @@ export default function ProductLookup({ onLookup, loading = false }) {
       {loading && <ProductCardSkeleton />}
 
       {!loading && error && (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
           {error}
         </div>
       )}
@@ -157,7 +157,7 @@ export default function ProductLookup({ onLookup, loading = false }) {
       )}
 
       {!loading && !error && !product && !hasSearched && (
-        <div className="text-center py-8 text-slate-500">
+        <div className="text-center py-8 text-slate-400">
           <Barcode className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="text-sm">
             Saisissez un code EAN pour afficher la fiche produit
@@ -193,12 +193,12 @@ function ProductCard({ product }) {
           <img
             src={product.image_url}
             alt={`Visuel ${product.nom ?? ''}`}
-            className="w-full aspect-square object-cover rounded-2xl border border-slate-200"
+            className="w-full aspect-square object-cover rounded-2xl border border-white/10"
             loading="lazy"
           />
         ) : (
-          <div className="w-full aspect-square flex items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50">
-            <Package className="h-16 w-16 text-slate-300" />
+          <div className="w-full aspect-square flex items-center justify-center rounded-2xl border-2 border-dashed border-white/20 bg-white/5">
+            <Package className="h-16 w-16 text-slate-500" />
           </div>
         )}
       </div>
@@ -206,16 +206,16 @@ function ProductCard({ product }) {
       {/* Details */}
       <div className="md:col-span-2 space-y-4">
         {/* Header */}
-        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
                 Produit
               </p>
-              <h4 className="text-lg font-semibold text-slate-900">
+              <h4 className="text-lg font-semibold text-white">
                 {product.nom ?? '—'}
               </h4>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-sm text-slate-400 mt-1">
                 {product.categorie ?? 'Catégorie non renseignée'}
               </p>
             </div>
@@ -250,7 +250,7 @@ function ProductCard({ product }) {
 
         {/* Codes associés */}
         {Array.isArray(product.codes) && product.codes.length > 0 && (
-          <div className="rounded-2xl border border-slate-100 px-4 py-3">
+          <div className="rounded-2xl border border-white/10 px-4 py-3">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">
               Codes associés
             </p>
@@ -258,7 +258,7 @@ function ProductCard({ product }) {
               {product.codes.map((code, i) => (
                 <span
                   key={i}
-                  className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-mono text-slate-700"
+                  className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-xs font-mono text-slate-300"
                 >
                   {code}
                 </span>
@@ -276,14 +276,14 @@ function ProductCard({ product }) {
  */
 function InfoCard({ icon: Icon, label, value, highlight }) {
   return (
-    <div className="rounded-2xl border border-slate-100 px-4 py-3">
+    <div className="rounded-2xl border border-white/10 px-4 py-3">
       <div className="flex items-center gap-2 mb-1">
         <Icon className="h-3.5 w-3.5 text-slate-400" />
         <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
           {label}
         </p>
       </div>
-      <p className={`text-sm font-semibold ${highlight ? 'text-amber-600' : 'text-slate-900'}`}>
+      <p className={`text-sm font-semibold ${highlight ? 'text-amber-400' : 'text-white'}`}>
         {value}
       </p>
     </div>

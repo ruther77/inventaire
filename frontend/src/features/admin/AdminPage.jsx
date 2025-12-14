@@ -3,7 +3,7 @@ import { Download, RefreshCw, ShieldCheck, Trash2, RotateCw, AlertTriangle } fro
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import MetricCard from '../../components/ui/MetricCard.jsx';
-import api from '../../api/client.js';
+import { getApiBaseUrl } from '../../api/client.js';
 import {
   useAdminOverview,
   useAdminUsers,
@@ -126,7 +126,7 @@ export default function AdminPage() {
     }
   };
 
-  const baseDownloadUrl = api.defaults.baseURL ?? '';
+  const baseDownloadUrl = getApiBaseUrl();
 
   const backupMetrics = useMemo(
     () => [

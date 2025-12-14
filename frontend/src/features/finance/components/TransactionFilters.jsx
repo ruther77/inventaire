@@ -27,7 +27,7 @@ export default function TransactionFilters({
         {/* Row 1: Entity, Account, Category */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
               Entité
             </label>
             <Select
@@ -36,13 +36,13 @@ export default function TransactionFilters({
               className="w-full"
             >
               <option value="">Toutes les entités</option>
-              <option value="1">Épicerie</option>
               <option value="2">Restaurant</option>
+              <option value="3">Trésorerie</option>
             </Select>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
               Compte bancaire
             </label>
             <Select
@@ -60,7 +60,7 @@ export default function TransactionFilters({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
               Catégorie
             </label>
             <Select
@@ -81,26 +81,26 @@ export default function TransactionFilters({
         {/* Row 2: Dates */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
               Date de début
             </label>
             <input
               type="date"
               value={filters.date_from || ''}
               onChange={(e) => handleChange('date_from', e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 min-h-[44px]"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 min-h-[44px]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
               Date de fin
             </label>
             <input
               type="date"
               value={filters.date_to || ''}
               onChange={(e) => handleChange('date_to', e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 min-h-[44px]"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 min-h-[44px]"
             />
           </div>
         </div>
@@ -108,7 +108,7 @@ export default function TransactionFilters({
         {/* Row 3: Amount range */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
               Montant minimum (€)
             </label>
             <Input
@@ -121,7 +121,7 @@ export default function TransactionFilters({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
               Montant maximum (€)
             </label>
             <Input
@@ -136,7 +136,7 @@ export default function TransactionFilters({
 
         {/* Row 4: Search text */}
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1.5">
+          <label className="block text-xs font-medium text-slate-400 mb-1.5">
             Recherche dans le libellé
           </label>
           <Input

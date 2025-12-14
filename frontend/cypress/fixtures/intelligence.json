@@ -1,0 +1,63 @@
+{
+  "inventory_summary": {
+    "total_products": 245,
+    "low_stock_count": 12,
+    "dead_stock_count": 8,
+    "reorder_needed": 15,
+    "avg_rotation_rate": 2.4,
+    "stock_value": 45230.50
+  },
+  "reorder_points": [
+    {
+      "product_id": 1,
+      "product_name": "Tomates",
+      "current_stock": 5,
+      "reorder_point": 15,
+      "safety_stock": 10,
+      "lead_time_days": 3,
+      "needs_reorder": true
+    },
+    {
+      "product_id": 2,
+      "product_name": "Huile d'olive",
+      "current_stock": 8,
+      "reorder_point": 12,
+      "safety_stock": 8,
+      "lead_time_days": 5,
+      "needs_reorder": true
+    }
+  ],
+  "stockout_predictions": [
+    {
+      "product_id": 1,
+      "product_name": "Tomates",
+      "current_stock": 5,
+      "daily_consumption": 2.5,
+      "predicted_stockout_date": "2025-12-15",
+      "days_until_stockout": 2,
+      "confidence": 0.92
+    }
+  ],
+  "dead_stock": [
+    {
+      "product_id": 45,
+      "product_name": "Sauce spéciale",
+      "current_stock": 25,
+      "last_movement_date": "2025-09-01",
+      "days_inactive": 100,
+      "rotation_rate": 0.1,
+      "stock_value": 125.00
+    }
+  ],
+  "abc_xyz": {
+    "A": [
+      { "product_id": 1, "product_name": "Tomates", "class": "AX", "revenue_pct": 15.2 }
+    ],
+    "B": [
+      { "product_id": 5, "product_name": "Oignons", "class": "BY", "revenue_pct": 5.1 }
+    ],
+    "C": [
+      { "product_id": 45, "product_name": "Sauce spéciale", "class": "CZ", "revenue_pct": 0.3 }
+    ]
+  }
+}

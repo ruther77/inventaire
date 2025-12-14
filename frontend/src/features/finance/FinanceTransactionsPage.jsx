@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useFinanceTransactions } from '../../hooks/useFinance.js';
 import { useFinanceCategories, useFinanceAccounts } from '../../hooks/useFinanceCategories.js';
 import usePersistedFilters from '../../hooks/usePersistedFilters.js';
@@ -7,6 +8,7 @@ import CategoryInlineEdit from './components/CategoryInlineEdit.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
+import { EmptyTransactions, EmptyFilteredResults } from '../../components/feedback/ActionableEmptyStates.jsx';
 import { Download, RefreshCw } from 'lucide-react';
 
 const defaultFilters = {
@@ -20,13 +22,36 @@ const defaultFilters = {
   q: undefined,
 };
 
+// Migration: nettoyer les anciens filtres invalides (entity_id=1 n'existe plus)
+if (typeof window !== 'undefined') {
+  try {
+    const saved = localStorage.getItem('filters_finance_transactions');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // entity_id=1 n'a pas de transactions finance, on le supprime
+      if (parsed.entity_id === 1 || parsed.entity_id === '1') {
+        parsed.entity_id = undefined;
+        localStorage.setItem('filters_finance_transactions', JSON.stringify(parsed));
+      }
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+}
+
 export default function FinanceTransactionsPage() {
+  const navigate = useNavigate();
   const { filters, setFilters, updateFilter, resetFilters } = usePersistedFilters(
     'finance_transactions',
     defaultFilters
   );
 
   const [selectedRows, setSelectedRows] = useState([]);
+
+  // Vérifier si des filtres sont actifs
+  const hasActiveFilters = useMemo(() => {
+    return Object.entries(filters).some(([key, value]) => value !== undefined && value !== null && value !== '');
+  }, [filters]);
 
   // Load data
   const categoriesQuery = useFinanceCategories({});
@@ -86,7 +111,13 @@ export default function FinanceTransactionsPage() {
         sortable: true,
         render: (value) => {
           if (!value) return '—';
-          const date = new Date(value);
+          // Parse la date sans conversion timezone (format YYYY-MM-DD)
+          const parts = value.split('-');
+          if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+          }
+          // Fallback pour autres formats
+          const date = new Date(value + 'T00:00:00');
           return date.toLocaleDateString('fr-FR', {
             day: '2-digit',
             month: '2-digit',
@@ -99,7 +130,7 @@ export default function FinanceTransactionsPage() {
         header: 'Libellé',
         sortable: true,
         render: (value) => (
-          <span className="font-medium text-slate-900">{value || '—'}</span>
+          <span className="font-medium text-white">{value || '—'}</span>
         ),
       },
       {
@@ -113,7 +144,7 @@ export default function FinanceTransactionsPage() {
           return (
             <span
               className={`font-semibold ${
-                isPositive ? 'text-emerald-600' : 'text-rose-600'
+                isPositive ? 'text-emerald-400' : 'text-rose-400'
               }`}
             >
               {isPositive ? '+' : ''}
@@ -145,7 +176,7 @@ export default function FinanceTransactionsPage() {
         render: (value, row) => {
           const account = accountById.get(value);
           return (
-            <span className="text-sm text-slate-600">
+            <span className="text-sm text-slate-400">
               {row.account_label || account?.label || value || '—'}
             </span>
           );
@@ -157,9 +188,9 @@ export default function FinanceTransactionsPage() {
         sortable: true,
         render: (value) => {
           const statusColors = {
-            matched: 'bg-emerald-100 text-emerald-700',
-            pending: 'bg-amber-100 text-amber-700',
-            ignored: 'bg-slate-100 text-slate-600',
+            matched: 'bg-emerald-500/20 text-emerald-400',
+            pending: 'bg-amber-500/20 text-amber-400',
+            ignored: 'bg-white/10 text-slate-400',
           };
           const statusLabels = {
             matched: 'Rapproché',
@@ -169,7 +200,7 @@ export default function FinanceTransactionsPage() {
           return (
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                statusColors[value] || 'bg-slate-100 text-slate-600'
+                statusColors[value] || 'bg-white/10 text-slate-400'
               }`}
             >
               {statusLabels[value] || value || 'Inconnu'}
@@ -233,8 +264,8 @@ export default function FinanceTransactionsPage() {
       {/* Header */}
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Finance</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Transactions bancaires</h1>
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Finance</p>
+          <h1 className="text-2xl font-semibold text-white">Transactions bancaires</h1>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -266,40 +297,52 @@ export default function FinanceTransactionsPage() {
         categories={categories}
       />
 
-      {/* Tableau */}
-      <Card padding="none">
-        <DataTable
-          data={transactions}
-          columns={columns}
-          loading={transactionsQuery.isLoading}
-          error={transactionsQuery.error}
-          selectable={true}
-          selectedRows={selectedRows}
-          onSelectionChange={setSelectedRows}
-          bulkActions={bulkActions}
-          sortable={true}
-          pagination={true}
-          pageSize={50}
-          pageSizeOptions={[25, 50, 100, 200]}
-          searchable={false}
-          emptyMessage="Aucune transaction trouvée"
-          getRowId={(row) => row.id || row.transaction_id}
-        />
+      {/* Tableau ou état vide */}
+      {!transactionsQuery.isLoading && !transactionsQuery.error && transactions.length === 0 ? (
+        hasActiveFilters ? (
+          <EmptyFilteredResults onReset={resetFilters} />
+        ) : (
+          <EmptyTransactions
+            onImport={() => navigate('/finance/import')}
+            onRefresh={() => transactionsQuery.refetch()}
+          />
+        )
+      ) : (
+        <Card padding="none">
+          <DataTable
+            data={transactions}
+            columns={columns}
+            loading={transactionsQuery.isLoading}
+            error={transactionsQuery.error}
+            onRetry={() => transactionsQuery.refetch()}
+            selectable={true}
+            selectedRows={selectedRows}
+            onSelectionChange={setSelectedRows}
+            bulkActions={bulkActions}
+            sortable={true}
+            pagination={true}
+            pageSize={50}
+            pageSizeOptions={[25, 50, 100, 200]}
+            searchable={false}
+            emptyMessage="Aucune transaction trouvée"
+            getRowId={(row) => row.id || row.transaction_id}
+          />
 
-        {/* Load more button */}
-        {transactionsQuery.hasNextPage && (
-          <div className="p-4 border-t border-slate-100 text-center">
-            <Button
-              variant="ghost"
-              onClick={() => transactionsQuery.fetchNextPage()}
-              loading={transactionsQuery.isFetchingNextPage}
-              disabled={transactionsQuery.isFetchingNextPage}
-            >
-              Charger plus de transactions
-            </Button>
-          </div>
-        )}
-      </Card>
+          {/* Load more button */}
+          {transactionsQuery.hasNextPage && (
+            <div className="p-4 border-t border-white/10 text-center">
+              <Button
+                variant="ghost"
+                onClick={() => transactionsQuery.fetchNextPage()}
+                loading={transactionsQuery.isFetchingNextPage}
+                disabled={transactionsQuery.isFetchingNextPage}
+              >
+                Charger plus de transactions
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

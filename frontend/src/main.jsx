@@ -7,7 +7,17 @@ import './styles.css';
 import { TenantProvider } from './context/TenantContext.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 30 * 60 * 1000, // 30 minutes (anciennement cacheTime)
+      retry: 1,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+  },
+});
 
 /**
  * Point d'entrée React : on enveloppe toute l'application avec le client

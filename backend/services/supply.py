@@ -82,8 +82,10 @@ def compute_supply_plan(
     planning_df["stock_actuel"] = planning_df["stock_actuel"].fillna(0.0).clip(lower=0.0)
 
     forecast_map = forecast_daily_consumption(tenant_id=int(tenant_id), horizon=safe_target)
-    planning_df["ventes_prevision"] = planning_df["id"].map(lambda pid: forecast_map.get(int(pid)))
-    planning_df["ventes_prevision"] = planning_df["ventes_prevision"].fillna(planning_df["ventes_jour"])
+    mapped_forecast = planning_df["id"].map(lambda pid: forecast_map.get(int(pid))).astype("Float64")
+    # Évite FutureWarning: conversion explicite avant fillna
+    ventes_jour_float = planning_df["ventes_jour"].astype("Float64")
+    planning_df["ventes_prevision"] = mapped_forecast.fillna(ventes_jour_float).astype(float)
 
     daily_sales = planning_df["ventes_jour"]
     stock_levels = planning_df["stock_actuel"]

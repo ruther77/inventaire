@@ -76,6 +76,17 @@ from backend.services.restaurant.mappings import (
     delete_plat_epicerie_mapping,
     list_epicerie_products,
 )
+from backend.services.restaurant.overview import (
+    get_restaurant_overview,
+    list_plats_paginated,
+    get_plat_detail,
+    get_plat_cost_breakdown,
+    list_ingredients_enhanced,
+    get_ingredient_price_history_detail,
+    analyze_food_cost,
+    simulate_price_change,
+    list_alerts_detailed,
+)
 
 __all__ = [
     # Constants
@@ -133,4 +144,14 @@ __all__ = [
     "upsert_plat_epicerie_mapping",
     "delete_plat_epicerie_mapping",
     "list_epicerie_products",
+    # Overview & Food Cost (UX 4.7)
+    "get_restaurant_overview",
+    "list_plats_paginated",
+    "get_plat_detail",
+    "get_plat_cost_breakdown",
+    "list_ingredients_enhanced",
+    "get_ingredient_price_history_detail",
+    "analyze_food_cost",
+    "simulate_price_change",
+    "list_alerts_detailed",
 ]

@@ -94,15 +94,15 @@ export function WeeklyFlowsChart({
                 <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
               tickLine={false}
-              axisLine={{ stroke: '#e2e8f0' }}
+              axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
               tickLine={false}
               axisLine={false}
               width={40}
@@ -114,7 +114,7 @@ export function WeeklyFlowsChart({
               iconType="circle"
               iconSize={8}
               formatter={(value) => (
-                <span className="text-xs text-slate-600">{value}</span>
+                <span className="text-xs text-slate-400">{value}</span>
               )}
             />
             <Area
@@ -185,25 +185,25 @@ export function CategoryStockChart({ data, loading = false, limit = 6 }) {
             layout="vertical"
             margin={{ top: 5, right: 30, left: 60, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={true} vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={true} vertical={false} />
             <XAxis
               type="number"
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
               tickLine={false}
-              axisLine={{ stroke: '#e2e8f0' }}
+              axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
               tickFormatter={(value) => value.toLocaleString('fr-FR')}
             />
             <YAxis
               type="category"
               dataKey="label"
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
               tickLine={false}
               axisLine={false}
               width={55}
             />
             <Tooltip
               content={<CustomTooltip />}
-              cursor={{ fill: '#f1f5f9' }}
+              cursor={{ fill: 'rgba(255,255,255,0.05)' }}
             />
             <Bar
               dataKey="qty"
@@ -232,7 +232,7 @@ function ChartContainer({ title, subtitle, action, children }) {
               {subtitle}
             </p>
           )}
-          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
         </div>
         {action}
       </div>
@@ -246,10 +246,10 @@ function ChartContainer({ title, subtitle, action, children }) {
  */
 function WindowSelector({ value, options, onChange }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-slate-500">
+    <div className="flex items-center gap-2 text-xs text-slate-400">
       <span>Fenêtre</span>
       <select
-        className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-200"
+        className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-white focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       >

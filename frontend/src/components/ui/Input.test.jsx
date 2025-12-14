@@ -27,7 +27,8 @@ describe('Input', () => {
 
     expect(screen.getByText('Invalid email address')).toBeInTheDocument();
     expect(screen.getByRole('textbox')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByRole('textbox')).toHaveClass('border-rose-400');
+    // Dark theme uses border-rose-500/50 instead of border-rose-400
+    expect(screen.getByRole('textbox')).toHaveClass('border-rose-500/50');
   });
 
   it('displays hint text when provided', () => {
@@ -49,7 +50,8 @@ describe('Input', () => {
 
   it('applies success styles', () => {
     render(<Input label="Email" success />);
-    expect(screen.getByRole('textbox')).toHaveClass('border-emerald-400');
+    // Dark theme uses border-emerald-500/50 instead of border-emerald-400
+    expect(screen.getByRole('textbox')).toHaveClass('border-emerald-500/50');
   });
 
   it('renders icon on the left by default', () => {

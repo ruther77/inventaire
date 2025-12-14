@@ -180,7 +180,9 @@ def list_admin_users() -> list[dict[str, Any]]:
     df = list_users_df()
     if df.empty:
         return []
-    df["created_at"] = df["created_at"].astype("datetime64[ns]")
+    # Convertir datetime timezone-aware en string ISO pour JSON
+    if "created_at" in df.columns:
+        df["created_at"] = df["created_at"].apply(lambda x: x.isoformat() if hasattr(x, 'isoformat') else str(x))
     return df.to_dict(orient="records")
 
 

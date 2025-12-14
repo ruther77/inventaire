@@ -15,6 +15,13 @@ import api, {
   fetchEpicerieProducts,
   updatePlatMapping,
   deletePlatMapping,
+  fetchRestaurantOverview,
+  fetchRestaurantPlatDetails,
+  fetchRestaurantPlatIngredients,
+  simulatePlatPrice,
+  fetchRestaurantAlerts,
+  fetchRestaurantFoodCostAnalysis,
+  fetchRestaurantMenusOverview,
 } from '../api/client.js';
 
 export const useRestaurantCategories = () =>
@@ -196,6 +203,10 @@ export const useSyncRestaurantIngredients = () => {
     mutationFn: syncRestaurantIngredients,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['restaurant', 'plat-mappings'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'ingredients'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'plats'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'consumptions'] });
     },
   });
 };
@@ -213,6 +224,10 @@ export const useUpdatePlatMapping = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['restaurant', 'plat-mappings'] });
       queryClient.invalidateQueries({ queryKey: ['restaurant', 'consumptions'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'price-history-comparison'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'plats'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'prices', 'history'] });
     },
   });
 };
@@ -224,6 +239,63 @@ export const useDeletePlatMapping = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['restaurant', 'plat-mappings'] });
       queryClient.invalidateQueries({ queryKey: ['restaurant', 'consumptions'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'price-history-comparison'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'plats'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'prices', 'history'] });
     },
   });
 };
+
+// ============================================================================
+// RESTAURANT OVERVIEW & FOOD COST
+// ============================================================================
+
+export const useRestaurantOverview = (filters = {}) =>
+  useQuery({
+    queryKey: ['restaurant', 'overview', filters],
+    queryFn: () => fetchRestaurantOverview(filters),
+  });
+
+export const useRestaurantPlatDetails = (platId) =>
+  useQuery({
+    queryKey: ['restaurant', 'plat', 'details', platId],
+    queryFn: () => fetchRestaurantPlatDetails(platId),
+    enabled: Boolean(platId),
+  });
+
+export const useRestaurantPlatIngredients = (platId) =>
+  useQuery({
+    queryKey: ['restaurant', 'plat', 'ingredients', platId],
+    queryFn: () => fetchRestaurantPlatIngredients(platId),
+    enabled: Boolean(platId),
+  });
+
+export const useSimulatePlatPrice = () => {
+  return useMutation({
+    mutationFn: ({ platId, payload }) => simulatePlatPrice(platId, payload),
+  });
+};
+
+export const useRestaurantAlerts = (filters = {}) =>
+  useQuery({
+    queryKey: ['restaurant', 'alerts', filters],
+    queryFn: () => fetchRestaurantAlerts(filters),
+  });
+
+export const useRestaurantFoodCostAnalysis = (filters = {}) =>
+  useQuery({
+    queryKey: ['restaurant', 'food-cost-analysis', filters],
+    queryFn: () => fetchRestaurantFoodCostAnalysis(filters),
+  });
+
+// ============================================================================ 
+// RESTAURANT MENUS & COÛTS (Scénario 3.6)
+// ============================================================================
+
+export const useRestaurantMenusOverview = () =>
+  useQuery({
+    queryKey: ['restaurant', 'menus', 'overview'],
+    queryFn: fetchRestaurantMenusOverview,
+    staleTime: 5 * 60 * 1000,
+  });

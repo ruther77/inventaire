@@ -1,0 +1,38 @@
+{
+  "ranking": [
+    {
+      "supplier_name": "METRO",
+      "overall_score": 8.5,
+      "price_score": 7.8,
+      "delivery_score": 9.2,
+      "quality_score": 8.5,
+      "trend": "stable",
+      "invoices_count": 45
+    },
+    {
+      "supplier_name": "SYSCO",
+      "overall_score": 7.2,
+      "price_score": 8.0,
+      "delivery_score": 6.5,
+      "quality_score": 7.1,
+      "trend": "declining",
+      "invoices_count": 32
+    },
+    {
+      "supplier_name": "POMONA",
+      "overall_score": 8.8,
+      "price_score": 8.2,
+      "delivery_score": 9.0,
+      "quality_score": 9.2,
+      "trend": "improving",
+      "invoices_count": 28
+    }
+  ],
+  "dimensions": {
+    "price_volatility": { "weight": 0.25, "description": "Stabilité des prix" },
+    "delivery_reliability": { "weight": 0.30, "description": "Fiabilité livraison" },
+    "invoice_accuracy": { "weight": 0.20, "description": "Précision factures" },
+    "payment_terms": { "weight": 0.15, "description": "Conditions paiement" },
+    "quality": { "weight": 0.10, "description": "Qualité produits" }
+  }
+}

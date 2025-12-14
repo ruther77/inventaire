@@ -1,0 +1,73 @@
+{
+  "summary": {
+    "total_entries": 1250,
+    "entries_today": 45,
+    "active_users": 5,
+    "security_events": 2
+  },
+  "entries": [
+    {
+      "id": 1,
+      "timestamp": "2025-12-11T10:30:00Z",
+      "user_id": 1,
+      "username": "admin",
+      "action": "UPDATE",
+      "entity_type": "product",
+      "entity_id": 45,
+      "changes": {
+        "prix_vente": { "old": 5.50, "new": 5.99 }
+      },
+      "ip_address": "192.168.1.100"
+    },
+    {
+      "id": 2,
+      "timestamp": "2025-12-11T10:25:00Z",
+      "user_id": 2,
+      "username": "manager",
+      "action": "CREATE",
+      "entity_type": "invoice",
+      "entity_id": 101,
+      "changes": {
+        "supplier": "Metro",
+        "amount": 1250.50
+      },
+      "ip_address": "192.168.1.101"
+    },
+    {
+      "id": 3,
+      "timestamp": "2025-12-11T10:20:00Z",
+      "user_id": 1,
+      "username": "admin",
+      "action": "DELETE",
+      "entity_type": "transaction",
+      "entity_id": 55,
+      "changes": null,
+      "ip_address": "192.168.1.100"
+    }
+  ],
+  "security_events": [
+    {
+      "id": 1,
+      "timestamp": "2025-12-11T09:00:00Z",
+      "event_type": "login_failed",
+      "user_id": null,
+      "username": "unknown_user",
+      "ip_address": "10.0.0.50",
+      "details": "Invalid credentials"
+    }
+  ],
+  "user_activity": [
+    {
+      "user_id": 1,
+      "username": "admin",
+      "action_count": 150,
+      "last_action": "2025-12-11T10:30:00Z"
+    },
+    {
+      "user_id": 2,
+      "username": "manager",
+      "action_count": 85,
+      "last_action": "2025-12-11T10:25:00Z"
+    }
+  ]
+}

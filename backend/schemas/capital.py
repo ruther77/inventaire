@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
-
-from .prices import LatestPriceEntry
 
 
 class TenantCapitalSnapshot(BaseModel):
@@ -41,7 +39,7 @@ class CapitalEntitySnapshot(BaseModel):
 class CapitalOverviewResponse(BaseModel):
     entities: List[CapitalEntitySnapshot]
     global_summary: GlobalCapitalSnapshot = Field(...)
-    latest_prices: List[LatestPriceEntry]
+    latest_prices: List[dict[str, Any]]
 
 
 __all__ = [

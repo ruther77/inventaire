@@ -97,17 +97,21 @@ def _latest_price_total(tenant_id: int) -> Decimal:
 
 
 def _bank_balance(tenant_id: int) -> Decimal:
+    """Calcule le solde bancaire depuis finance_transactions."""
+    # On utilise finance_entity_members pour mapper tenant_id -> entity_id
     df = query_df(
         text(
             """
-            SELECT COALESCE(SUM(
-                CASE
-                    WHEN LOWER(type) LIKE 'entrée%' THEN montant
-                    ELSE -montant
-                END
-            ), 0) AS balance
-            FROM restaurant_bank_statements
-            WHERE tenant_id = :tenant_id
+            SELECT COALESCE(
+                SUM(CASE WHEN t.direction = 'IN' THEN tl.montant_ttc ELSE 0 END) -
+                SUM(CASE WHEN t.direction = 'OUT' THEN tl.montant_ttc ELSE 0 END),
+                0
+            ) AS balance
+            FROM finance_transaction_lines tl
+            JOIN finance_transactions t ON t.id = tl.transaction_id
+            WHERE t.entity_id IN (
+                SELECT entity_id FROM finance_entity_members WHERE tenant_id = :tenant_id
+            )
             """
         ),
         params={"tenant_id": int(tenant_id)},

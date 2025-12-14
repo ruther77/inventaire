@@ -1,0 +1,50 @@
+{
+  "summary": {
+    "total_anomalies": 8,
+    "critical_count": 2,
+    "high_count": 3,
+    "medium_count": 3,
+    "resolved_today": 1
+  },
+  "outliers": [
+    {
+      "id": 1,
+      "transaction_id": 456,
+      "amount": 5000.00,
+      "z_score": 3.5,
+      "description": "METRO CASH",
+      "date": "2025-12-08",
+      "severity": "high",
+      "reason": "Montant 3.5x supérieur à la moyenne"
+    }
+  ],
+  "duplicates": [
+    {
+      "id": 2,
+      "invoice_ids": [123, 124],
+      "supplier": "METRO",
+      "amount": 450.00,
+      "dates": ["2025-12-05", "2025-12-05"],
+      "similarity": 0.98,
+      "severity": "critical"
+    }
+  ],
+  "sequence_gaps": [
+    {
+      "supplier": "SYSCO",
+      "expected_number": "F2025-0045",
+      "last_number": "F2025-0043",
+      "gap_count": 1
+    }
+  ],
+  "round_amounts": [
+    {
+      "id": 3,
+      "transaction_id": 789,
+      "amount": 1000.00,
+      "date": "2025-12-07",
+      "description": "Virement",
+      "severity": "low"
+    }
+  ]
+}

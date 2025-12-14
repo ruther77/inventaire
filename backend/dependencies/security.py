@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 import jwt
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 
@@ -20,12 +20,20 @@ from backend.settings import Settings
 
 DEFAULT_SECRET = "change-me-in-prod"
 DEFAULT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "120"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+
+# Cookie configuration
+COOKIE_NAME_ACCESS = "access_token"
+COOKIE_NAME_REFRESH = "refresh_token"
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
+COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax")  # lax, strict, none
 
 logger = logging.getLogger(__name__)
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+# OAuth2 scheme - auto_error=False allows fallback to cookie auth
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 
 
 class AuthenticatedUser(BaseModel):
@@ -94,8 +102,63 @@ def create_access_token(claims: dict[str, Any], expires_delta: timedelta | None 
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
+    payload.update({"exp": expire, "jti": uuid.uuid4().hex, "type": "access"})
+    return jwt.encode(payload, _get_secret(), algorithm=_get_algorithm())
+
+
+def create_refresh_token(claims: dict[str, Any], expires_delta: timedelta | None = None) -> str:
+    """Create a refresh token with longer expiration."""
+
+    payload = {
+        "sub": claims.get("sub"),
+        "username": claims.get("username"),
+        "tenant_id": claims.get("tenant_id"),
+        "type": "refresh",
+    }
+    expire = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
     payload.update({"exp": expire, "jti": uuid.uuid4().hex})
     return jwt.encode(payload, _get_secret(), algorithm=_get_algorithm())
+
+
+def set_auth_cookies(
+    response: Response,
+    access_token: str,
+    refresh_token: str,
+    access_max_age: int | None = None,
+    refresh_max_age: int | None = None,
+) -> None:
+    """Set httpOnly cookies for access and refresh tokens."""
+
+    access_max_age = access_max_age or ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    refresh_max_age = refresh_max_age or REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+
+    response.set_cookie(
+        key=COOKIE_NAME_ACCESS,
+        value=access_token,
+        max_age=access_max_age,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        path="/",
+    )
+    response.set_cookie(
+        key=COOKIE_NAME_REFRESH,
+        value=refresh_token,
+        max_age=refresh_max_age,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        path="/auth",  # Refresh token only accessible on /auth endpoints
+    )
+
+
+def clear_auth_cookies(response: Response) -> None:
+    """Clear authentication cookies (logout)."""
+
+    response.delete_cookie(key=COOKIE_NAME_ACCESS, path="/")
+    response.delete_cookie(key=COOKIE_NAME_REFRESH, path="/auth")
 
 
 def _decode_token(token: str) -> dict[str, Any]:
@@ -122,8 +185,83 @@ def _decode_token(token: str) -> dict[str, Any]:
     ) from last_error
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> AuthenticatedUser:
+def _extract_token_from_request(request: Request) -> str | None:
+    """Extract token from cookie or Authorization header."""
+
+    # 1. Try cookie first (preferred for httpOnly security)
+    token = request.cookies.get(COOKIE_NAME_ACCESS)
+    if token:
+        return token
+
+    # 2. Fallback to Authorization header for API clients
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        return auth_header[7:]
+
+    return None
+
+
+def get_current_user_from_request(request: Request) -> AuthenticatedUser:
+    """Get current user from cookie or header token."""
+
+    token = _extract_token_from_request(request)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token manquant",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     payload = _decode_token(token)
+
+    # Verify it's an access token, not a refresh token
+    if payload.get("type") == "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token non autorise pour cette operation",
+        )
+
+    try:
+        user_id = int(payload["sub"])
+        username = str(payload["username"])
+        role = str(payload["role"])
+        tenant_id = int(payload["tenant_id"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token manquant des informations nécessaires",
+        ) from exc
+
+    role_lower = role.lower()
+    if role_lower not in ALLOWED_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Rôle inconnu dans le token",
+        )
+
+    _gc_revoked()
+
+    return AuthenticatedUser(id=user_id, username=username, role=role_lower, tenant_id=tenant_id)
+
+
+def get_current_user(token: str | None = Depends(oauth2_scheme)) -> AuthenticatedUser:
+    """Legacy: Get current user from OAuth2 bearer token."""
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token manquant",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    payload = _decode_token(token)
+
+    # Verify it's an access token
+    if payload.get("type") == "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token non autorise pour cette operation",
+        )
+
     try:
         user_id = int(payload["sub"])
         username = str(payload["username"])
@@ -147,14 +285,31 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> AuthenticatedUser:
     return AuthenticatedUser(id=user_id, username=username, role=role_lower, tenant_id=tenant_id)
 
 
-def require_user(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    return user
+def decode_refresh_token(token: str) -> dict[str, Any]:
+    """Decode and validate a refresh token."""
+
+    payload = _decode_token(token)
+
+    if payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide pour rafraichissement",
+        )
+
+    return payload
 
 
-def require_roles(*roles: str) -> Callable[[AuthenticatedUser], AuthenticatedUser]:
+async def require_user(request: Request) -> AuthenticatedUser:
+    """Get current user from cookie or header (hybrid authentication)."""
+    return get_current_user_from_request(request)
+
+
+def require_roles(*roles: str) -> Callable:
+    """Require specific roles for access."""
     allowed = {role.lower() for role in roles} or set(ALLOWED_ROLES)
 
-    def _checker(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
+    async def _checker(request: Request) -> AuthenticatedUser:
+        user = get_current_user_from_request(request)
         if user.role not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -165,10 +320,15 @@ def require_roles(*roles: str) -> Callable[[AuthenticatedUser], AuthenticatedUse
     return _checker
 
 
-def enforce_default_rbac(
-    request: Request, user: AuthenticatedUser = Depends(get_current_user)
-) -> AuthenticatedUser:
-    """Allow anyone authenticated to read, managers/admins to mutate."""
+async def enforce_default_rbac(request: Request) -> AuthenticatedUser:
+    """Allow anyone authenticated to read, managers/admins to mutate.
+
+    Supports both:
+    - httpOnly cookies (preferred for browsers)
+    - Authorization: Bearer header (for API clients)
+    """
+
+    user = get_current_user_from_request(request)
 
     method = request.method.upper()
     if method in {"POST", "PUT", "PATCH", "DELETE"} and ROLE_PRIORITY[user.role] < ROLE_PRIORITY["manager"]:

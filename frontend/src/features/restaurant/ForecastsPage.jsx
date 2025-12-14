@@ -81,51 +81,51 @@ export default function ForecastsPage({ context = 'restaurant' }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Prévisions</p>
-        <h1 className="text-2xl font-semibold text-slate-900">{contextLabel} · Propulsé par ARIMA</h1>
-        <p className="text-sm text-slate-500">
-          Projection glissante construite sur 6 mois d’historique ventes/stock. Ajuste l’horizon et la granularité pour
+        <h1 className="text-2xl font-semibold text-orange-400">{contextLabel} · Propulsé par ARIMA</h1>
+        <p className="text-sm text-slate-400">
+          Projection glissante construite sur 6 mois d'historique ventes/stock. Ajuste l'horizon et la granularité pour
           simuler différents scénarios.
         </p>
       </div>
 
       <Card className="flex flex-wrap items-center gap-4">
-        <label className="text-sm font-semibold text-slate-600">
+        <label className="text-sm font-semibold text-slate-300">
           Horizon
           <select
-            className="ml-3 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm"
+            className="ml-3 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white"
             value={horizon}
             onChange={(event) => setHorizon(Number(event.target.value))}
           >
             {HORIZON_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
+              <option key={option.value} value={option.value} className="bg-slate-800">
                 {option.label}
               </option>
             ))}
           </select>
         </label>
-        <label className="text-sm font-semibold text-slate-600">
+        <label className="text-sm font-semibold text-slate-300">
           Granularité
           <select
-            className="ml-3 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm"
+            className="ml-3 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white"
             value={granularity}
             onChange={(event) => setGranularity(event.target.value)}
           >
             {GRANULARITY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
+              <option key={option.value} value={option.value} className="bg-slate-800">
                 {option.label}
               </option>
             ))}
           </select>
         </label>
-        <label className="text-sm font-semibold text-slate-600">
+        <label className="text-sm font-semibold text-slate-300">
           Top produits
           <select
-            className="ml-3 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm"
+            className="ml-3 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white"
             value={top}
             onChange={(event) => setTop(Number(event.target.value))}
           >
             {[5, 8, 12, 20].map((value) => (
-              <option key={value} value={value}>
+              <option key={value} value={value} className="bg-slate-800">
                 {value}
               </option>
             ))}
@@ -136,7 +136,7 @@ export default function ForecastsPage({ context = 'restaurant' }) {
         </Button>
       </Card>
 
-      <Card className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-4">
         <Metric
           label="Volume quotidien"
           value={metrics ? `${numberFormatter.format(metrics.total_daily_units || 0)} u.` : '—'}
@@ -150,7 +150,7 @@ export default function ForecastsPage({ context = 'restaurant' }) {
         <Metric
           label="Produits à risque"
           value={metrics ? `${metrics.at_risk_items} réf.` : '—'}
-          hint="Couverture < seuil d’alerte"
+          hint="Couverture < seuil d'alerte"
         />
         <Metric
           label="Couverture médiane"
@@ -161,15 +161,15 @@ export default function ForecastsPage({ context = 'restaurant' }) {
           }
           hint="Stock / prévision"
         />
-      </Card>
+      </div>
 
       <Card className="flex flex-col gap-4">
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Timeline</p>
-            <h3 className="text-lg font-semibold text-slate-900">Projection {granularity === 'daily' ? 'journalisée' : granularity === 'weekly' ? 'hebdo' : 'mensuelle'}</h3>
+            <h3 className="text-lg font-semibold text-white">Projection {granularity === 'daily' ? 'journalisée' : granularity === 'weekly' ? 'hebdo' : 'mensuelle'}</h3>
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-400">
             {forecastQuery.isFetching ? 'Actualisation en cours…' : `${timelineData.length} point(s)`} • Horizon {horizon} j
           </p>
         </div>
@@ -177,14 +177,15 @@ export default function ForecastsPage({ context = 'restaurant' }) {
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={timelineData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                <YAxis tick={{ fill: '#94a3b8' }} />
                 <Tooltip
                   formatter={(value, name) =>
                     name === 'value' ? currencyFormatter.format(value) : `${numberFormatter.format(value)} u.`
                   }
-                  labelClassName="text-sm font-semibold"
+                  contentStyle={{ backgroundColor: 'rgba(15,15,25,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                  labelStyle={{ color: '#e2e8f0' }}
                 />
                 <Area type="monotone" dataKey="units" name="Unités" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.1} />
                 <Area type="monotone" dataKey="value" name="Valeur" stroke="#6366f1" fill="#6366f1" fillOpacity={0.15} />
@@ -192,7 +193,7 @@ export default function ForecastsPage({ context = 'restaurant' }) {
             </ResponsiveContainer>
           </div>
         ) : (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-400">
             {forecastQuery.isLoading ? 'Chargement des prévisions…' : 'Pas encore de données suffisantes pour cette période.'}
           </p>
         )}
@@ -202,46 +203,46 @@ export default function ForecastsPage({ context = 'restaurant' }) {
         <Card className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Top produits</p>
-            <h3 className="text-lg font-semibold text-slate-900">Couverture & risque</h3>
+            <h3 className="text-lg font-semibold text-white">Couverture & risque</h3>
           </div>
           {topProducts.length ? (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100 text-sm">
+              <table className="min-w-full divide-y divide-white/10 text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
+                  <tr className="text-left text-xs uppercase tracking-widest text-slate-400">
                     <th className="px-3 py-2">Produit</th>
                     <th className="px-3 py-2">Prévision/j</th>
                     <th className="px-3 py-2">Couverture / rupture</th>
                     <th className="px-3 py-2">Risque</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-white/10">
                   {topProducts.map((product) => (
                     <tr key={product.product_id}>
                       <td className="px-3 py-2">
-                        <p className="font-semibold text-slate-900">{product.nom}</p>
-                        <p className="text-xs text-slate-500">
+                        <p className="font-semibold text-white">{product.nom}</p>
+                        <p className="text-xs text-slate-400">
                           {product.categorie || '—'} {product.ean ? `· ${product.ean}` : ''}
                         </p>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 text-slate-300">
                         {numberFormatter.format(product.forecast_daily)} u.
-                        <div className="text-xs text-slate-500">{currencyFormatter.format(product.forecast_value)}</div>
+                        <div className="text-xs text-slate-400">{currencyFormatter.format(product.forecast_value)}</div>
                       </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 text-slate-300">
                       {product.stock_cover_days !== null && product.stock_cover_days !== undefined
                         ? `${numberFormatter.format(product.stock_cover_days)} j`
                         : '∞'}
                       {product.stock_cover_days !== null &&
                         product.stock_cover_days !== undefined &&
                         Number.isFinite(product.stock_cover_days) && (
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-slate-400">
                             Rupture dans ~{Math.max(0, Math.round(product.stock_cover_days))} j
                           </div>
                         )}
                     </td>
                       <td className="px-3 py-2">
-                        <span className={`text-sm font-semibold ${RISK_COLORS[product.risk_level] || 'text-slate-500'}`}>
+                        <span className={`text-sm font-semibold ${RISK_COLORS[product.risk_level] || 'text-slate-400'}`}>
                           {product.risk_level.toUpperCase()}
                         </span>
                       </td>
@@ -251,7 +252,7 @@ export default function ForecastsPage({ context = 'restaurant' }) {
               </table>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-400">
               {forecastQuery.isLoading ? 'Analyse des produits…' : 'Aucune référence prioritaire pour cet horizon.'}
             </p>
           )}
@@ -260,26 +261,28 @@ export default function ForecastsPage({ context = 'restaurant' }) {
         <Card className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Catégories</p>
-            <h3 className="text-lg font-semibold text-slate-900">Poids des familles</h3>
+            <h3 className="text-lg font-semibold text-white">Poids des familles</h3>
           </div>
           {categoriesData.length ? (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart layout="vertical" data={categoriesData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="categorie" type="category" width={140} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis type="number" tick={{ fill: '#94a3b8' }} />
+                  <YAxis dataKey="categorie" type="category" width={140} tick={{ fill: '#94a3b8' }} />
                   <Tooltip
                     formatter={(value, name) =>
                       name === 'value' ? currencyFormatter.format(value) : `${numberFormatter.format(value)} u./jour`
                     }
+                    contentStyle={{ backgroundColor: 'rgba(15,15,25,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                    labelStyle={{ color: '#e2e8f0' }}
                   />
-                  <Bar dataKey="value" name="Valeur" fill="#1d4ed8" />
+                  <Bar dataKey="value" name="Valeur" fill="#f97316" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Pas d’historique suffisant pour ventiler par catégorie.</p>
+            <p className="text-sm text-slate-400">Pas d'historique suffisant pour ventiler par catégorie.</p>
           )}
         </Card>
       </div>
@@ -288,8 +291,8 @@ export default function ForecastsPage({ context = 'restaurant' }) {
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Réassort</p>
-            <h3 className="text-lg font-semibold text-slate-900">Suggestions automatiques</h3>
-            <p className="text-sm text-slate-500">
+            <h3 className="text-lg font-semibold text-white">Suggestions automatiques</h3>
+            <p className="text-sm text-slate-400">
               Basé sur la couverture cible et les prévisions de consommation.
             </p>
           </div>
@@ -298,46 +301,46 @@ export default function ForecastsPage({ context = 'restaurant' }) {
           </Button>
         </div>
         {supplyQuery.isLoading ? (
-          <p className="text-sm text-slate-500">Calcul du plan d&apos;approvisionnement…</p>
+          <p className="text-sm text-slate-400">Calcul du plan d&apos;approvisionnement…</p>
         ) : suggestions.length ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100 text-sm">
+            <table className="min-w-full divide-y divide-white/10 text-sm">
               <thead>
-                <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
+                <tr className="text-left text-xs uppercase tracking-widest text-slate-400">
                   <th className="px-3 py-2">Produit</th>
                   <th className="px-3 py-2">Couverture</th>
                   <th className="px-3 py-2">Quantité à commander</th>
                   <th className="px-3 py-2">Valeur</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-white/10">
                 {suggestions.map((item) => (
                   <tr key={item.id}>
                     <td className="px-3 py-2">
-                      <p className="font-semibold text-slate-900">{item.nom}</p>
-                      <p className="text-xs text-slate-500">
+                      <p className="font-semibold text-white">{item.nom}</p>
+                      <p className="text-xs text-slate-400">
                         {item.categorie || '—'} {item.fournisseur ? `· ${item.fournisseur}` : ''}
                       </p>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 text-slate-300">
                       {item.couverture_jours !== null && item.couverture_jours !== undefined
                         ? `${numberFormatter.format(item.couverture_jours)} j`
                         : '∞'}
                       {item.ecart_couverture !== null && item.ecart_couverture !== undefined && (
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-400">
                           Manque {numberFormatter.format(Math.max(0, Math.abs(item.ecart_couverture || 0)))} j
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2 font-semibold text-slate-900">{item.quantite_a_commander} u</td>
-                    <td className="px-3 py-2">{currencyFormatter.format(item.valeur_commande || 0)}</td>
+                    <td className="px-3 py-2 font-semibold text-white">{item.quantite_a_commander} u</td>
+                    <td className="px-3 py-2 text-slate-300">{currencyFormatter.format(item.valeur_commande || 0)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-400">
             {supplyQuery.isError ? 'Impossible de récupérer les suggestions.' : 'Aucune recommandation pour ce paramétrage.'}
           </p>
         )}
@@ -348,10 +351,10 @@ export default function ForecastsPage({ context = 'restaurant' }) {
 
 function Metric({ label, value, hint }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</p>
-      <p className="text-2xl font-semibold text-slate-900">{value}</p>
-      {hint && <p className="text-xs text-slate-500">{hint}</p>}
+      <p className="text-2xl font-semibold text-white">{value}</p>
+      {hint && <p className="text-xs text-slate-400">{hint}</p>}
     </div>
   );
 }

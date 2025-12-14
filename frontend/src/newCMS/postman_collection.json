@@ -1,0 +1,342 @@
+{
+  "info": {
+    "name": "NewCMS Restaurant & Mobile API",
+    "description": "Collection for testing newCMS restaurant overview and mobile inventory endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenant_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Restaurant",
+      "item": [
+        {
+          "name": "Get Restaurant Overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/newcms/restaurant/overview",
+              "host": ["{{base_url}}"],
+              "path": ["newcms", "restaurant", "overview"]
+            },
+            "description": "Get aggregated restaurant overview with plat costs, alerts, stock locations, and top plats."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mobile - Inventory",
+      "item": [
+        {
+          "name": "List Inventory (Page 1)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/newcms/mobile/inventory?page=1&page_size=50",
+              "host": ["{{base_url}}"],
+              "path": ["newcms", "mobile", "inventory"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Get paginated inventory list for mobile scanning."
+          },
+          "response": []
+        },
+        {
+          "name": "Search Inventory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/newcms/mobile/inventory?page=1&page_size=20&search=tomate",
+              "host": ["{{base_url}}"],
+              "path": ["newcms", "mobile", "inventory"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": "tomate"
+                }
+              ]
+            },
+            "description": "Search inventory by name or barcode."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mobile - Scan",
+      "item": [
+        {
+          "name": "Scan Barcode (Found)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code_barre\": \"3245678901234\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/newcms/mobile/scan",
+              "host": ["{{base_url}}"],
+              "path": ["newcms", "mobile", "scan"]
+            },
+            "description": "Scan a barcode and get product details."
+          },
+          "response": []
+        },
+        {
+          "name": "Scan Barcode (Not Found)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code_barre\": \"9999999999999\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/newcms/mobile/scan",
+              "host": ["{{base_url}}"],
+              "path": ["newcms", "mobile", "scan"]
+            },
+            "description": "Scan a non-existent barcode."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mobile - Adjust Stock",
+      "item": [
+        {
+          "name": "Adjust Stock - Decrease (Breakage)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": 42,\n  \"adjustment\": -1,\n  \"adjustment_type\": \"delta\",\n  \"reason\": \"breakage\",\n  \"notes\": \"Cassé pendant le transport\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/newcms/mobile/adjust",
+              "host": ["{{base_url}}"],
+              "path": ["newcms", "mobile", "adjust"]
+            },
+            "description": "Decrease stock by 1 due to breakage."
+          },
+          "response": []
+        },
+        {
+          "name": "Adjust Stock - Increase (Error Correction)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": 42,\n  \"adjustment\": 5,\n  \"adjustment_type\": \"delta\",\n  \"reason\": \"error\",\n  \"notes\": \"Correction suite recompte\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/newcms/mobile/adjust",
+              "host": ["{{base_url}}"],
+              "path": ["newcms", "mobile", "adjust"]
+            },
+            "description": "Increase stock by 5 to correct inventory error."
+          },
+          "response": []
+        },
+        {
+          "name": "Adjust Stock - Absolute Value",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": 42,\n  \"adjustment\": 20,\n  \"adjustment_type\": \"absolute\",\n  \"reason\": \"error\",\n  \"notes\": \"Recompte physique complet\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/newcms/mobile/adjust",
+              "host": ["{{base_url}}"],
+              "path": ["newcms", "mobile", "adjust"]
+            },
+            "description": "Set stock to absolute value after physical recount."
+          },
+          "response": []
+        },
+        {
+          "name": "Adjust Stock - Theft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": 42,\n  \"adjustment\": -2,\n  \"adjustment_type\": \"delta\",\n  \"reason\": \"theft\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/newcms/mobile/adjust",
+              "host": ["{{base_url}}"],
+              "path": ["newcms", "mobile", "adjust"]
+            },
+            "description": "Decrease stock due to theft."
+          },
+          "response": []
+        },
+        {
+          "name": "Adjust Stock - Expiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": 42,\n  \"adjustment\": -3,\n  \"adjustment_type\": \"delta\",\n  \"reason\": \"expiry\",\n  \"notes\": \"Produits périmés depuis hier\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/newcms/mobile/adjust",
+              "host": ["{{base_url}}"],
+              "path": ["newcms", "mobile", "adjust"]
+            },
+            "description": "Decrease stock due to expired products."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login (Get Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Save token to collection variable",
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', jsonData.access_token);",
+                  "    console.log('Token saved:', jsonData.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "test@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "password",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/token",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "token"]
+            },
+            "description": "Get JWT token for authentication. Token is automatically saved to collection variables."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

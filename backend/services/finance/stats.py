@@ -12,7 +12,8 @@ from core.data_repository import query_df
 logger = logging.getLogger(__name__)
 
 # Active l'utilisation des vues matérialisées (plus rapide, mais données légèrement décalées)
-USE_MATERIALIZED_VIEWS = True
+# Désactivé temporairement car les vues contiennent des données obsolètes
+USE_MATERIALIZED_VIEWS = False
 
 
 def categories_stats(entity_id: int | None = None) -> List[dict]:

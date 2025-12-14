@@ -36,14 +36,14 @@ export function DashboardList({
             {subtitle}
           </p>
         )}
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <h3 className="text-sm font-semibold text-white">{title}</h3>
       </div>
 
       {/* Content */}
       {loading ? (
         <ListSkeleton items={maxItems} />
       ) : displayItems.length === 0 ? (
-        <p className="text-sm text-slate-500 py-4">{emptyMessage}</p>
+        <p className="text-sm text-slate-400 py-4">{emptyMessage}</p>
       ) : (
         <ul className="space-y-2">
           {displayItems.map((item, index) => (
@@ -99,9 +99,9 @@ function DefaultListItem({
   return (
     <div
       className={clsx(
-        'flex items-center justify-between rounded-2xl border border-slate-100 px-3 py-2 text-sm',
+        'flex items-center justify-between rounded-2xl border border-white/10 px-3 py-2 text-sm',
         'transition-all duration-150',
-        onClick && 'cursor-pointer hover:bg-slate-50 hover:border-slate-200'
+        onClick && 'cursor-pointer hover:bg-white/5 hover:border-white/20'
       )}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
@@ -112,20 +112,20 @@ function DefaultListItem({
           <span
             className={clsx(
               'flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold',
-              index === 0 && 'bg-amber-100 text-amber-700',
-              index === 1 && 'bg-slate-200 text-slate-600',
-              index === 2 && 'bg-orange-100 text-orange-700',
-              index > 2 && 'bg-slate-100 text-slate-500'
+              index === 0 && 'bg-amber-500/20 text-amber-400',
+              index === 1 && 'bg-slate-500/20 text-slate-300',
+              index === 2 && 'bg-orange-500/20 text-orange-400',
+              index > 2 && 'bg-white/10 text-slate-400'
             )}
           >
             {index + 1}
           </span>
         )}
-        <span className="font-medium text-slate-900 truncate">
+        <span className="font-medium text-white truncate">
           {item[labelKey]}
         </span>
       </div>
-      <span className="text-slate-600 flex-shrink-0 ml-2">
+      <span className="text-slate-400 flex-shrink-0 ml-2">
         {formattedValue}{suffix}
       </span>
     </div>
@@ -145,19 +145,19 @@ export function TopStockList({ items, loading }) {
       showRank
       suffix=" €"
       renderItem={(item, index) => (
-        <div className="flex items-center justify-between rounded-2xl border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50 transition-colors">
+        <div className="flex items-center justify-between rounded-2xl border border-white/10 px-3 py-2 text-sm hover:bg-white/5 transition-colors">
           <div className="flex items-center gap-3">
             <RankBadge rank={index + 1} />
             <div className="min-w-0">
-              <p className="font-medium text-slate-900 truncate">{item.nom}</p>
-              <p className="text-xs text-slate-500">{item.categorie || 'NC'}</p>
+              <p className="font-medium text-white truncate">{item.nom}</p>
+              <p className="text-xs text-slate-400">{item.categorie || 'NC'}</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="font-semibold text-slate-900">
+            <p className="font-semibold text-white">
               {Number(item.valeur_stock).toLocaleString('fr-FR')} €
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-400">
               {item.stock_actuel} u
             </p>
           </div>
@@ -196,14 +196,14 @@ export function SuppliersList({ items, loading }) {
       valueKey="valeur"
       suffix=" €"
       renderItem={(item) => (
-        <div className="flex items-center justify-between rounded-2xl border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50 transition-colors">
+        <div className="flex items-center justify-between rounded-2xl border border-white/10 px-3 py-2 text-sm hover:bg-white/5 transition-colors">
           <div className="flex items-center gap-2">
-            <div className="rounded-lg bg-slate-100 p-1.5">
-              <Truck className="h-4 w-4 text-slate-500" />
+            <div className="rounded-lg bg-white/10 p-1.5">
+              <Truck className="h-4 w-4 text-slate-400" />
             </div>
-            <span className="font-medium text-slate-900">{item.fournisseur}</span>
+            <span className="font-medium text-white">{item.fournisseur}</span>
           </div>
-          <span className="text-slate-600">
+          <span className="text-slate-400">
             {Number(item.valeur).toLocaleString('fr-FR')} €
           </span>
         </div>
@@ -231,7 +231,7 @@ export function MarginAlertsList({ items, loading }) {
         const isNegative = margin < 0;
 
         return (
-          <div className="flex items-center justify-between rounded-2xl border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50 transition-colors">
+          <div className="flex items-center justify-between rounded-2xl border border-white/10 px-3 py-2 text-sm hover:bg-white/5 transition-colors">
             <div className="flex items-center gap-2 min-w-0">
               {isNegative ? (
                 <AlertTriangle className="h-4 w-4 text-rose-500 flex-shrink-0" />
@@ -240,14 +240,14 @@ export function MarginAlertsList({ items, loading }) {
               ) : (
                 <TrendingUp className="h-4 w-4 text-emerald-500 flex-shrink-0" />
               )}
-              <span className="font-medium text-slate-900 truncate">{item.nom}</span>
+              <span className="font-medium text-white truncate">{item.nom}</span>
             </div>
             <span
               className={clsx(
                 'font-semibold',
-                isNegative && 'text-rose-600',
-                isLow && !isNegative && 'text-amber-600',
-                !isLow && 'text-slate-600'
+                isNegative && 'text-rose-400',
+                isLow && !isNegative && 'text-amber-400',
+                !isLow && 'text-slate-400'
               )}
             >
               {margin.toFixed(1)} %
@@ -277,14 +277,14 @@ export function LowStockList({ items, loading, onReorder }) {
         const percentage = Math.min(100, (stock / threshold) * 100);
 
         return (
-          <div className="rounded-2xl border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50 transition-colors">
+          <div className="rounded-2xl border border-white/10 px-3 py-2 text-sm hover:bg-white/5 transition-colors">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-slate-900 truncate">{item.nom}</span>
+              <span className="font-medium text-white truncate">{item.nom}</span>
               <StatusBadge status={isOut ? 'critical' : 'low'} />
             </div>
             <div className="flex items-center gap-3">
               {/* Progress bar */}
-              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
                 <div
                   className={clsx(
                     'h-full rounded-full transition-all',
@@ -293,7 +293,7 @@ export function LowStockList({ items, loading, onReorder }) {
                   style={{ width: `${percentage}%` }}
                 />
               </div>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-400">
                 {stock}/{threshold}
               </span>
             </div>
@@ -312,10 +312,10 @@ function RankBadge({ rank }) {
     <span
       className={clsx(
         'flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold',
-        rank === 1 && 'bg-amber-100 text-amber-700',
-        rank === 2 && 'bg-slate-200 text-slate-600',
-        rank === 3 && 'bg-orange-100 text-orange-700',
-        rank > 3 && 'bg-slate-100 text-slate-500'
+        rank === 1 && 'bg-amber-500/20 text-amber-400',
+        rank === 2 && 'bg-slate-500/20 text-slate-300',
+        rank === 3 && 'bg-orange-500/20 text-orange-400',
+        rank > 3 && 'bg-white/10 text-slate-400'
       )}
     >
       {rank}

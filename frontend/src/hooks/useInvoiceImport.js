@@ -5,6 +5,10 @@ import {
   extractInvoiceFromFile,
   importInvoiceLines,
   importInvoiceToCatalog,
+  linkInvoiceLine,
+  createProductFromLine,
+  confirmInvoiceStock,
+  zeroClickInvoiceImport,
   fetchInvoiceHistory,
 } from '../api/client.js';
 
@@ -55,5 +59,37 @@ export function useInvoiceHistory(filters = {}) {
     queryFn: () => fetchInvoiceHistory(filters),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
+  });
+}
+
+export function useInvoiceZeroClick() {
+  return useMutation({
+    mutationFn: zeroClickInvoiceImport,
+    onSuccess: () => toast.success('Import zero-click en cours'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Zero-click impossible')),
+  });
+}
+
+export function useLinkInvoiceLine() {
+  return useMutation({
+    mutationFn: linkInvoiceLine,
+    onSuccess: () => toast.success('Ligne liée au produit'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Liaison impossible')),
+  });
+}
+
+export function useCreateProductFromLine() {
+  return useMutation({
+    mutationFn: createProductFromLine,
+    onSuccess: () => toast.success('Produit créé depuis la facture'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Création produit impossible')),
+  });
+}
+
+export function useConfirmInvoiceStock() {
+  return useMutation({
+    mutationFn: confirmInvoiceStock,
+    onSuccess: () => toast.success('Mouvements stock validés'),
+    onError: (error) => toast.error(getErrorMessage(error, 'Validation stock impossible')),
   });
 }

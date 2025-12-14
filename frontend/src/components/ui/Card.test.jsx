@@ -31,9 +31,9 @@ describe('Card', () => {
   });
 
   it('applies custom padding', () => {
-    const { container } = render(<Card padding="p-4">Content</Card>);
+    const { container } = render(<Card padding="sm">Content</Card>);
     const card = container.firstChild;
-    expect(card.className).toContain('p-4');
+    expect(card.className).toContain('p-4'); // sm: p-4
   });
 
   it('applies custom className', () => {

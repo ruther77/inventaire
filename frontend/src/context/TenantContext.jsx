@@ -1,79 +1,49 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth.js';
 
-const STORAGE_KEY = 'tenant/code';
-const DEFAULT_TENANT = { id: 1, code: 'epicerie', label: 'Épicerie HQ' };
+// ============================================================================
+// APP CONTEXT 2025 - Simplified (no multi-tenant UI)
+// ============================================================================
 
-export const tenants = [
-  DEFAULT_TENANT,
-  { id: 2, code: 'restaurant', label: 'Restaurant HQ' },
-  { id: 3, code: 'tresorerie', label: 'Trésorerie HQ' },
-];
+/**
+ * Contexte simplifié - L'interface est unifiée mais le backend utilise toujours
+ * le concept de tenant pour les données. On utilise 'epicerie' par défaut.
+ */
 
-const TenantContext = createContext({
+const DEFAULT_TENANT = { id: 1, code: 'epicerie', label: 'Inventaire Pro' };
+
+const DEFAULT_CONTEXT = {
   tenant: DEFAULT_TENANT,
-  preferredTenant: DEFAULT_TENANT,
-  setTenant: () => {},
-  isTenantLocked: false,
-});
+};
+
+const TenantContext = createContext(DEFAULT_CONTEXT);
 
 export function TenantProvider({ children }) {
-  const { user, isAuthenticated } = useAuth();
-  const [preferredCode, setPreferredCode] = useState(() => {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-      return DEFAULT_TENANT.code;
-    }
-    return localStorage.getItem(STORAGE_KEY) ?? DEFAULT_TENANT.code;
-  });
+  const { user } = useAuth();
 
-  const sessionTenant = useMemo(() => {
-    if (!user) return null;
-    return {
-      id: user.tenant_id,
-      code: user.tenant_code,
-      label: user.tenant_name ?? user.tenant_code,
-    };
-  }, [user]);
+  // Create a simple context based on user info
+  const value = useMemo(() => ({
+    tenant: {
+      id: user?.tenant_id || DEFAULT_TENANT.id,
+      code: user?.tenant_code || DEFAULT_TENANT.code,
+      label: user?.tenant_name || DEFAULT_TENANT.label,
+    },
+    // Keep for backward compatibility
+    setTenant: () => {},
+    isTenantLocked: true,
+    preferredTenant: DEFAULT_TENANT,
+  }), [user]);
 
-  const preferredTenant = useMemo(() => {
-    return tenants.find((entry) => entry.code === preferredCode) ?? DEFAULT_TENANT;
-  }, [preferredCode]);
-
-  const effectiveTenant = sessionTenant ?? preferredTenant;
-
-  useEffect(() => {
-    if (sessionTenant && preferredCode !== sessionTenant.code) {
-      setPreferredCode(sessionTenant.code);
-    }
-  }, [preferredCode, sessionTenant]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, effectiveTenant.code);
-    }
-  }, [effectiveTenant.code]);
-
-  const value = useMemo(
-    () => ({
-      tenant: effectiveTenant,
-      preferredTenant,
-      setTenant: (nextTenant) => {
-        if (!nextTenant?.code) return;
-        if (isAuthenticated && sessionTenant && sessionTenant.code !== nextTenant.code) {
-          // Pendant une session authentifiée, on mémorise juste la préférence pour la prochaine connexion.
-          setPreferredCode(nextTenant.code);
-          return;
-        }
-        setPreferredCode(nextTenant.code);
-      },
-      isTenantLocked: Boolean(sessionTenant),
-    }),
-    [effectiveTenant, preferredTenant, isAuthenticated, sessionTenant],
+  return (
+    <TenantContext.Provider value={value}>
+      {children}
+    </TenantContext.Provider>
   );
-
-  return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;
 }
 
 export function useTenant() {
   return useContext(TenantContext);
 }
+
+// Export for backward compatibility - single tenant now
+export const tenants = [DEFAULT_TENANT];

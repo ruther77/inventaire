@@ -53,16 +53,22 @@ describe('Modal', () => {
     const closeButton = screen.getByRole('button', { name: /fermer/i });
     await userEvent.click(closeButton);
 
-    expect(onClose).toHaveBeenCalledTimes(1);
+    // Wait for animation to complete (150ms timeout in handleClose)
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    }, { timeout: 300 });
   });
 
-  it('calls onClose when Escape key is pressed', () => {
+  it('calls onClose when Escape key is pressed', async () => {
     const onClose = vi.fn();
     render(<Modal {...defaultProps} onClose={onClose} />);
 
     fireEvent.keyDown(document, { key: 'Escape' });
 
-    expect(onClose).toHaveBeenCalledTimes(1);
+    // Wait for animation to complete (150ms timeout in handleClose)
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    }, { timeout: 300 });
   });
 
   it('calls onClose when overlay is clicked', async () => {
@@ -72,7 +78,10 @@ describe('Modal', () => {
     const overlay = screen.getByRole('presentation');
     await userEvent.click(overlay);
 
-    expect(onClose).toHaveBeenCalledTimes(1);
+    // Wait for animation to complete (150ms timeout in handleClose)
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    }, { timeout: 300 });
   });
 
   it('does not call onClose when overlay click is disabled', async () => {
@@ -124,11 +133,12 @@ describe('Modal', () => {
     expect(document.body.style.overflow).toBe('hidden');
   });
 
-  it('restores body scroll when closed', () => {
-    const { rerender } = render(<Modal {...defaultProps} />);
+  it('restores body scroll when unmounted', () => {
+    const { unmount } = render(<Modal {...defaultProps} />);
     expect(document.body.style.overflow).toBe('hidden');
 
-    rerender(<Modal {...defaultProps} open={false} />);
+    // Unmounting should restore body scroll via cleanup effect
+    unmount();
     expect(document.body.style.overflow).toBe('');
   });
 

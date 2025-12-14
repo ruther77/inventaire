@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, isValidElement } from 'react';
 import clsx from 'clsx';
 import { ChevronDown, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { MetricCardSkeleton } from './Skeleton.jsx';
@@ -39,9 +39,9 @@ export default function MetricCard({
   const trendDirection = getTrendDirection();
 
   const trendStyles = {
-    up: 'bg-emerald-50 text-emerald-600',
-    down: 'bg-rose-50 text-rose-600',
-    neutral: 'bg-slate-100 text-slate-600',
+    up: 'bg-emerald-500/15 text-emerald-200',
+    down: 'bg-rose-500/15 text-rose-200',
+    neutral: 'bg-white/10 text-slate-200',
   };
 
   const TrendIcon = {
@@ -72,7 +72,7 @@ export default function MetricCard({
       className={clsx(
         'metric group',
         status && statusStyles[status],
-        isInteractive && 'cursor-pointer hover:shadow-md hover:border-slate-200 transition-all',
+        isInteractive && 'cursor-pointer hover:shadow-md hover:border-white/20 transition-all',
         className
       )}
       onClick={isInteractive ? handleClick : undefined}
@@ -82,18 +82,18 @@ export default function MetricCard({
       aria-expanded={expandable ? expanded : undefined}
     >
       <div className="flex items-start justify-between">
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-200">
           {label}
         </p>
         {Icon && (
-          <div className="rounded-lg bg-slate-100 p-1.5 text-slate-500">
-            <Icon className="h-4 w-4" aria-hidden="true" />
+          <div className="rounded-lg bg-white/10 p-2 text-slate-100">
+            {isValidElement(Icon) ? Icon : <Icon className="h-4 w-4" aria-hidden="true" />}
           </div>
         )}
         {expandable && (
           <ChevronDown
             className={clsx(
-              'h-4 w-4 text-slate-400 transition-transform',
+              'h-4 w-4 text-slate-300 transition-transform',
               expanded && 'rotate-180'
             )}
             aria-hidden="true"
@@ -102,11 +102,11 @@ export default function MetricCard({
       </div>
 
       <div className="flex items-end gap-3 mt-1">
-        <p className="text-3xl font-semibold text-slate-900">{value}</p>
+        <p className="text-3xl font-semibold text-white">{value}</p>
         {trend !== undefined && trend !== null && (
           <span
             className={clsx(
-              'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold',
+              'inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold',
               trendStyles[trendDirection]
             )}
           >
@@ -118,9 +118,9 @@ export default function MetricCard({
 
       {(hint || trendLabel) && (
         <div className="flex items-center justify-between mt-1">
-          {hint && <p className="text-sm text-slate-500">{hint}</p>}
+          {hint && <p className="text-[15px] leading-6 text-slate-200">{hint}</p>}
           {trendLabel && (
-            <p className="text-xs text-slate-400">{trendLabel}</p>
+            <p className="text-sm text-slate-300">{trendLabel}</p>
           )}
         </div>
       )}
@@ -161,16 +161,16 @@ export function CompactMetricCard({ label, value, trend, className }) {
 
   return (
     <div className={clsx('flex items-center justify-between py-2', className)}>
-      <span className="text-sm text-slate-600">{label}</span>
+      <span className="text-base text-slate-200">{label}</span>
       <div className="flex items-center gap-2">
-        <span className="font-semibold text-slate-900">{value}</span>
+        <span className="font-semibold text-white">{value}</span>
         {trend && (
           <span
             className={clsx(
-              'text-xs font-medium',
-              trendDirection === 'up' && 'text-emerald-600',
-              trendDirection === 'down' && 'text-rose-600',
-              trendDirection === 'neutral' && 'text-slate-500'
+              'text-sm font-medium',
+              trendDirection === 'up' && 'text-emerald-300',
+              trendDirection === 'down' && 'text-rose-300',
+              trendDirection === 'neutral' && 'text-slate-300'
             )}
           >
             {trend}

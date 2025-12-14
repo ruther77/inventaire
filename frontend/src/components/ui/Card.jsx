@@ -2,10 +2,10 @@ import clsx from 'clsx';
 
 const variants = {
   default: 'glass-panel',
-  elevated: 'rounded-2xl bg-white shadow-lg border border-slate-100',
-  outline: 'rounded-2xl bg-white border border-slate-200',
-  ghost: 'rounded-2xl bg-slate-50/50',
-  interactive: 'glass-panel hover:shadow-lg hover:border-slate-300 active:scale-[0.99] transition-all duration-200 cursor-pointer',
+  elevated: 'glass-panel shadow-lg',
+  outline: 'glass-panel',
+  ghost: 'rounded-2xl bg-white/5',
+  interactive: 'glass-panel hover:bg-white/10 hover:border-white/20 active:scale-[0.99] transition-all duration-200 cursor-pointer',
 };
 
 const paddings = {
@@ -62,8 +62,8 @@ export function CardHeader({ className, title, description, action, children }) 
   return (
     <div className={clsx('flex items-start justify-between gap-4 mb-4', className)}>
       <div className="min-w-0 flex-1">
-        {title && <h3 className="text-lg font-semibold text-slate-900">{title}</h3>}
-        {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+        {title && <h3 className="text-lg font-semibold text-white">{title}</h3>}
+        {description && <p className="mt-1 text-[15px] leading-6 text-slate-200">{description}</p>}
       </div>
       {action && <div className="flex-shrink-0">{action}</div>}
     </div>
@@ -82,7 +82,7 @@ export function CardContent({ className, children }) {
  */
 export function CardFooter({ className, children }) {
   return (
-    <div className={clsx('mt-4 pt-4 border-t border-slate-100 flex items-center justify-end gap-3', className)}>
+    <div className={clsx('mt-4 pt-4 border-t border-white/10 flex items-center justify-end gap-3', className)}>
       {children}
     </div>
   );

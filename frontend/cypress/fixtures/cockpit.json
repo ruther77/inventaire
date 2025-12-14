@@ -1,0 +1,49 @@
+{
+  "overview": {
+    "revenue_today": 2450.00,
+    "revenue_trend": "up",
+    "revenue_change_pct": 8.5,
+    "gross_margin_pct": 32.5,
+    "margin_trend": "stable",
+    "critical_stock_count": 3,
+    "pending_invoices": 5,
+    "anomalies_count": 2,
+    "health_score": 85
+  },
+  "kpis_live": {
+    "revenue_today": 2450.00,
+    "orders_today": 45,
+    "avg_ticket": 54.44,
+    "stock_alerts": 3,
+    "cash_balance": 15000
+  },
+  "alerts": [
+    {
+      "id": 1,
+      "type": "stock",
+      "severity": "warning",
+      "title": "Stock critique - Tomates",
+      "message": "Rupture prévue dans 2 jours",
+      "created_at": "2025-12-10T10:00:00Z",
+      "acknowledged": false
+    },
+    {
+      "id": 2,
+      "type": "anomaly",
+      "severity": "critical",
+      "title": "Facture en double détectée",
+      "message": "METRO - 450.00 EUR",
+      "created_at": "2025-12-10T09:30:00Z",
+      "acknowledged": false
+    }
+  ],
+  "health": {
+    "score": 85,
+    "components": {
+      "stock": 78,
+      "margins": 92,
+      "cashflow": 88,
+      "suppliers": 82
+    }
+  }
+}

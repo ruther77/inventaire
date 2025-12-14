@@ -2,12 +2,12 @@ import { forwardRef, useId } from 'react';
 import clsx from 'clsx';
 
 const baseClasses =
-  'w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-[border-color,box-shadow] duration-150 focus:outline-none focus:ring-2 disabled:opacity-60 disabled:cursor-not-allowed min-h-[44px]';
+  'w-full rounded-xl border bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-500 transition-[border-color,box-shadow] duration-150 focus:outline-none focus:ring-2 disabled:opacity-60 disabled:cursor-not-allowed min-h-[44px]';
 
 const stateClasses = {
-  default: 'border-slate-200 focus:border-brand-500 focus:ring-brand-200',
-  error: 'border-rose-400 focus:border-rose-500 focus:ring-rose-200 bg-rose-50/50',
-  success: 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-200',
+  default: 'border-white/10 focus:border-brand-500 focus:ring-brand-500/30',
+  error: 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/30 bg-rose-500/10',
+  success: 'border-emerald-500/50 focus:border-emerald-500 focus:ring-emerald-500/30',
 };
 
 const Input = forwardRef(function Input(
@@ -42,7 +42,7 @@ const Input = forwardRef(function Input(
       {label && (
         <label
           htmlFor={inputId}
-          className="text-sm font-medium text-slate-700"
+          className="text-sm font-medium text-slate-300"
         >
           {label}
           {required && <span className="ml-1 text-rose-500">*</span>}
@@ -78,7 +78,7 @@ const Input = forwardRef(function Input(
         )}
       </div>
       {error && (
-        <p id={errorId} className="text-xs text-rose-600 flex items-center gap-1" role="alert">
+        <p id={errorId} className="text-xs text-rose-400 flex items-center gap-1" role="alert">
           <svg className="h-3 w-3 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
@@ -86,7 +86,7 @@ const Input = forwardRef(function Input(
         </p>
       )}
       {hint && !error && (
-        <p id={hintId} className="text-xs text-slate-500">
+        <p id={hintId} className="text-xs text-slate-400">
           {hint}
         </p>
       )}

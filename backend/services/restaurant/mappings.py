@@ -109,6 +109,7 @@ def sync_ingredients_from_mappings(tenant_id: int = 2) -> int:
 
 def list_combined_price_history(tenant_id: int) -> list[Dict[str, Any]]:
     """Return restaurant price history with linked Epicerie costs."""
+    import math
     sql = text(
         """
         SELECT
@@ -132,7 +133,13 @@ def list_combined_price_history(tenant_id: int) -> list[Dict[str, Any]]:
     df = query_df(sql, {"tenant": tenant_id})
     if df.empty:
         return []
-    return df.to_dict("records")
+    # Convert NaN to None for JSON serialization
+    records = df.to_dict("records")
+    for record in records:
+        for key, value in record.items():
+            if isinstance(value, float) and math.isnan(value):
+                record[key] = None
+    return records
 
 
 def list_plat_epicerie_links(tenant_id: int) -> list[Dict[str, Any]]:
@@ -180,7 +187,8 @@ def upsert_plat_epicerie_mapping(
     ratio: float = 1.0,
     tenant_epicerie: int = 1,
 ) -> Dict[str, Any]:
-    """Create or update a plat-epicerie mapping."""
+    """Create or update a plat-epicerie mapping and sync ingredient costs."""
+    # 1. Upsert the mapping
     sql = text(
         """
         INSERT INTO restaurant_epicerie_sku_map
@@ -205,11 +213,66 @@ def upsert_plat_epicerie_mapping(
     )
     if df.empty:
         return {}
+
+    # 2. Get epicerie product info
+    prod_df = query_df(
+        text("SELECT nom, categorie, prix_achat FROM produits WHERE id = :id AND tenant_id = :tenant"),
+        {"id": produit_epicerie_id, "tenant": tenant_epicerie},
+    )
+    if not prod_df.empty:
+        epicerie_nom = prod_df.iloc[0]["nom"]
+        epicerie_categorie = prod_df.iloc[0]["categorie"]
+        prix_achat = float(prod_df.iloc[0]["prix_achat"] or 0)
+
+        # Guess unit from category
+        normalized = (epicerie_categorie or '').lower()
+        if any(kw in normalized for kw in ('champagne', 'whisky', 'spiritueux', 'alcool', 'bouteille', 'biere', 'softs', 'jus', 'boissons')):
+            unit = 'bouteille'
+        else:
+            unit = 'unit'
+
+        # 3. Create or update ingredient
+        existing = query_df(
+            text("SELECT id FROM restaurant_ingredients WHERE tenant_id = :tenant AND LOWER(nom) = LOWER(:name) LIMIT 1"),
+            {"tenant": tenant_restaurant, "name": epicerie_nom},
+        )
+        if not existing.empty:
+            ingredient_id = int(existing.iloc[0]["id"])
+            # Update the price
+            exec_sql(
+                text("UPDATE restaurant_ingredients SET cout_unitaire = :cost WHERE id = :id"),
+                {"id": ingredient_id, "cost": prix_achat},
+            )
+        else:
+            ingredient_id = exec_sql_return_id(
+                text("""
+                    INSERT INTO restaurant_ingredients (tenant_id, nom, unite_base, cout_unitaire, stock_actuel)
+                    VALUES (:tenant, :name, :unit, :cost, 0)
+                    RETURNING id
+                """),
+                {"tenant": tenant_restaurant, "name": epicerie_nom, "unit": unit, "cost": prix_achat},
+            )
+
+        # 4. Attach ingredient to plat
+        exec_sql(
+            text("""
+                INSERT INTO restaurant_plat_ingredients (tenant_id, plat_id, ingredient_id, quantite, unite)
+                VALUES (:tenant, :plat_id, :ingredient_id, :quantite, :unit)
+                ON CONFLICT (plat_id, ingredient_id)
+                DO UPDATE SET quantite = EXCLUDED.quantite, unite = EXCLUDED.unite
+            """),
+            {"tenant": tenant_restaurant, "plat_id": plat_id, "ingredient_id": ingredient_id, "quantite": ratio, "unit": unit},
+        )
+
+        # 5. Refresh plat costs
+        from core import restaurant_costs
+        restaurant_costs.refresh_plat_costs(tenant_id=tenant_restaurant)
+
     return df.iloc[0].to_dict()
 
 
 def delete_plat_epicerie_mapping(tenant_restaurant: int, plat_id: int) -> bool:
-    """Delete a plat-epicerie mapping."""
+    """Delete a plat-epicerie mapping and refresh costs."""
     sql = text(
         """
         DELETE FROM restaurant_epicerie_sku_map
@@ -218,6 +281,11 @@ def delete_plat_epicerie_mapping(tenant_restaurant: int, plat_id: int) -> bool:
         """
     )
     exec_sql(sql, {"tenant_restaurant": tenant_restaurant, "plat_id": plat_id})
+
+    # Refresh plat costs after deletion
+    from core import restaurant_costs
+    restaurant_costs.refresh_plat_costs(tenant_id=tenant_restaurant)
+
     return True
 
 

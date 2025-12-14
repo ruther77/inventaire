@@ -89,6 +89,8 @@ export function DataTable({
   // Custom rendering
   rowClassName,
   getRowId = (row, index) => row.id ?? index,
+  // Error retry
+  onRetry,
 }) {
   // État local
   const [currentPage, setCurrentPage] = useState(1);
@@ -297,18 +299,34 @@ export function DataTable({
   // Render loading skeleton
   if (loading && data.length === 0) {
     return (
-      <div className={clsx('w-full', className)}>
+      <div className={clsx('w-full text-[15px] leading-6 text-slate-100', className)}>
         <DataTableSkeleton columns={displayedColumns.length} rows={5} />
       </div>
     );
   }
 
-  // Render error
+  // Render error with retry capability
   if (error) {
     return (
-      <div className={clsx('w-full p-8 text-center', className)}>
-        <div className="text-rose-500 mb-2">Une erreur est survenue</div>
-        <div className="text-sm text-slate-500">{error.message || String(error)}</div>
+      <div className={clsx('w-full p-8 text-center text-[15px] leading-6 text-slate-100', className)}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-rose-400 text-4xl mb-2">
+            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+          </div>
+          <div className="text-rose-300 font-semibold">Une erreur est survenue</div>
+          <div className="text-base text-slate-300 max-w-md">{error.message || String(error)}</div>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-2 px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors"
+            >
+              Réessayer
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -320,7 +338,7 @@ export function DataTable({
   );
 
   return (
-    <div className={clsx('w-full', className)}>
+    <div className={clsx('w-full text-[15px] leading-6 text-slate-100', className)}>
       {/* Screen reader announcements */}
       <div
         role="status"
@@ -363,16 +381,16 @@ export function DataTable({
           aria-rowcount={filteredData.length}
           aria-colcount={displayedColumns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)}
           className={clsx(
-            'w-full text-sm text-left',
-            bordered && 'border border-slate-200'
+            'w-full text-[15px] leading-6 text-left text-slate-100',
+            bordered && 'border border-white/10'
           )}
         >
           <thead
             role="rowgroup"
             className={clsx(
-              'text-xs uppercase bg-slate-50 text-slate-600',
-              stickyHeader && 'sticky top-0 z-10 shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]',
-              bordered && 'border-b border-slate-200'
+              'text-xs uppercase tracking-[0.25em] bg-white/10 text-slate-200',
+              stickyHeader && 'sticky top-0 z-10 shadow-[0_1px_3px_0_rgba(0,0,0,0.2)]',
+              bordered && 'border-b border-white/10'
             )}
           >
             <tr role="row">
@@ -403,7 +421,7 @@ export function DataTable({
                   }
                   className={clsx(
                     'px-4 py-3 font-semibold',
-                    column.sortable !== false && sortable && 'cursor-pointer select-none hover:bg-slate-100',
+                    column.sortable !== false && sortable && 'cursor-pointer select-none hover:bg-white/10',
                     column.align === 'right' && 'text-right',
                     column.align === 'center' && 'text-center'
                   )}
@@ -431,13 +449,13 @@ export function DataTable({
               )}
             </tr>
           </thead>
-          <tbody role="rowgroup" className="divide-y divide-slate-100">
+          <tbody role="rowgroup" className="divide-y divide-white/10">
             {paginatedData.length === 0 ? (
               <tr role="row">
                 <td
                   role="cell"
                   colSpan={displayedColumns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)}
-                  className="px-4 py-12 text-center text-slate-500"
+                  className="px-4 py-12 text-center text-slate-200"
                 >
                   {emptyIcon && <div className="mb-3">{emptyIcon}</div>}
                   {emptyMessage}
@@ -460,10 +478,10 @@ export function DataTable({
                     onKeyDown={(e) => handleKeyDown(e, rowIndex)}
                     className={clsx(
                       'transition-colors',
-                      striped && rowIndex % 2 === 1 && 'bg-slate-50/50',
-                      isSelected && 'bg-brand-50',
+                      striped && rowIndex % 2 === 1 && 'bg-white/5',
+                      isSelected && 'bg-brand-500/20',
                       isFocused && 'ring-2 ring-brand-500 ring-inset',
-                      onRowClick && 'cursor-pointer hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+                      onRowClick && 'cursor-pointer hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
                       typeof rowClassName === 'function' ? rowClassName(row, rowIndex) : rowClassName
                     )}
                     onClick={() => onRowClick?.(row, rowIndex)}
@@ -521,7 +539,7 @@ export function DataTable({
 
         {/* Loading overlay */}
         {loading && data.length > 0 && (
-          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-900/70 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
           </div>
         )}
@@ -583,7 +601,7 @@ function DataTableToolbar({
             Rechercher dans le tableau
           </label>
           <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 pointer-events-none"
             aria-hidden="true"
           />
           <input
@@ -596,8 +614,8 @@ function DataTableToolbar({
             aria-label="Rechercher dans le tableau"
             aria-controls="data-table"
             className={clsx(
-              'w-full pl-9 pr-4 py-2 text-sm',
-              'border border-slate-200 rounded-lg',
+              'w-full pl-10 pr-4 py-2.5 text-[15px] leading-6 text-white',
+              'border border-white/15 bg-white/5 rounded-lg',
               'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent',
               'placeholder-slate-400'
             )}
@@ -607,7 +625,7 @@ function DataTableToolbar({
               type="button"
               onClick={() => onSearchChange('')}
               aria-label="Effacer la recherche"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded p-1"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded p-1"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -618,24 +636,24 @@ function DataTableToolbar({
       {/* Bulk actions */}
       {selectedCount > 0 && bulkActions.length > 0 && (
         <div
-          className="flex items-center gap-2 px-3 py-1.5 bg-brand-50 rounded-lg"
+          className="flex items-center gap-2 px-3 py-1.5 bg-brand-500/20 rounded-lg"
           role="region"
           aria-label="Actions groupées"
         >
           <span
-            className="text-sm font-medium text-brand-700"
+            className="text-base font-medium text-brand-300"
             aria-live="polite"
             aria-atomic="true"
           >
             {selectedCount} sélectionné{selectedCount > 1 ? 's' : ''}
           </span>
-          <div className="h-4 w-px bg-brand-200" aria-hidden="true" />
+          <div className="h-4 w-px bg-brand-500/30" aria-hidden="true" />
           {bulkActions.map((action) => (
             <button
               key={action.id}
               type="button"
               onClick={() => action.onClick?.(data.filter((_, i) => true))}
-              className="text-sm text-brand-600 hover:text-brand-800 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded px-2 py-1"
+              className="text-sm text-brand-400 hover:text-brand-300 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded px-2 py-1"
               aria-label={`${action.label} pour ${selectedCount} élément${selectedCount > 1 ? 's' : ''}`}
             >
               {action.label}
@@ -660,8 +678,8 @@ function DataTableToolbar({
               'border rounded-lg transition-colors',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
               hasActiveFilters
-                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                ? 'border-brand-500 bg-brand-500/20 text-brand-400'
+                : 'border-white/15 hover:bg-white/5 text-slate-200'
             )}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
@@ -693,7 +711,7 @@ function DataTableToolbar({
           <button
             type="button"
             onClick={() => setShowColumns(!showColumns)}
-            className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600"
+            className="flex items-center gap-2 px-3 py-2 text-sm border border-white/15 rounded-lg hover:bg-white/5 text-slate-200"
           >
             <Columns className="h-4 w-4" />
             Colonnes
@@ -715,7 +733,7 @@ function DataTableToolbar({
         <button
           type="button"
           onClick={onExport}
-          className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600"
+          className="flex items-center gap-2 px-3 py-2 text-sm border border-white/15 rounded-lg hover:bg-white/5 text-slate-200"
         >
           <Download className="h-4 w-4" />
           Exporter
@@ -743,17 +761,17 @@ function DataTablePagination({
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 mt-4 px-2">
       {/* Items info */}
-      <div className="text-sm text-slate-500">
+      <div className="text-base text-slate-200">
         {startItem}-{endItem} sur {totalItems} résultat{totalItems > 1 ? 's' : ''}
       </div>
 
       {/* Page size selector */}
       <div className="flex items-center gap-2">
-        <span className="text-sm text-slate-500">Lignes par page:</span>
+        <span className="text-base text-slate-200">Lignes par page:</span>
         <select
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="px-2 py-1 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="px-3 py-2 text-sm border border-white/15 bg-white/5 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
         >
           {pageSizeOptions.map((size) => (
             <option key={size} value={size}>
@@ -783,7 +801,7 @@ function DataTablePagination({
         <div className="flex items-center gap-1 mx-2">
           {generatePageNumbers(currentPage, totalPages).map((page, i) =>
             page === '...' ? (
-              <span key={`ellipsis-${i}`} className="px-2 text-slate-400">
+              <span key={`ellipsis-${i}`} className="px-2 text-slate-300">
                 ...
               </span>
             ) : (
@@ -830,8 +848,8 @@ function PaginationButton({ children, active, disabled, ...props }) {
         active
           ? 'bg-brand-600 text-white'
           : disabled
-            ? 'text-slate-300 cursor-not-allowed'
-            : 'text-slate-600 hover:bg-slate-100'
+            ? 'text-slate-500 cursor-not-allowed'
+            : 'text-slate-200 hover:bg-white/10'
       )}
       {...props}
     >
@@ -842,7 +860,7 @@ function PaginationButton({ children, active, disabled, ...props }) {
 
 function SortIndicator({ direction }) {
   if (!direction) {
-    return <ChevronsUpDown className="h-4 w-4 text-slate-300" />;
+    return <ChevronsUpDown className="h-4 w-4 text-slate-500" />;
   }
   return direction === 'asc' ? (
     <ChevronUp className="h-4 w-4 text-brand-600" />
@@ -872,7 +890,7 @@ const Checkbox = forwardRef(function Checkbox({ checked, indeterminate, onChange
         checked={checked}
         onChange={onChange}
         className={clsx(
-          'h-5 w-5 rounded border-slate-400 text-brand-600 cursor-pointer',
+          'h-5 w-5 rounded border-slate-500 text-brand-600 cursor-pointer',
           'transition-colors duration-150',
           'focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
           'hover:border-brand-500'
@@ -907,13 +925,13 @@ function RowActionsMenu({ actions, row, rowIndex }) {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+        className="p-1 rounded hover:bg-white/10 text-slate-300 hover:text-slate-200"
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
+        <div className="absolute right-0 mt-1 w-48 bg-slate-800 rounded-lg shadow-lg border border-white/10 py-1 z-20">
           {visibleActions.map((action) => (
             <button
               key={action.id}
@@ -926,8 +944,8 @@ function RowActionsMenu({ actions, row, rowIndex }) {
               className={clsx(
                 'w-full flex items-center gap-2 px-3 py-2 text-sm text-left',
                 action.destructive
-                  ? 'text-rose-600 hover:bg-rose-50'
-                  : 'text-slate-700 hover:bg-slate-50',
+                  ? 'text-rose-400 hover:bg-rose-500/20'
+                  : 'text-slate-300 hover:bg-white/10',
                 action.disabled && 'opacity-50 cursor-not-allowed'
               )}
             >
@@ -957,19 +975,19 @@ function FilterDropdown({ filters, activeFilters, onFilterChange, onClose }) {
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-slate-200 p-4 z-20"
+      className="absolute right-0 mt-2 w-64 bg-slate-800 rounded-lg shadow-lg border border-white/10 p-4 z-20"
     >
       <div className="space-y-4">
         {filters.map((filter) => (
           <div key={filter.key}>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-medium text-slate-300 mb-1">
               {filter.label}
             </label>
             {filter.type === 'select' ? (
               <select
                 value={activeFilters[filter.key] || ''}
                 onChange={(e) => onFilterChange(filter.key, e.target.value || null)}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full px-3 py-2 text-sm border border-white/10 bg-white/5 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">Tous</option>
                 {filter.options?.map((opt) => (
@@ -984,19 +1002,19 @@ function FilterDropdown({ filters, activeFilters, onFilterChange, onClose }) {
                 value={activeFilters[filter.key] || ''}
                 onChange={(e) => onFilterChange(filter.key, e.target.value || null)}
                 placeholder={filter.placeholder}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full px-3 py-2 text-sm border border-white/10 bg-white/5 text-white placeholder-slate-500 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             )}
           </div>
         ))}
       </div>
-      <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end gap-2">
+      <div className="mt-4 pt-4 border-t border-white/10 flex justify-end gap-2">
         <button
           type="button"
           onClick={() => {
             filters.forEach((f) => onFilterChange(f.key, null));
           }}
-          className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 rounded"
+          className="px-3 py-1.5 text-sm text-slate-200 hover:bg-white/10 rounded"
         >
           Réinitialiser
         </button>
@@ -1028,10 +1046,10 @@ function ColumnVisibilityDropdown({ columns, visibleColumns, onVisibleColumnsCha
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-20"
+      className="absolute right-0 mt-2 w-56 bg-slate-800 rounded-lg shadow-lg border border-white/10 py-2 z-20"
     >
-      <div className="px-3 py-2 border-b border-slate-100">
-        <span className="text-xs font-semibold uppercase text-slate-400">
+      <div className="px-3 py-2 border-b border-white/10">
+        <span className="text-xs font-semibold uppercase text-slate-200">
           Colonnes visibles
         </span>
       </div>
@@ -1039,7 +1057,7 @@ function ColumnVisibilityDropdown({ columns, visibleColumns, onVisibleColumnsCha
         {columns.map((column) => (
           <label
             key={column.key}
-            className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer"
+            className="flex items-center gap-3 px-3 py-2 hover:bg-white/10 cursor-pointer"
           >
             <input
               type="checkbox"
@@ -1050,13 +1068,13 @@ function ColumnVisibilityDropdown({ columns, visibleColumns, onVisibleColumnsCha
                   [column.key]: e.target.checked,
                 }))
               }
-              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              className="h-4 w-4 rounded border-slate-500 text-brand-600 focus:ring-brand-500"
             />
-            <span className="text-sm text-slate-700">{column.header || column.key}</span>
+            <span className="text-sm text-slate-200">{column.header || column.key}</span>
             {visibleColumns[column.key] ? (
-              <Eye className="h-4 w-4 text-slate-400 ml-auto" />
+              <Eye className="h-4 w-4 text-slate-300 ml-auto" />
             ) : (
-              <EyeOff className="h-4 w-4 text-slate-300 ml-auto" />
+              <EyeOff className="h-4 w-4 text-slate-500 ml-auto" />
             )}
           </label>
         ))}
@@ -1077,9 +1095,9 @@ function DataTableSkeleton({ columns = 5, rows = 5 }) {
       </div>
 
       {/* Table skeleton */}
-      <div className="border border-slate-200 rounded-lg overflow-hidden">
+      <div className="border border-white/10 rounded-lg overflow-hidden">
         {/* Header */}
-        <div className="flex gap-4 px-4 py-3 bg-slate-50 border-b border-slate-200">
+        <div className="flex gap-4 px-4 py-3 bg-white/5 border-b border-white/10">
           {Array.from({ length: columns }).map((_, i) => (
             <Skeleton key={i} className="h-4 flex-1" />
           ))}
@@ -1089,7 +1107,7 @@ function DataTableSkeleton({ columns = 5, rows = 5 }) {
         {Array.from({ length: rows }).map((_, rowIndex) => (
           <div
             key={rowIndex}
-            className="flex gap-4 px-4 py-3 border-b border-slate-100 last:border-0"
+            className="flex gap-4 px-4 py-3 border-b border-white/10 last:border-0"
           >
             {Array.from({ length: columns }).map((_, colIndex) => (
               <Skeleton key={colIndex} className="h-4 flex-1" />

@@ -10,35 +10,33 @@ export default function FinanceAccountsPage() {
   const accounts = accountsStatsQuery.data ?? [];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        {/* Header */}
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-blue-100">
-              <Building2 className="w-8 h-8 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Tresorerie HQ</p>
-              <h1 className="text-2xl font-semibold text-slate-900">Comptes bancaires</h1>
-            </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <header className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-orange-500/20">
+            <Building2 className="w-8 h-8 text-orange-400" />
           </div>
-          <Button
-            variant="ghost"
-            onClick={() => accountsStatsQuery.refetch()}
-            disabled={accountsStatsQuery.isLoading}
-          >
-            Rafraichir
-          </Button>
-        </header>
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Tresorerie HQ</p>
+            <h1 className="text-2xl font-semibold text-orange-400">Comptes bancaires</h1>
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          onClick={() => accountsStatsQuery.refetch()}
+          disabled={accountsStatsQuery.isLoading}
+        >
+          Rafraichir
+        </Button>
+      </header>
 
-        {/* Content */}
-        <AccountsTab
-          accounts={accounts}
-          isLoading={accountsStatsQuery.isLoading}
-          onRefresh={() => accountsStatsQuery.refetch()}
-        />
-      </div>
+      {/* Content */}
+      <AccountsTab
+        accounts={accounts}
+        isLoading={accountsStatsQuery.isLoading}
+        onRefresh={() => accountsStatsQuery.refetch()}
+      />
     </div>
   );
 }

@@ -1,0 +1,74 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "Tomates",
+      "sku": "TOM-001",
+      "category": "Fruits & Légumes",
+      "unit": "kg",
+      "prix_achat": 2.50,
+      "prix_vente": 3.99,
+      "current_stock": 45,
+      "min_stock": 15,
+      "supplier": "Metro",
+      "status": "active"
+    },
+    {
+      "id": 2,
+      "name": "Huile d'olive",
+      "sku": "HUI-001",
+      "category": "Épicerie",
+      "unit": "L",
+      "prix_achat": 8.00,
+      "prix_vente": 12.99,
+      "current_stock": 28,
+      "min_stock": 12,
+      "supplier": "Pomona",
+      "status": "active"
+    },
+    {
+      "id": 3,
+      "name": "Pain",
+      "sku": "PAI-001",
+      "category": "Boulangerie",
+      "unit": "pièce",
+      "prix_achat": 0.80,
+      "prix_vente": 1.20,
+      "current_stock": 100,
+      "min_stock": 50,
+      "supplier": "Boulangerie Locale",
+      "status": "active"
+    },
+    {
+      "id": 4,
+      "name": "Fromage Comté",
+      "sku": "FRO-001",
+      "category": "Crémerie",
+      "unit": "kg",
+      "prix_achat": 15.00,
+      "prix_vente": 24.99,
+      "current_stock": 8,
+      "min_stock": 5,
+      "supplier": "Lactalis",
+      "status": "active"
+    },
+    {
+      "id": 5,
+      "name": "Vin Rouge Bordeaux",
+      "sku": "VIN-001",
+      "category": "Boissons",
+      "unit": "bouteille",
+      "prix_achat": 6.50,
+      "prix_vente": 12.00,
+      "current_stock": 35,
+      "min_stock": 20,
+      "supplier": "Cave du Bordelais",
+      "status": "active"
+    }
+  ],
+  "total": 245,
+  "page": 1,
+  "pageSize": 20,
+  "categories": ["Fruits & Légumes", "Épicerie", "Boulangerie", "Crémerie", "Boissons", "Viandes", "Poissons"],
+  "suppliers": ["Metro", "Pomona", "Lactalis", "Boulangerie Locale", "Cave du Bordelais"]
+}

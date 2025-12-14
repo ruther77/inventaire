@@ -177,11 +177,11 @@ export default function Modal({
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <h3 id={titleId} className="text-xl font-semibold text-slate-900">
+            <h3 id={titleId} className="text-xl font-semibold text-white">
               {title}
             </h3>
             {description && (
-              <p id={descriptionId} className="mt-1 text-sm text-slate-500">
+              <p id={descriptionId} className="mt-1 text-base text-slate-200">
                 {description}
               </p>
             )}
@@ -192,10 +192,10 @@ export default function Modal({
               className={clsx(
                 'group rounded-full p-3 -mr-3 -mt-3 min-w-[44px] min-h-[44px]',
                 'flex items-center justify-center',
-                'text-slate-400 transition-all duration-150',
-                'hover:bg-slate-100 hover:text-slate-800',
+                'text-slate-200 transition-all duration-150',
+                'hover:bg-white/10 hover:text-white',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2',
-                'active:scale-95 active:bg-slate-200'
+                'active:scale-95 active:bg-white/15'
               )}
               onClick={handleClose}
               aria-label="Fermer la modale"

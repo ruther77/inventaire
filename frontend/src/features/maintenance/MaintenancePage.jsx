@@ -3,7 +3,7 @@ import { Download } from 'lucide-react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { useBackups } from '../../hooks/useMaintenance.js';
-import api from '../../api/client.js';
+import { getApiBaseUrl } from '../../api/client.js';
 
 const sizeFormatter = (size) => {
   if (size === 0) return '0 o';
@@ -79,7 +79,7 @@ export default function MaintenancePage() {
                         variant="ghost"
                         size="sm"
                         as="a"
-                        href={`${api.defaults.baseURL ?? ''}/maintenance/backups/${encodeURIComponent(backup.name)}`}
+                        href={`${getApiBaseUrl()}/maintenance/backups/${encodeURIComponent(backup.name)}`}
                       >
                         <Download className="h-4 w-4" />
                       </Button>

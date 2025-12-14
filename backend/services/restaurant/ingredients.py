@@ -17,7 +17,7 @@ def list_ingredients(tenant_id: int) -> List[dict[str, Any]]:
         text(
             """
             SELECT id, nom, unite_base, cout_unitaire, stock_actuel
-            FROM restaurant_ingredients
+            FROM ingredients
             WHERE tenant_id = :tenant
             ORDER BY nom
             """
@@ -33,7 +33,7 @@ def create_ingredient(tenant_id: int, payload: dict[str, Any]) -> dict[str, Any]
         row = conn.execute(
             text(
                 """
-                INSERT INTO restaurant_ingredients (tenant_id, nom, unite_base, cout_unitaire, stock_actuel)
+                INSERT INTO ingredients (tenant_id, nom, unite_base, cout_unitaire, stock_actuel)
                 VALUES (:tenant, :nom, :unite_base, :cout_unitaire, :stock_actuel)
                 RETURNING id, nom, unite_base, cout_unitaire, stock_actuel
                 """
@@ -49,7 +49,7 @@ def update_ingredient_price(tenant_id: int, ingredient_id: int, new_price: float
         row = conn.execute(
             text(
                 """
-                UPDATE restaurant_ingredients
+                UPDATE ingredients
                 SET cout_unitaire = :price
                 WHERE tenant_id = :tenant AND id = :ingredient_id
                 RETURNING id, nom, unite_base, cout_unitaire, stock_actuel
@@ -70,21 +70,21 @@ def list_plats(tenant_id: int) -> List[dict[str, Any]]:
             """
             WITH couts AS (
                 SELECT
-                    rpi.plat_id,
-                    SUM(rpi.quantite * COALESCE(ri.cout_unitaire, 0)) AS cout_matiere
-                FROM restaurant_plat_ingredients rpi
-                JOIN restaurant_ingredients ri ON ri.id = rpi.ingredient_id
-                WHERE rpi.tenant_id = :tenant
-                GROUP BY rpi.plat_id
+                    pi.plat_id,
+                    SUM(pi.quantite_batch * COALESCE(i.cout_unitaire, 0)) AS cout_matiere
+                FROM plat_ingredients pi
+                JOIN ingredients i ON i.id = pi.ingredient_id
+                WHERE pi.tenant_id = :tenant
+                GROUP BY pi.plat_id
             )
             SELECT
                 p.id,
                 p.nom,
-                p.categorie,
+                p.type AS categorie,
                 p.prix_vente_ttc,
                 p.actif,
                 COALESCE(c.cout_matiere, 0) AS cout_matiere
-            FROM restaurant_plats p
+            FROM plats p
             LEFT JOIN couts c ON c.plat_id = p.id
             WHERE p.tenant_id = :tenant
             ORDER BY p.nom
@@ -114,16 +114,16 @@ def list_plats(tenant_id: int) -> List[dict[str, Any]]:
 
         sql = text(
             f"""
-            SELECT rpi.id,
-                   rpi.plat_id,
-                   rpi.ingredient_id,
-                   ri.nom,
-                   rpi.quantite,
-                   rpi.unite
-            FROM restaurant_plat_ingredients rpi
-            JOIN restaurant_ingredients ri ON ri.id = rpi.ingredient_id
-            WHERE rpi.tenant_id = :tenant
-              AND rpi.plat_id IN ({", ".join(placeholder_tokens)})
+            SELECT pi.id,
+                   pi.plat_id,
+                   pi.ingredient_id,
+                   i.nom,
+                   pi.quantite_batch AS quantite,
+                   i.unite_base AS unite
+            FROM plat_ingredients pi
+            JOIN ingredients i ON i.id = pi.ingredient_id
+            WHERE pi.tenant_id = :tenant
+              AND pi.plat_id IN ({", ".join(placeholder_tokens)})
             """
         )
         ing_df = query_df(sql, params=params)
@@ -155,16 +155,25 @@ def list_plat_alerts(tenant_id: int) -> List[dict[str, Any]]:
 
 def create_plat(tenant_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     """Create a dish and initialize totals/margins from linked ingredients."""
+    # Map 'categorie' to 'type' for the new schema
+    plat_type = payload.pop("categorie", "dish")
     with get_engine().begin() as conn:
+        # Get the restaurant_id for this tenant
+        rest_row = conn.execute(
+            text("SELECT id FROM restaurants WHERE tenant_id = :tenant LIMIT 1"),
+            {"tenant": tenant_id},
+        ).fetchone()
+        restaurant_id = rest_row[0] if rest_row else 1
+
         row = conn.execute(
             text(
                 """
-                INSERT INTO restaurant_plats (tenant_id, nom, categorie, prix_vente_ttc, actif)
-                VALUES (:tenant, :nom, :categorie, :prix_vente_ttc, :actif)
-                RETURNING id, nom, categorie, prix_vente_ttc, actif
+                INSERT INTO plats (tenant_id, restaurant_id, nom, type, prix_vente_ttc, actif)
+                VALUES (:tenant, :restaurant_id, :nom, :type, :prix_vente_ttc, :actif)
+                RETURNING id, nom, type AS categorie, prix_vente_ttc, actif
                 """
             ),
-            {**payload, "tenant": tenant_id},
+            {**payload, "tenant": tenant_id, "restaurant_id": restaurant_id, "type": plat_type},
         ).fetchone()
     base = dict(row._mapping)
     price = _safe_float(base.get("prix_vente_ttc"))
@@ -182,17 +191,19 @@ def create_plat(tenant_id: int, payload: dict[str, Any]) -> dict[str, Any]:
 
 def attach_ingredient_to_plat(tenant_id: int, plat_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     """Associate an ingredient with a dish with cost recalculation."""
+    # Map 'quantite' to 'quantite_batch' for the new schema
+    quantite = payload.get("quantite", payload.get("quantite_batch", 0))
     with get_engine().begin() as conn:
         conn.execute(
             text(
                 """
-                INSERT INTO restaurant_plat_ingredients (tenant_id, plat_id, ingredient_id, quantite, unite)
-                VALUES (:tenant, :plat_id, :ingredient_id, :quantite, :unite)
+                INSERT INTO plat_ingredients (tenant_id, plat_id, ingredient_id, quantite_batch)
+                VALUES (:tenant, :plat_id, :ingredient_id, :quantite_batch)
                 ON CONFLICT (plat_id, ingredient_id)
-                DO UPDATE SET quantite = EXCLUDED.quantite, unite = EXCLUDED.unite
+                DO UPDATE SET quantite_batch = EXCLUDED.quantite_batch
                 """
             ),
-            {"tenant": tenant_id, "plat_id": plat_id, **payload},
+            {"tenant": tenant_id, "plat_id": plat_id, "ingredient_id": payload["ingredient_id"], "quantite_batch": quantite},
         )
     refresh_plat_costs(tenant_id)
     return {"status": "ok"}
@@ -204,10 +215,10 @@ def update_plat_price(tenant_id: int, plat_id: int, new_price: float) -> dict[st
         row = conn.execute(
             text(
                 """
-                UPDATE restaurant_plats
+                UPDATE plats
                 SET prix_vente_ttc = :price
                 WHERE tenant_id = :tenant AND id = :plat_id
-                RETURNING id, nom, categorie, prix_vente_ttc, actif
+                RETURNING id, nom, type AS categorie, prix_vente_ttc, actif
                 """
             ),
             {"tenant": tenant_id, "plat_id": plat_id, "price": new_price},

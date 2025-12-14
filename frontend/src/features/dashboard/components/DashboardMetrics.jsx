@@ -92,8 +92,8 @@ export function DashboardMetricsCompact({ kpis, loading }) {
       <div className="space-y-3">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex justify-between animate-pulse">
-            <div className="h-4 w-24 bg-slate-200 rounded" />
-            <div className="h-4 w-16 bg-slate-200 rounded" />
+            <div className="h-4 w-24 bg-white/10 rounded" />
+            <div className="h-4 w-16 bg-white/10 rounded" />
           </div>
         ))}
       </div>
@@ -111,10 +111,10 @@ export function DashboardMetricsCompact({ kpis, loading }) {
     <div className="space-y-2">
       {items.map((item) => (
         <div key={item.label} className="flex items-center justify-between py-1.5">
-          <span className="text-sm text-slate-600">{item.label}</span>
+          <span className="text-sm text-slate-400">{item.label}</span>
           <span
             className={`font-semibold ${
-              item.highlight ? 'text-amber-600' : 'text-slate-900'
+              item.highlight ? 'text-amber-400' : 'text-white'
             }`}
           >
             {item.value ?? '—'}

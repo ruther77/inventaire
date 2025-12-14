@@ -1,35 +1,48 @@
-import { useEffect, useState } from 'react';
-import { fetchCapitalOverview } from '../../api/client.js';
+import { useState } from 'react';
+import { Briefcase, TrendingUp, Building2, Wallet } from 'lucide-react';
+import { usePortfolio } from '../../hooks/usePortfolio.js';
+import Card from '../../components/ui/Card.jsx';
+import EmptyState, { EmptyData } from '../../components/ui/EmptyState.jsx';
+import Skeleton from '../../components/ui/Skeleton.jsx';
 
-function SummaryCard({ title, value, subtitle }) {
+function SummaryCard({ title, value, subtitle, icon: Icon }) {
   return (
-    <div className="border rounded px-4 py-3 bg-white shadow-sm">
-      <p className="text-sm text-gray-500">{title}</p>
-      <p className="text-2xl font-semibold">{value}</p>
-      {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
-    </div>
+    <Card className="p-4">
+      <div className="flex items-start gap-3">
+        {Icon && (
+          <div className="p-2 rounded-lg bg-orange-500/10">
+            <Icon className="h-5 w-5 text-orange-400" />
+          </div>
+        )}
+        <div>
+          <p className="text-sm text-slate-400">{title}</p>
+          <p className="text-2xl font-semibold text-white mt-1">{value}</p>
+          {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+        </div>
+      </div>
+    </Card>
   );
 }
 
 function LatestPricesChart({ items }) {
   if (!items || !items.length) {
-    return <p className="text-sm text-gray-500">Aucune donnée de prix récente.</p>;
+    return <EmptyData className="py-6" />;
   }
   const maxPrice = Math.max(...items.map((item) => Number(item.prix_achat) || 0), 1);
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {items.map((item) => {
         const value = Number(item.prix_achat) || 0;
         const width = Math.min(100, (value / maxPrice) * 100);
         return (
           <div key={`${item.code}-${item.created_at}`} className="space-y-1">
-            <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>{item.code}</span>
-              <span>{value.toFixed(2)} €</span>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-300">{item.code}</span>
+              <span className="text-amber-400 font-medium">{value.toFixed(2)} €</span>
             </div>
-            <div className="h-2 rounded bg-gray-200">
+            <div className="h-2 rounded-full bg-white/5">
               <div
-                className="h-2 rounded bg-gradient-to-r from-blue-500 to-teal-400"
+                className="h-2 rounded-full bg-gradient-to-r from-orange-500 to-amber-400"
                 style={{ width: `${width}%` }}
               />
             </div>
@@ -40,62 +53,73 @@ function LatestPricesChart({ items }) {
   );
 }
 
-function PortfolioPage({ initialData = null }) {
-  const [data, setData] = useState(initialData);
-  const [loading, setLoading] = useState(initialData === null);
+function PortfolioPage() {
   const [selectedEntity, setSelectedEntity] = useState('global');
 
-  useEffect(() => {
-    if (initialData) {
-      return;
-    }
+  const { entities, globalSummary, latestPrices, isLoading } = usePortfolio();
 
-    setLoading(true);
-    fetchCapitalOverview()
-      .then((response) => setData(response))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) {
-    return <p>Chargement du portefeuille...</p>;
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-48 mb-2" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="p-4">
+              <Skeleton className="h-4 w-24 mb-2" />
+              <Skeleton className="h-8 w-32" />
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
   }
 
-  if (!data) {
-    return <p>Aucune donnée disponible.</p>;
+  if (!entities.length && !globalSummary.total_assets) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold text-orange-400">Portefeuille consolidé</h1>
+          <p className="text-sm text-slate-400">Suivi du stock et de la trésorerie par business.</p>
+        </div>
+        <Card className="p-8">
+          <EmptyState
+            icon={Briefcase}
+            title="Aucune donnée de portefeuille"
+            description="Les données de votre portefeuille apparaîtront ici une fois que vous aurez configuré vos entités et importé des transactions."
+            size="lg"
+          />
+        </Card>
+      </div>
+    );
   }
 
-  const {
-    entities = [],
-    global_summary: globalSummary = {
-      stock_value: 0,
-      bank_balance: 0,
-      cash_balance: 0,
-      total_assets: 0,
-    },
-    latest_prices: latestPricesRaw = [],
-  } = data;
-  const latestPrices = Array.isArray(latestPricesRaw) ? latestPricesRaw : [];
   const displayEntities =
     selectedEntity === 'global' ? entities : entities.filter((entity) => entity.code === selectedEntity);
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Portefeuille consolidé</h1>
-        <p className="text-sm text-gray-500">Suivi du stock et de la trésorerie par business.</p>
+        <h1 className="text-xl font-semibold text-orange-400">Portefeuille consolidé</h1>
+        <p className="text-sm text-slate-400">Suivi du stock et de la trésorerie par business.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <SummaryCard
+          icon={TrendingUp}
           title="Capital global"
           value={`${globalSummary.total_assets.toLocaleString('fr-FR')} €`}
           subtitle="Stocks + trésorerie"
         />
         <SummaryCard
+          icon={Wallet}
           title="Trésorerie disponible"
           value={`${(globalSummary.bank_balance + globalSummary.cash_balance).toLocaleString('fr-FR')} €`}
           subtitle="Banque + caisse"
         />
         <SummaryCard
+          icon={Building2}
           title="Stocks valorisés"
           value={`${globalSummary.stock_value.toLocaleString('fr-FR')} €`}
           subtitle="Dernier prix connu"
@@ -103,15 +127,15 @@ function PortfolioPage({ initialData = null }) {
       </div>
 
       <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-600">Filtrer par entité :</span>
+        <span className="text-sm text-slate-400">Filtrer par entité :</span>
         <select
           value={selectedEntity}
           onChange={(event) => setSelectedEntity(event.target.value)}
-          className="border rounded px-3 py-2 text-sm"
+          className="border border-white/10 rounded-lg bg-white/5 px-3 py-2 text-sm text-white focus:border-orange-500/50 focus:outline-none"
         >
-          <option value="global">Global</option>
+          <option value="global" className="bg-slate-800">Global</option>
           {entities.map((entity) => (
-            <option key={entity.entity_id} value={entity.code}>
+            <option key={entity.entity_id} value={entity.code} className="bg-slate-800">
               {entity.code}
             </option>
           ))}
@@ -119,49 +143,49 @@ function PortfolioPage({ initialData = null }) {
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Par entité</h2>
+        <h2 className="text-lg font-semibold text-amber-400">Par entité</h2>
         <div className="space-y-4">
           {displayEntities.length ? (
             displayEntities.map((entity) => (
-              <div key={entity.entity_id} className="border rounded p-4 bg-white shadow-sm space-y-4">
+              <Card key={entity.entity_id} className="p-4 space-y-4">
                 <div>
-                  <p className="text-sm text-gray-500">{entity.code}</p>
-                  <p className="text-lg font-bold">{entity.name}</p>
+                  <p className="text-sm text-slate-500">{entity.code}</p>
+                  <p className="text-lg font-bold text-white">{entity.name}</p>
                   <div className="grid grid-cols-2 gap-2 text-sm mt-3">
                     <div>
-                      <p className="text-gray-400">Stock</p>
-                      <p className="font-medium">{entity.stock_value.toLocaleString('fr-FR')} €</p>
+                      <p className="text-slate-500">Stock</p>
+                      <p className="font-medium text-white">{entity.stock_value.toLocaleString('fr-FR')} €</p>
                     </div>
                     <div>
-                      <p className="text-gray-400">Banque</p>
-                      <p className="font-medium">{entity.bank_balance.toLocaleString('fr-FR')} €</p>
+                      <p className="text-slate-500">Banque</p>
+                      <p className="font-medium text-white">{entity.bank_balance.toLocaleString('fr-FR')} €</p>
                     </div>
                     <div>
-                      <p className="text-gray-400">Caisse</p>
-                      <p className="font-medium">{entity.cash_balance.toLocaleString('fr-FR')} €</p>
+                      <p className="text-slate-500">Caisse</p>
+                      <p className="font-medium text-white">{entity.cash_balance.toLocaleString('fr-FR')} €</p>
                     </div>
                     <div>
-                      <p className="text-gray-400">Total</p>
-                      <p className="font-medium">{entity.total_assets.toLocaleString('fr-FR')} €</p>
+                      <p className="text-slate-500">Total</p>
+                      <p className="font-medium text-amber-400">{entity.total_assets.toLocaleString('fr-FR')} €</p>
                     </div>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xs uppercase text-gray-400">Business units</p>
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Business units</p>
                   {entity.members.length ? (
                     <div className="grid gap-3 md:grid-cols-2">
                       {entity.members.map((tenant) => (
-                        <div key={tenant.tenant_id} className="rounded border px-3 py-2 text-sm">
-                          <p className="font-semibold">{tenant.name}</p>
-                          <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-gray-500">
+                        <div key={tenant.tenant_id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                          <p className="font-semibold text-white">{tenant.name}</p>
+                          <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-slate-400">
                             <span>Stock</span>
-                            <span className="text-right">{tenant.stock_value.toLocaleString('fr-FR')} €</span>
+                            <span className="text-right text-slate-300">{tenant.stock_value.toLocaleString('fr-FR')} €</span>
                             <span>Banque</span>
-                            <span className="text-right">{tenant.bank_balance.toLocaleString('fr-FR')} €</span>
+                            <span className="text-right text-slate-300">{tenant.bank_balance.toLocaleString('fr-FR')} €</span>
                             <span>Caisse</span>
-                            <span className="text-right">{tenant.cash_balance.toLocaleString('fr-FR')} €</span>
+                            <span className="text-right text-slate-300">{tenant.cash_balance.toLocaleString('fr-FR')} €</span>
                             <span>Total</span>
-                            <span className="text-right text-gray-900 font-semibold">
+                            <span className="text-right text-amber-400 font-semibold">
                               {tenant.total_assets.toLocaleString('fr-FR')} €
                             </span>
                           </div>
@@ -169,54 +193,56 @@ function PortfolioPage({ initialData = null }) {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-500">Aucun tenant rattaché.</p>
+                    <p className="text-sm text-slate-500">Aucun tenant rattaché.</p>
                   )}
                 </div>
-              </div>
+              </Card>
             ))
           ) : (
-            <div className="border rounded p-4 bg-white text-sm text-gray-500">Aucune entité sélectionnée.</div>
+            <Card className="p-4">
+              <p className="text-sm text-slate-400">Aucune entité sélectionnée.</p>
+            </Card>
           )}
         </div>
       </section>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Derniers prix connus</h2>
-          <p className="text-xs text-gray-500">Les lignes les plus récentes par code</p>
+          <h2 className="text-lg font-semibold text-amber-400">Derniers prix connus</h2>
+          <p className="text-xs text-slate-500">Les lignes les plus récentes par code</p>
         </div>
         <div className="grid gap-6">
-          <div className="border rounded px-4 py-3 bg-white shadow-sm">
+          <Card className="p-4">
             <LatestPricesChart items={latestPrices} />
-          </div>
-          <div className="overflow-x-auto border rounded bg-white shadow-sm">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Code</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Fournisseur</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Prix achat</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Quantité</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Date facture</th>
+          </Card>
+          <Card className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Code</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Fournisseur</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Prix achat</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Quantité</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Date facture</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 text-sm">
+              <tbody className="divide-y divide-white/5 text-sm">
                 {latestPrices.map((item) => (
-                  <tr key={`${item.code}-${item.created_at}`}>
-                    <td className="px-4 py-2">{item.code}</td>
-                    <td className="px-4 py-2">{item.fournisseur || '—'}</td>
-                    <td className="px-4 py-2">
+                  <tr key={`${item.code}-${item.created_at}`} className="hover:bg-white/5">
+                    <td className="px-4 py-3 text-white font-medium">{item.code}</td>
+                    <td className="px-4 py-3 text-slate-300">{item.fournisseur || '—'}</td>
+                    <td className="px-4 py-3 text-amber-400 font-medium">
                       {Number(item.prix_achat).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} €
                     </td>
-                    <td className="px-4 py-2">{item.quantite ?? '—'}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-3 text-slate-300">{item.quantite ?? '—'}</td>
+                    <td className="px-4 py-3 text-slate-300">
                       {item.facture_date ? new Date(item.facture_date).toLocaleDateString('fr-FR') : '—'}
-                      <details className="text-xs text-gray-400">
-                        <summary>Détails</summary>
+                      <details className="text-xs text-slate-500 mt-1">
+                        <summary className="cursor-pointer hover:text-slate-400">Détails</summary>
                         {item.source_context ? (
-                          <p>Contexte : {item.source_context}</p>
+                          <p className="mt-1">Contexte : {item.source_context}</p>
                         ) : (
-                          <p>Aucun contexte fourni.</p>
+                          <p className="mt-1">Aucun contexte fourni.</p>
                         )}
                         <p>Créé le : {item.created_at ? new Date(item.created_at).toLocaleString('fr-FR') : '—'}</p>
                       </details>
@@ -225,7 +251,7 @@ function PortfolioPage({ initialData = null }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Card>
         </div>
       </section>
     </div>

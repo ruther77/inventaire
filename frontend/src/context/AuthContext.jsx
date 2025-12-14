@@ -72,18 +72,22 @@ export function AuthProvider({ children }) {
       body.set('username', username);
       body.set('password', password);
       body.set('tenant', tenant);
-      const { data } = await api.post('/auth/token', body, {
+      const response = await api.post('/auth/token', body, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       });
-      const nextSession = { token: data.access_token, user: data.user };
+      // API returns wrapped response: { success, data: { access_token, user }, error, meta }
+      const payload = response.data?.data ?? response.data;
+      const nextSession = { token: payload.access_token, user: payload.user };
       setAccessToken(nextSession.token);
       if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
       }
       setSession(nextSession);
-      return data;
+      return payload;
     } catch (authError) {
-      const detail = authError?.response?.data?.detail ?? 'Authentification impossible';
+      // Handle wrapped error response: { success: false, error: { message } }
+      const errorData = authError?.response?.data;
+      const detail = errorData?.error?.message ?? errorData?.detail ?? 'Authentification impossible';
       setError(detail);
       throw authError;
     } finally {

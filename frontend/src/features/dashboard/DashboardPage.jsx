@@ -316,7 +316,7 @@ export default function DashboardPage() {
       default:
         return (
           <Card>
-            <p className="text-sm text-slate-500">Sélectionnez une section pour afficher son contenu.</p>
+            <p className="text-sm text-slate-400">Sélectionnez une section pour afficher son contenu.</p>
           </Card>
         );
     }
@@ -361,7 +361,7 @@ export default function DashboardPage() {
           id="mobile-dashboard-section"
           value={activePanel}
           onChange={(event) => handlePanelSelect(event.target.value)}
-          className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-400 focus:outline-none"
+          className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-brand-400 focus:outline-none"
         >
           {sectionOptions.map((option) => (
             <option key={option.id} value={option.id}>

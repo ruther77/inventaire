@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from backend.schemas.catalog import (
     ProductCreate,
@@ -19,10 +19,11 @@ def list_products(
     search: str | None = None,
     category: str | None = None,
     status: str | None = None,
-    page: int = 1,
-    per_page: int = 25,
+    page: int = Query(default=1, ge=1, le=10000, description="Numéro de page"),
+    per_page: int = Query(default=25, ge=1, le=100, description="Éléments par page (max 100)"),
     tenant: Tenant = Depends(get_current_tenant),
 ):
+    """Liste les produits avec pagination stricte."""
     items, total = catalog_service.list_products_page(
         tenant_id=tenant.id,
         search=search,
@@ -85,3 +86,19 @@ def get_product_by_barcode(barcode: str, tenant: Tenant = Depends(get_current_te
         return catalog_service.get_product_by_barcode(barcode, tenant_id=tenant.id)
     except catalog_service.ProductNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/categories")
+def list_categories(tenant: Tenant = Depends(get_current_tenant)):
+    """
+    Liste toutes les categories de produits.
+    """
+    return catalog_service.list_categories(tenant_id=tenant.id)
+
+
+@router.get("/vendors")
+def list_vendors(tenant: Tenant = Depends(get_current_tenant)):
+    """
+    Liste tous les fournisseurs.
+    """
+    return catalog_service.list_vendors(tenant_id=tenant.id)

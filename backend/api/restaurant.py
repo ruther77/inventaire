@@ -38,8 +38,21 @@ from backend.schemas.restaurant import (
     RestaurantPriceHistoryComparisonEntry,
     RestaurantPlatEpicerieLink,
     RestaurantPlatMappingCreate,
+    # NEW SCHEMAS FOR UX 4.7
+    RestaurantOverview,
+    PlatListResponse,
+    PlatDetail,
+    CostBreakdownResponse,
+    IngredientListItem,
+    IngredientPriceHistoryResponse,
+    FoodCostAnalysis,
+    PriceSimulation,
+    PriceSimulationInput,
+    RestaurantAlertDetail,
+    RestaurantMenuOverview,
 )
 from backend.services import restaurant as restaurant_service
+from backend.services.restaurant import menus as restaurant_menus_service
 from backend.services import supply as supply_service  # noqa: F401
 
 router = APIRouter(prefix="/restaurant", tags=["restaurant"])
@@ -359,3 +372,207 @@ def price_history_overview(
 ):
     payload = restaurant_service.list_recent_price_changes(tenant.id, limit=limit)
     return RestaurantPriceHistoryOverview(**payload)
+
+
+# ========== NEW ENDPOINTS FOR UX 4.7: Restaurant Overview & Food Cost ==========
+
+
+@router.get("/overview", response_model=RestaurantOverview)
+def get_restaurant_overview(
+    period: str = Query("30d", description="Période: 7d, 30d, 90d, 1y"),
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Vue d'ensemble du restaurant.
+
+    Returns:
+    - Chiffre d'affaires période
+    - Food cost % global
+    - Nombre de plats actifs
+    - Top 5 plats par ventes
+    - Alertes (marges faibles, ruptures ingrédients)
+    """
+    payload = restaurant_service.get_restaurant_overview(tenant.id, period=period)
+    return RestaurantOverview(**payload)
+
+
+@router.get("/plats/list", response_model=PlatListResponse)
+def list_plats_paginated(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    categorie: str | None = Query(None),
+    actif: bool | None = Query(None),
+    min_margin_pct: float | None = Query(None),
+    sort_by: str = Query("nom", description="nom, margin_pct, sales_count, prix_vente_ttc"),
+    sort_desc: bool = Query(False),
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Liste paginée des plats avec filtres et tri.
+
+    Filters:
+    - categorie: Filtrer par catégorie
+    - actif: Filtrer par statut actif/inactif
+    - min_margin_pct: Marge minimale en %
+
+    Sort:
+    - sort_by: Champ de tri (nom, margin_pct, sales_count, prix_vente_ttc)
+    - sort_desc: Tri descendant si true
+    """
+    payload = restaurant_service.list_plats_paginated(
+        tenant.id,
+        page=page,
+        page_size=page_size,
+        categorie=categorie,
+        actif=actif,
+        min_margin_pct=min_margin_pct,
+        sort_by=sort_by,
+        sort_desc=sort_desc,
+    )
+    return PlatListResponse(**payload)
+
+
+@router.get("/plats/{plat_id}/detail", response_model=PlatDetail)
+def get_plat_detail(
+    plat_id: int,
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Détails complets d'un plat.
+
+    Returns:
+    - Fiche technique complète
+    - Liste ingrédients avec quantités et coûts
+    - Historique des prix
+    - Calculs de marge et food cost
+    """
+    payload = restaurant_service.get_plat_detail(tenant.id, plat_id)
+    return PlatDetail(**payload)
+
+
+@router.get("/plats/{plat_id}/cost-breakdown", response_model=CostBreakdownResponse)
+def get_plat_cost_breakdown(
+    plat_id: int,
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Décomposition détaillée du coût d'un plat.
+
+    Returns:
+    - Coût par ingrédient
+    - % du coût total
+    - Tendance prix ingrédients (30j)
+    """
+    payload = restaurant_service.get_plat_cost_breakdown(tenant.id, plat_id)
+    return CostBreakdownResponse(**payload)
+
+
+@router.get("/ingredients/list", response_model=list[IngredientListItem])
+def list_ingredients_enhanced(tenant: Tenant = Depends(get_current_tenant)):
+    """
+    Liste enrichie des ingrédients.
+
+    Returns:
+    - Prix unitaire actuel
+    - Fournisseur principal
+    - Stock actuel
+    - Tendance prix (30j)
+    """
+    ingredients = restaurant_service.list_ingredients_enhanced(tenant.id)
+    return [IngredientListItem(**ing) for ing in ingredients]
+
+
+@router.get("/ingredients/{ingredient_id}/price-history-detail", response_model=IngredientPriceHistoryResponse)
+def get_ingredient_price_history_detail(
+    ingredient_id: int,
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Historique détaillé des prix d'un ingrédient.
+    """
+    payload = restaurant_service.get_ingredient_price_history_detail(tenant.id, ingredient_id)
+    return IngredientPriceHistoryResponse(**payload)
+
+
+@router.get("/food-cost/analysis", response_model=FoodCostAnalysis)
+def get_food_cost_analysis(
+    period: str = Query("30d", description="Période: 7d, 30d, 90d, 1y"),
+    target_food_cost: float = Query(30.0, ge=0, le=100, description="Food cost cible en %"),
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Analyse complète du food cost.
+
+    Returns:
+    - Food cost par catégorie de plat
+    - Évolution sur période
+    - Comparaison objectif vs réel
+    - Recommandations IA
+    """
+    payload = restaurant_service.analyze_food_cost(tenant.id, period=period, target_food_cost=target_food_cost)
+    return FoodCostAnalysis(**payload)
+
+
+@router.post("/plats/{plat_id}/simulate-price", response_model=PriceSimulation)
+def simulate_plat_price_change(
+    plat_id: int,
+    payload: PriceSimulationInput,
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Simulation de changement de prix.
+
+    Input:
+    - new_price: Nouveau prix de vente (OU)
+    - target_margin_pct: Marge cible en % (calculera le prix nécessaire)
+
+    Returns:
+    - État actuel vs simulé
+    - Impact sur food cost, marge, rentabilité
+    - Estimation impact annuel
+    """
+    result = restaurant_service.simulate_price_change(
+        tenant.id,
+        plat_id,
+        new_price=payload.new_price,
+        target_margin_pct=payload.target_margin_pct,
+    )
+    return PriceSimulation(**result)
+
+
+@router.get("/alerts/detailed", response_model=list[RestaurantAlertDetail])
+def list_restaurant_alerts_detailed(
+    alert_type: str | None = Query(None, description="plat_margin, ingredient_price, stock_rupture"),
+    severity: str | None = Query(None, description="critical, warning, info"),
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """
+    Liste détaillée des alertes restaurant.
+
+    Types d'alertes:
+    - plat_margin: Marges < seuil
+    - ingredient_price: Prix ingrédients en hausse
+    - stock_rupture: Ruptures de stock prévues
+
+    Severities:
+    - critical: Action urgente requise
+    - warning: À surveiller
+    - info: Informatif
+    """
+    alerts = restaurant_service.list_alerts_detailed(
+        tenant.id,
+        alert_type=alert_type,
+        severity=severity,
+    )
+    return [RestaurantAlertDetail(**alert) for alert in alerts]
+
+
+# ========== SCÉNARIO 3.6 - Restaurant Menus & Coûts (inspiré newCMS) ==========
+
+
+@router.get("/menus/overview", response_model=RestaurantMenuOverview)
+def get_restaurant_menus_overview(tenant: Tenant = Depends(get_current_tenant)):
+    """
+    Vue d'ensemble des menus : coûts matière, food cost, alertes ingrédients.
+    """
+    return restaurant_menus_service.get_menu_overview(tenant.id)

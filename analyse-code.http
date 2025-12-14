@@ -1,0 +1,6 @@
+POST http://localhost:5678/webhook/analyse-code
+Content-Type: application/json
+
+{
+  "path": "/home/ruuuzer/Documents/monprojet/frontend/src/newCMS/components/TopBar.jsx"
+}

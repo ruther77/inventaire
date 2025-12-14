@@ -42,22 +42,27 @@ from analyze_releves import (
 DB_CONFIG = {
     "host": os.environ.get("DB_HOST", "db"),
     "port": os.environ.get("DB_PORT", "5432"),
-    "dbname": os.environ.get("DB_NAME", "postgres"),
+    "dbname": os.environ.get("DB_NAME", "epicerie"),
     "user": os.environ.get("DB_USER", "postgres"),
     "password": os.environ.get("DB_PASSWORD", "postgres"),
 }
 
 # Mapping fichiers -> (account_id, entity_id)
+# IDs pour base epicerie:
+#   1 = LCL - INCONTOURNABLE (entity 3)
+#   2 = LCL - NOUTAM (entity 2)
+#   3 = SUMUP - INCONTOURNABLE (entity 3)
+#  14 = BNP - ANGELE (entity 2)
 FILE_TO_ACCOUNT = {
-    # LCL - NOUTAM / Epicerie (account 1, entity 1)
-    "COMPTECOURANT_00459448258": (1, 1),
-    "releve noutam lcl": (1, 1),
-    # LCL - L'INCONTOURNABLE / Restaurant (account 2, entity 2)
-    "l'incontournable": (2, 2),
-    # BNP - ANGELE (account 3, entity 2)
-    "releve 23 24 25 BNP angele": (3, 2),
-    # SUMUP - L'INCONTOURNABLE (account 4, entity 2)
-    "sumup releve": (4, 2),
+    # LCL - NOUTAM / Epicerie (account 2, entity 2)
+    "COMPTECOURANT_00459448258": (2, 2),
+    "releve noutam lcl": (2, 2),
+    # LCL - L'INCONTOURNABLE / Restaurant (account 1, entity 3)
+    "l'incontournable": (1, 3),
+    # BNP - ANGELE (account 14, entity 2)
+    "releve 23 24 25 BNP angele": (14, 2),
+    # SUMUP - L'INCONTOURNABLE (account 3, entity 3)
+    "sumup releve": (3, 3),
 }
 
 
@@ -69,19 +74,27 @@ def get_account_info(filename: str) -> tuple[int, int]:
     raise ValueError(f"Compte non trouvé pour: {filename}")
 
 
-def parse_date(date_str: str, bank_type: str) -> datetime:
-    """Parse une date selon le format de la banque."""
+def parse_date(date_str: str, bank_type: str, ref_year: int = None) -> datetime:
+    """Parse une date selon le format de la banque.
+
+    Args:
+        date_str: La date à parser
+        bank_type: Type de banque (LCL, BNP, SUMUP)
+        ref_year: Année de référence pour les formats sans année (DD.MM)
+    """
     if not date_str:
         return None
 
     # Nettoyer
     date_str = date_str.strip()
 
-    # Format DD.MM (LCL/BNP) - on ajoute l'année courante
+    # Format DD.MM (LCL/BNP) - utiliser l'année de référence
     if re.match(r"^\d{2}\.\d{2}$", date_str):
         day, month = date_str.split(".")
-        # On utilise 2024 par défaut, sera ajusté selon le relevé
-        return datetime(2024, int(month), int(day))
+        if ref_year is None:
+            # Fallback: utiliser l'année courante
+            ref_year = datetime.now().year
+        return datetime(ref_year, int(month), int(day))
 
     # Format DD.MM.YY (date valeur LCL)
     if re.match(r"^\d{2}\.\d{2}\.\d{2}$", date_str):
@@ -103,9 +116,14 @@ def parse_date(date_str: str, bank_type: str) -> datetime:
     return None
 
 
-def compute_checksum(date_op, libelle, montant, account_id) -> str:
-    """Calcule un checksum unique pour éviter les doublons."""
-    data = f"{date_op}|{libelle}|{montant}|{account_id}"
+def compute_checksum(date_op, libelle, montant, account_id, position: int = 0) -> str:
+    """Calcule un checksum unique pour éviter les doublons.
+
+    Args:
+        position: Index de la transaction dans le relevé pour différencier
+                  les transactions identiques (même date/libellé/montant)
+    """
+    data = f"{date_op}|{libelle}|{montant}|{account_id}|{position}"
     return hashlib.md5(data.encode()).hexdigest()
 
 
@@ -168,17 +186,36 @@ def import_to_db(folder: str = "/app/releve", split_by_month: bool = True):
 
             # Parser toutes les transactions avec leurs dates
             parsed_transactions = []
-            period_ref = None
 
-            # Extraire la période de référence du fichier pour ajuster les années
-            if stmt.period_start:
-                period_ref = parse_date(stmt.period_start, stmt.bank_type)
-            elif stmt.period_end:
-                period_ref = parse_date(stmt.period_end, stmt.bank_type)
+            # Pour BNP/SUMUP: construire un mapping mois -> années disponibles depuis opening_balances
+            # Cela permet de distribuer les transactions aux bonnes années
+            month_to_years = defaultdict(list)
+            if stmt.opening_balances:
+                for (year, month) in stmt.opening_balances.keys():
+                    month_to_years[month].append(year)
+                for m in month_to_years:
+                    month_to_years[m].sort()  # Trier les années par ordre croissant
 
             for tx in stmt.transactions:
-                date_op = parse_date(tx.date, stmt.bank_type)
-                date_val = parse_date(tx.valeur, stmt.bank_type) if tx.valeur else date_op
+                # Déterminer l'année de référence pour cette transaction
+                # Priorité: date de valeur (DD.MM.YY) > opening_balances > année courante
+                ref_year = None
+
+                # 1. Essayer d'extraire l'année depuis la date de valeur (format DD.MM.YY)
+                if tx.valeur and re.match(r"^\d{2}\.\d{2}\.\d{2}$", tx.valeur):
+                    year_part = tx.valeur.split(".")[2]
+                    ref_year = 2000 + int(year_part)
+
+                # 2. Fallback sur opening_balances si disponible
+                if ref_year is None and tx.date and re.match(r"^\d{2}\.\d{2}$", tx.date):
+                    month = int(tx.date.split(".")[1])
+                    if month in month_to_years and month_to_years[month]:
+                        ref_year = month_to_years[month][0]
+                        if len(month_to_years[month]) > 1:
+                            month_to_years[month] = month_to_years[month][1:]
+
+                date_op = parse_date(tx.date, stmt.bank_type, ref_year)
+                date_val = parse_date(tx.valeur, stmt.bank_type, ref_year) if tx.valeur else date_op
 
                 if not date_op:
                     continue
@@ -275,8 +312,8 @@ def import_to_db(folder: str = "/app/releve", split_by_month: bool = True):
                     # Insérer les lignes de cette période
                     period_lines = 0
                     period_tx_count = 0
-                    for ptx in period_txs:
-                        checksum = compute_checksum(ptx['date_op'], ptx['libelle'], ptx['montant'], account_id)
+                    for tx_idx, ptx in enumerate(period_txs):
+                        checksum = compute_checksum(ptx['date_op'], ptx['libelle'], ptx['montant'], account_id, tx_idx)
 
                         # Vérifier doublon ligne
                         cur.execute("SELECT id FROM finance_bank_statement_lines WHERE checksum = %s", (checksum,))
@@ -345,8 +382,8 @@ def import_to_db(folder: str = "/app/releve", split_by_month: bool = True):
                 statement_id = cur.fetchone()[0]
                 total_statements += 1
 
-                for ptx in parsed_transactions:
-                    checksum = compute_checksum(ptx['date_op'], ptx['libelle'], ptx['montant'], account_id)
+                for tx_idx, ptx in enumerate(parsed_transactions):
+                    checksum = compute_checksum(ptx['date_op'], ptx['libelle'], ptx['montant'], account_id, tx_idx)
 
                     # Vérifier doublon ligne
                     cur.execute("SELECT id FROM finance_bank_statement_lines WHERE checksum = %s", (checksum,))

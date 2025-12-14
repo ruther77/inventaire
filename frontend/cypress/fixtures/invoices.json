@@ -1,0 +1,54 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "invoice_number": "INV-2025-0001",
+      "supplier": "Metro",
+      "date": "2025-12-01",
+      "due_date": "2025-12-31",
+      "amount_ht": 1050.00,
+      "amount_ttc": 1260.00,
+      "tva": 210.00,
+      "status": "validated",
+      "payment_status": "pending",
+      "lines_count": 12
+    },
+    {
+      "id": 2,
+      "invoice_number": "INV-2025-0002",
+      "supplier": "Pomona",
+      "date": "2025-12-03",
+      "due_date": "2025-01-02",
+      "amount_ht": 520.30,
+      "amount_ttc": 624.36,
+      "tva": 104.06,
+      "status": "pending",
+      "payment_status": "pending",
+      "lines_count": 8
+    },
+    {
+      "id": 3,
+      "invoice_number": "INV-2025-0003",
+      "supplier": "Lactalis",
+      "date": "2025-12-05",
+      "due_date": "2025-01-04",
+      "amount_ht": 890.00,
+      "amount_ttc": 968.11,
+      "tva": 78.11,
+      "status": "validated",
+      "payment_status": "paid",
+      "lines_count": 5
+    }
+  ],
+  "total": 85,
+  "page": 1,
+  "pageSize": 20,
+  "summary": {
+    "total_pending": 5,
+    "total_validated": 72,
+    "total_paid": 8,
+    "amount_pending": 3250.50,
+    "amount_this_month": 15420.30
+  },
+  "suppliers": ["Metro", "Pomona", "Lactalis", "Boulangerie Locale", "Cave du Bordelais"]
+}

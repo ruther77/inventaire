@@ -1,0 +1,42 @@
+{
+  "summary": {
+    "sales_trend": "up",
+    "sales_trend_pct": 5.2,
+    "cashflow_forecast_30d": 12500,
+    "stockouts_predicted": 3,
+    "confidence_avg": 0.85
+  },
+  "sales_forecasts": [
+    {
+      "date": "2025-12-11",
+      "predicted_value": 1250.00,
+      "confidence_lower": 1100.00,
+      "confidence_upper": 1400.00,
+      "confidence": 0.88
+    },
+    {
+      "date": "2025-12-12",
+      "predicted_value": 1320.00,
+      "confidence_lower": 1150.00,
+      "confidence_upper": 1490.00,
+      "confidence": 0.86
+    }
+  ],
+  "cashflow_forecasts": [
+    {
+      "date": "2025-12-11",
+      "predicted_balance": 15000,
+      "inflows": 1200,
+      "outflows": 800,
+      "confidence": 0.85
+    }
+  ],
+  "stock_depletion": [
+    {
+      "product_id": 1,
+      "product_name": "Tomates",
+      "predicted_stockout_date": "2025-12-15",
+      "days_until_stockout": 5
+    }
+  ]
+}

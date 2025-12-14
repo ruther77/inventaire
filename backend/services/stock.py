@@ -16,13 +16,24 @@ def fetch_movement_timeseries(
     *,
     tenant_id: int = 1,
 ) -> pd.DataFrame:
+    """Récupère les mouvements de stock groupés par jour.
+
+    La fenêtre est calculée à partir de la date du dernier mouvement,
+    pas de la date actuelle, pour éviter les périodes vides.
+    """
+    # Utilise une sous-requête pour obtenir la date max et calculer la fenêtre
     sql = """
+        WITH latest AS (
+            SELECT COALESCE(MAX(date_mvt), now()) AS max_date
+            FROM mouvements_stock
+            WHERE tenant_id = :tenant_id
+        )
         SELECT
             date_trunc('day', m.date_mvt) AS jour,
             m.type,
             SUM(m.quantite) AS quantite
-        FROM mouvements_stock m
-        WHERE m.date_mvt >= now() - (:window * INTERVAL '1 day')
+        FROM mouvements_stock m, latest
+        WHERE m.date_mvt >= latest.max_date - make_interval(days => :window)
           AND m.tenant_id = :tenant_id
     """
     params: dict[str, object] = {

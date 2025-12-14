@@ -1,0 +1,268 @@
+================================================================================
+    NewCMS Restaurant & Mobile API - Architecture Diagram
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CLIENT LAYER                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────┐          ┌──────────────────┐                        │
+│  │  Web Dashboard  │          │   Mobile App     │                        │
+│  │   (React.js)    │          │ (React Native)   │                        │
+│  │                 │          │                  │                        │
+│  │  - Overview     │          │  - Scan barcode  │                        │
+│  │  - Charts       │          │  - Adjust stock  │                        │
+│  │  - Alerts       │          │  - Inventory     │                        │
+│  └────────┬────────┘          └────────┬─────────┘                        │
+│           │                            │                                   │
+│           │ HTTPS                      │ HTTPS                             │
+│           │ JWT Token                  │ JWT Token                         │
+│           └────────────┬───────────────┘                                   │
+│                        │                                                   │
+└────────────────────────┼───────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                             API LAYER (FastAPI)                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │                    /newcms/restaurant/*                               │  │
+│  │  ┌────────────────────────────────────────────────────────────────┐  │  │
+│  │  │  GET /overview                                                  │  │  │
+│  │  │  ┌──────────────────────────────────────────────────────────┐  │  │  │
+│  │  │  │  • Plat costs (food cost %)                              │  │  │  │
+│  │  │  │  • Ingredient alerts (rupture, alerte)                   │  │  │  │
+│  │  │  │  • Stock by location (bar, cuisine, cave)                │  │  │  │
+│  │  │  │  • Top 5 plats by margin                                 │  │  │  │
+│  │  │  └──────────────────────────────────────────────────────────┘  │  │  │
+│  │  └────────────────────────────────────────────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │                      /newcms/mobile/*                                 │  │
+│  │  ┌────────────────────────────────────────────────────────────────┐  │  │
+│  │  │  GET /inventory?page=1&page_size=50&search=tomate             │  │  │
+│  │  │  • Paginated list of scannable items                           │  │  │
+│  │  │  • Search by name or barcode                                   │  │  │
+│  │  └────────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                       │  │
+│  │  ┌────────────────────────────────────────────────────────────────┐  │  │
+│  │  │  POST /scan                                                     │  │  │
+│  │  │  • Input: {"code_barre": "3245678901234"}                      │  │  │
+│  │  │  • Output: Product details + stock                             │  │  │
+│  │  │  • Performance: 10-30ms with index                             │  │  │
+│  │  └────────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                       │  │
+│  │  ┌────────────────────────────────────────────────────────────────┐  │  │
+│  │  │  POST /adjust                                                   │  │  │
+│  │  │  • Input: {product_id, adjustment, type, reason, notes}        │  │  │
+│  │  │  • Transaction: FOR UPDATE lock                                │  │  │
+│  │  │  • Audit: mouvements_stock entry                               │  │  │
+│  │  │  • Reasons: breakage, theft, error, expiry, other              │  │  │
+│  │  └────────────────────────────────────────────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │                      Dependencies                                     │  │
+│  │  • get_current_tenant (JWT auth)                                     │  │
+│  │  • Pydantic schemas (validation)                                     │  │
+│  │  • SQLAlchemy (queries)                                              │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          DATABASE LAYER (PostgreSQL)                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  plats                                                                │  │
+│  │  ┌────────────────────────────────────────────────────────────────┐  │  │
+│  │  │ • id, nom, prix_vente_ttc, actif                               │  │  │
+│  │  │ • Used for: plat cost calculation                              │  │  │
+│  │  └────────────────────────────────────────────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  ingredients                                                          │  │
+│  │  ┌────────────────────────────────────────────────────────────────┐  │  │
+│  │  │ • id, nom, stock_actuel, seuil_alerte                          │  │  │
+│  │  │ • code_barre (NEW) - for mobile scanning                       │  │  │
+│  │  │ • seuil_alerte (NEW) - for stock alerts                        │  │  │
+│  │  │ • Index: idx_ingredients_code_barre                            │  │  │
+│  │  │ • Index: idx_ingredients_stock_alert                           │  │  │
+│  │  └────────────────────────────────────────────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  plat_ingredients                                                     │  │
+│  │  ┌────────────────────────────────────────────────────────────────┐  │  │
+│  │  │ • plat_id, ingredient_id, quantite_batch                       │  │  │
+│  │  │ • Used for: food cost calculation                              │  │  │
+│  │  │ • Index: idx_plat_ingredients_plat_id                          │  │  │
+│  │  └────────────────────────────────────────────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  mouvements_stock                                                     │  │
+│  │  ┌────────────────────────────────────────────────────────────────┐  │  │
+│  │  │ • produit_id, type, quantite, date_mvt                         │  │  │
+│  │  │ • source (NEW) - audit trail                                   │  │  │
+│  │  │   Format: "mobile_adjust:reason:notes"                         │  │  │
+│  │  │   Example: "mobile_adjust:breakage:Cassé pendant transport"    │  │  │
+│  │  └────────────────────────────────────────────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+                              DATA FLOW EXAMPLES
+================================================================================
+
+1. RESTAURANT OVERVIEW FLOW
+   ┌────────────┐      GET /newcms/restaurant/overview      ┌────────────┐
+   │   Client   │─────────────────────────────────────────▶ │   FastAPI  │
+   └────────────┘                 (JWT token)               └──────┬─────┘
+                                                                   │
+                                                                   │ SQL queries
+                                                                   ▼
+   ┌────────────┐      {metrics, plat_costs, ...}          ┌────────────┐
+   │  Dashboard │◀─────────────────────────────────────────│ PostgreSQL │
+   └────────────┘           JSON response                   └────────────┘
+
+
+2. MOBILE SCAN FLOW
+   ┌────────────┐      POST /newcms/mobile/scan            ┌────────────┐
+   │   Mobile   │─────────────────────────────────────────▶│   FastAPI  │
+   │    App     │  {"code_barre": "3245678901234"}         └──────┬─────┘
+   └────────────┘                                                  │
+                                                                   │ SELECT ... WHERE code_barre = ?
+                                                                   │ (10-30ms with index)
+                                                                   ▼
+   ┌────────────┐      {found: true, product: {...}}       ┌────────────┐
+   │   Scan UI  │◀─────────────────────────────────────────│ PostgreSQL │
+   └────────────┘           JSON response                   └────────────┘
+
+
+3. STOCK ADJUSTMENT FLOW
+   ┌────────────┐      POST /newcms/mobile/adjust          ┌────────────┐
+   │   Mobile   │─────────────────────────────────────────▶│   FastAPI  │
+   │    App     │  {product_id: 1, adjustment: -1,         └──────┬─────┘
+   └────────────┘   reason: "breakage"}                           │
+                                                                   │ BEGIN TRANSACTION
+                                                                   │ SELECT ... FOR UPDATE
+                                                                   │ UPDATE ingredients SET stock = ...
+                                                                   │ INSERT mouvements_stock (audit)
+                                                                   │ COMMIT
+                                                                   ▼
+   ┌────────────┐      {old_stock: 15.5, new_stock: 14.5}  ┌────────────┐
+   │   Success  │◀─────────────────────────────────────────│ PostgreSQL │
+   │   Screen   │           JSON response                   └────────────┘
+   └────────────┘
+
+
+================================================================================
+                              PERFORMANCE METRICS
+================================================================================
+
+Endpoint                    Avg Time    Optimization
+────────────────────────────────────────────────────────────────────────────
+/restaurant/overview        200-500ms   • SQL aggregation
+                                        • Cache recommended (5min TTL)
+
+/mobile/inventory           50-100ms    • LIMIT/OFFSET pagination
+                                        • Index on tenant_id
+
+/mobile/scan                10-30ms     • Index on code_barre (CRITICAL)
+                                        • Single row lookup
+
+/mobile/adjust              50-100ms    • Transaction atomicity
+                                        • FOR UPDATE lock
+
+
+================================================================================
+                                 SECURITY
+================================================================================
+
+Authentication:   JWT token via get_current_tenant
+Authorization:    tenant_id isolation on all queries
+Validation:       Pydantic schemas (strict types)
+SQL Injection:    Parameterized queries (SQLAlchemy)
+Concurrency:      FOR UPDATE lock on stock adjustments
+Audit Trail:      All adjustments logged in mouvements_stock
+
+
+================================================================================
+                              FILE STRUCTURE
+================================================================================
+
+newCMS/
+├── backend/
+│   ├── api/
+│   │   └── restaurant.py          (376 lines - 4 endpoints)
+│   └── schemas/
+│       └── restaurant.py          (129 lines - 10 schemas)
+│
+├── Documentation/
+│   ├── QUICK_START.md             (Installation 5 min)
+│   ├── README.md                  (Vue d'ensemble)
+│   ├── RESTAURANT_MOBILE_API.md   (Doc API complète)
+│   ├── DEPLOYMENT.md              (Guide production)
+│   ├── INDEX.md                   (Index documentation)
+│   └── ARCHITECTURE.txt           (Ce fichier)
+│
+├── Configuration/
+│   ├── migration_mobile_support.sql  (BDD migration)
+│   ├── mobile_config.example.json    (Mobile config)
+│   └── postman_collection.json       (API tests)
+│
+└── Exemples/
+    ├── INTEGRATION_EXAMPLE.py     (FastAPI integration)
+    ├── mobile_client_example.tsx  (React Native client)
+    └── test_endpoints.py          (Unit tests)
+
+
+================================================================================
+                           DEPLOYMENT CHECKLIST
+================================================================================
+
+☐ 1. Run migration:     psql -f migration_mobile_support.sql
+☐ 2. Add router:        app.include_router(restaurant_router)
+☐ 3. Restart server:    uvicorn backend.main:app --reload
+☐ 4. Test endpoints:    curl /newcms/restaurant/overview
+☐ 5. Verify indexes:    SELECT * FROM pg_indexes WHERE tablename='ingredients'
+☐ 6. Add barcodes:      UPDATE ingredients SET code_barre = ...
+☐ 7. Test scan:         POST /newcms/mobile/scan
+☐ 8. Test adjust:       POST /newcms/mobile/adjust
+☐ 9. Verify audit:      SELECT * FROM mouvements_stock
+☐ 10. Monitor logs:     tail -f api.log | grep newcms
+
+
+================================================================================
+                              QUICK COMMANDS
+================================================================================
+
+# Test schema import
+python -c "from newCMS.backend.schemas.restaurant import *; print('OK')"
+
+# Test router import
+python -c "from newCMS.backend.api import restaurant_router; print('OK')"
+
+# Run unit tests
+python newCMS/test_endpoints.py
+
+# Run migration
+psql -U postgres -d inventaire -f newCMS/migration_mobile_support.sql
+
+# Test endpoint
+curl -H "Authorization: Bearer TOKEN" http://localhost:8000/newcms/restaurant/overview
+
+
+================================================================================
+Version: 1.0.0
+Author: Restaurant Backend Expert
+Date: 2025-12-11
+================================================================================

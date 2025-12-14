@@ -21,6 +21,10 @@ class ProductNotFound(CatalogServiceError):
 PRODUCT_COLUMNS = (
     "id, nom, tenant_id, prix_achat, prix_vente, tva, categorie, seuil_alerte, stock_actuel, actif"
 )
+# Version préfixée pour les JOINs
+PRODUCT_COLUMNS_PREFIXED = (
+    "p.id, p.nom, p.tenant_id, p.prix_achat, p.prix_vente, p.tva, p.categorie, p.seuil_alerte, p.stock_actuel, p.actif"
+)
 
 
 def _row_to_dict(row: Any) -> Dict[str, Any]:
@@ -217,7 +221,7 @@ def get_product_by_barcode(barcode: str, *, tenant_id: int) -> dict[str, Any]:
         row = conn.execute(
             text(
                 f"""
-                SELECT {PRODUCT_COLUMNS}
+                SELECT {PRODUCT_COLUMNS_PREFIXED}
                 FROM produits p
                 JOIN produits_barcodes pb ON p.id = pb.produit_id
                 WHERE pb.code = :code AND p.tenant_id = :tenant_id
@@ -233,3 +237,58 @@ def get_product_by_barcode(barcode: str, *, tenant_id: int) -> dict[str, Any]:
         record = _row_to_dict(row)
         record["codes"] = _fetch_barcodes(conn, int(record["id"]), tenant_id)
         return record
+
+
+def list_categories(*, tenant_id: int) -> list[dict[str, Any]]:
+    """Liste toutes les categories distinctes de produits."""
+    with get_engine().begin() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT DISTINCT categorie as name, COUNT(*) as product_count
+                FROM produits
+                WHERE tenant_id = :tenant_id AND categorie IS NOT NULL AND categorie != ''
+                GROUP BY categorie
+                ORDER BY categorie
+                """
+            ),
+            {"tenant_id": tenant_id},
+        ).fetchall()
+        return [{"name": row[0], "product_count": int(row[1])} for row in rows]
+
+
+def list_vendors(*, tenant_id: int) -> list[dict[str, Any]]:
+    """Liste tous les fournisseurs depuis processed_invoices ou restaurant_fournisseurs."""
+    with get_engine().begin() as conn:
+        # Extraire les fournisseurs des factures traitées
+        rows = conn.execute(
+            text(
+                """
+                SELECT DISTINCT supplier as name
+                FROM processed_invoices
+                WHERE tenant_id = :tenant_id AND supplier IS NOT NULL AND supplier != ''
+                ORDER BY supplier
+                """
+            ),
+            {"tenant_id": tenant_id},
+        ).fetchall()
+
+        if rows:
+            return [{"id": idx + 1, "name": row[0]} for idx, row in enumerate(rows)]
+
+        # Fallback: restaurant_fournisseurs si applicable
+        try:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT id, nom as name
+                    FROM restaurant_fournisseurs
+                    WHERE tenant_id = :tenant_id
+                    ORDER BY nom
+                    """
+                ),
+                {"tenant_id": tenant_id},
+            ).fetchall()
+            return [{"id": row[0], "name": row[1]} for row in rows]
+        except Exception:
+            return []
