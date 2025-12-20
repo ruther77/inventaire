@@ -1,4 +1,4 @@
-"""Supply planning endpoints."""
+"""Endpoints de planification d'approvisionnement."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Constants for restaurant services - category rules, regex patterns, presets."""
+"""Constantes pour les services restaurant : règles de catégorie, regex, presets."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any, Dict
 from core.vendor_categories import load_vendor_category_rules
 
 
-# Regex patterns for parsing bank statements
+# Motifs regex pour analyser les relevés bancaires
 TRANSACTION_LINE_RE = re.compile(
     r'^(?P<op>\d{2}\.\d{2})\s+(?P<val>\d{2}\.\d{2}\.\d{2})\s+(?P<body>.+)$'
 )
@@ -135,7 +135,7 @@ STOP_PREFIXES = tuple(
     )
 )
 
-# Category rules for automatic classification
+# Règles de catégorie pour la classification automatique
 CATEGORY_RULES: tuple[tuple[tuple[str, ...], str, tuple[str, ...] | None], ...] = (
     (("VERSEMENT ALS",), "Encaissement", ("Entree",)),
     (("REMISE CB", "REM CB", "CB NO", "CB ", "CARTE"), "Encaissement", ("Entree",)),
@@ -233,7 +233,7 @@ CATEGORY_RULES: tuple[tuple[tuple[str, ...], str, tuple[str, ...] | None], ...] 
     (("CHANTIER", "FACTURE"), "Autre", None),
 ) + load_vendor_category_rules()
 
-# Group presets for dashboard summaries
+# Pré-réglages de regroupement pour les synthèses du tableau de bord
 CATEGORY_GROUP_PRESETS: Dict[str, Dict[str, Any]] = {
     "default": {
         "label": "Vue standard",
@@ -302,7 +302,7 @@ CATEGORY_GROUP_PRESETS: Dict[str, Dict[str, Any]] = {
     }
 }
 
-# SumUp PDF parsing patterns
+# Motifs d'analyse PDF SumUp
 SUMUP_DATE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
 SUMUP_TIME_RE = re.compile(r"^\d{2}:\d{2}$")
 SUMUP_STATUS_PREFIXES = (
@@ -313,5 +313,5 @@ SUMUP_STATUS_PREFIXES = (
     "REFUS",
 )
 
-# Forecast granularity options
+# Options de granularité des prévisions
 ALLOWED_FORECAST_GRANULARITY = {"daily", "weekly", "monthly"}

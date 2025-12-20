@@ -1,4 +1,4 @@
-"""Supply planning computations reused by the REST API."""
+"""Calculs de planification d'approvisionnement réutilisés par l'API REST."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def compute_supply_plan(
     *,
     tenant_id: int = 1,
 ) -> dict[str, object]:
-    """Return the dynamic supply plan matching the former Streamlit view."""
+    """Retourne le plan d'approvisionnement dynamique aligné sur l'ancienne vue Streamlit."""
 
     safe_target = max(1, int(target_coverage))
     safe_alert = max(1, min(int(alert_threshold), safe_target))

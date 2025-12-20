@@ -16,6 +16,7 @@ import {
   fetchScoringCriteria,
   updateScoringCriteria,
   fetchSupplierAlerts,
+  acknowledgeSupplierAlert,
   recalculateSupplierScores,
 } from '../api/client.js';
 
@@ -119,6 +120,21 @@ export function useSupplierAlerts(filters = {}) {
     queryFn: () => fetchSupplierAlerts({ severity, acknowledged, limit }),
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchInterval: 5 * 60 * 1000, // Refresh toutes les 5 minutes
+  });
+}
+
+/**
+ * Hook mutation pour acquitter une alerte fournisseur.
+ */
+export function useAcknowledgeAlert() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (alertId) => acknowledgeSupplierAlert(alertId),
+    onSuccess: () => {
+      // Invalider les queries d'alertes pour rafraîchir la liste
+      queryClient.invalidateQueries({ queryKey: ['supplier-scoring', 'alerts'] });
+    },
   });
 }
 

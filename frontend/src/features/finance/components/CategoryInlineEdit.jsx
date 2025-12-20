@@ -3,20 +3,25 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import Select from '../../../components/ui/Select.jsx';
 import { useFinanceCategories } from '../../../hooks/useFinanceCategories.js';
-import { updateTransactionCategory } from '../../../api/client.js';
+import { updateTransactionCategory, recordCategoryFeedback } from '../../../api/client.js';
 
 /**
  * CategoryInlineEdit - Composant pour l'édition inline des catégories de transaction
+ * Intègre le feedback ML pour améliorer la catégorisation automatique (Phase 4)
  *
  * @param {number} transactionId - ID de la transaction
  * @param {number} currentCategoryId - ID de la catégorie actuelle
  * @param {string} currentCategoryName - Nom de la catégorie actuelle
+ * @param {number} aiConfidence - Score de confiance IA (0-1), optionnel
+ * @param {number} predictedCategoryId - ID de la catégorie prédite par l'IA (si différente de current)
  * @param {function} onUpdate - Callback après mise à jour (transactionId, newCategoryId)
  */
 export default function CategoryInlineEdit({
   transactionId,
   currentCategoryId,
   currentCategoryName,
+  aiConfidence = null,
+  predictedCategoryId = null,
   onUpdate,
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -31,11 +36,33 @@ export default function CategoryInlineEdit({
   const updateMutation = useMutation({
     mutationFn: ({ transactionId, categoryId }) =>
       updateTransactionCategory({ transactionId, categoryId }),
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
       // Invalider les queries pour rafraîchir les données
       queryClient.invalidateQueries({ queryKey: ['finance', 'transactions'] });
       queryClient.invalidateQueries({ queryKey: ['finance', 'categories-stats'] });
       queryClient.invalidateQueries({ queryKey: ['finance', 'dashboard-summary'] });
+
+      // ========================================
+      // PHASE 4: Enregistrer le feedback ML
+      // ========================================
+      // Si l'utilisateur a changé la catégorie, on enregistre cette correction
+      // pour améliorer le modèle de catégorisation automatique
+      const originalCategoryId = predictedCategoryId ?? currentCategoryId;
+      if (variables.categoryId !== originalCategoryId) {
+        try {
+          await recordCategoryFeedback(variables.transactionId, {
+            actual_category_id: variables.categoryId,
+            predicted_category_id: originalCategoryId,
+            confidence_score: aiConfidence,
+            correction_source: 'user_inline_edit',
+          });
+          // Invalider les stats de feedback
+          queryClient.invalidateQueries({ queryKey: ['finance', 'feedback'] });
+        } catch (feedbackError) {
+          // Ne pas bloquer l'UX si le feedback échoue
+          console.warn('Feedback ML non enregistré:', feedbackError);
+        }
+      }
 
       // Trouver le nom de la nouvelle catégorie
       const newCategory = categories.find((c) => c.id === variables.categoryId);

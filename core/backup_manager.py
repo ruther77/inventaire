@@ -1,10 +1,10 @@
-"""Utilities for managing database backup files.
+"""Outils de gestion des fichiers de sauvegarde de base de données.
 
-This module centralises backup related operations used by the Streamlit
-administration dashboard.  It exposes helpers to create, inspect, restore and
-remove PostgreSQL dumps stored on disk.  Each function is intentionally small
-and testable so that the UI can simply call them without having to mock any
-Streamlit specific behaviour.
+Ce module centralise les opérations liées aux sauvegardes utilisées par le
+tableau de bord d'administration Streamlit. Il expose des helpers pour créer,
+inspecter, restaurer et supprimer les dumps PostgreSQL stockés sur disque.
+Chaque fonction reste volontairement concise et testable pour que l'UI puisse
+les appeler sans avoir à simuler un comportement spécifique à Streamlit.
 """  # Docstring du module backup
 from __future__ import annotations  # Active les annotations différées
 
@@ -25,12 +25,12 @@ from sqlalchemy.engine.url import make_url  # Parsing d'URL SQLAlchemy
 
 
 class BackupError(RuntimeError):
-    """Raised when a backup operation cannot be completed."""  # Exception métier pour les backups
+    """Levée lorsqu'une opération de sauvegarde ne peut pas aboutir."""  # Exception métier pour les backups
 
 
 @dataclass(frozen=True, slots=True)
 class BackupMetadata:
-    """Simple container describing a backup file present on disk."""  # Métadonnées d'un fichier backup
+    """Conteneur simple décrivant un fichier de sauvegarde présent sur disque."""  # Métadonnées d'un fichier backup
 
     name: str  # Nom de fichier
     path: Path  # Chemin complet
@@ -39,7 +39,7 @@ class BackupMetadata:
 
     @property
     def size_mb(self) -> float:
-        """Human friendly representation in megabytes."""  # Taille en Mo
+        """Représentation lisible en mégaoctets."""  # Taille en Mo
 
         return self.size_bytes / (1024 * 1024)  # Conversion octets -> Mo
 
@@ -66,10 +66,10 @@ _PSQL_ENV_VARS: Tuple[str, ...] = ("PSQL_PATH", "PSQL_BIN")  # Variables pour ps
 
 @dataclass(frozen=True, slots=True)
 class BinaryStatus:
-    """Describe how a required external command is resolved."""  # Statut d'un binaire externe
+    """Décrit comment une commande externe requise est résolue."""  # Statut d'un binaire externe
 
     name: str  # Nom logique (pg_dump/psql)
-    configured: str  # Chemin configuré (argument/env/default)
+    configured: str  # Chemin configuré (argument/env/defaut)
     resolved: Optional[str]  # Chemin résolu réel
     source: str  # Source de la résolution
 
@@ -85,10 +85,10 @@ def _settings_path(directory: str | os.PathLike[str] | None = None) -> Path:
 def load_backup_settings(
     directory: str | os.PathLike[str] | None = None,
 ) -> Dict[str, object]:
-    """Return persisted backup automation settings."""  # Docstring chargement paramètres
+    """Retourne les paramètres d'automatisation de sauvegarde persistés."""  # Docstring chargement paramètres
 
-    # The configuration is stored as JSON next to the backup files so that
-    # Streamlit sessions can recover the last saved preferences.
+    # La configuration est stockée en JSON à côté des sauvegardes pour que
+    # les sessions Streamlit puissent retrouver les préférences enregistrées.
 
     path = _settings_path(directory)  # Résout le chemin du fichier
     if not path.exists():  # Si inexistant
@@ -100,10 +100,10 @@ def load_backup_settings(
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))  # Lit et parse le JSON
     except (OSError, json.JSONDecodeError):  # Erreur d'E/S ou JSON invalide
-        return dict(_DEFAULT_SETTINGS)  # Fallback défaut
+        return dict(_DEFAULT_SETTINGS)  # Repli sur les valeurs par défaut
 
-    settings: Dict[str, object] = dict(_DEFAULT_SETTINGS)  # Copie des defaults
-    settings.update({k: v for k, v in payload.items() if k in _DEFAULT_SETTINGS})  # Merge des clés reconnues
+    settings: Dict[str, object] = dict(_DEFAULT_SETTINGS)  # Copie des valeurs par défaut
+    settings.update({k: v for k, v in payload.items() if k in _DEFAULT_SETTINGS})  # Fusionne uniquement les clés reconnues
     return settings  # Retourne les paramètres
 
 
@@ -111,9 +111,9 @@ def save_backup_settings(
     settings: Dict[str, object],
     directory: str | os.PathLike[str] | None = None,
 ) -> None:
-    """Persist backup automation settings to disk."""  # Docstring sauvegarde paramètres
+    """Persiste les paramètres d'automatisation des sauvegardes sur disque."""  # Docstring sauvegarde paramètres
 
-    payload = dict(_DEFAULT_SETTINGS)  # Base default
+    payload = dict(_DEFAULT_SETTINGS)  # Base des valeurs par défaut
     payload.update({k: v for k, v in settings.items() if k in _DEFAULT_SETTINGS})  # Mise à jour des valeurs fournies
     path = _settings_path(directory)  # Chemin du fichier
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")  # Écriture JSON
@@ -124,16 +124,15 @@ def get_backup_directory(
     *,
     create: bool = True,
 ) -> Path:
-    """Return the directory used to store backup files."""  # Docstring répertoire backup
+    """Retourne le répertoire utilisé pour stocker les fichiers de sauvegarde."""  # Docstring répertoire backup
 
     # Args:
-    #     directory: Optional override path.  When omitted the BACKUP_DIR
-    #         environment variable is used, or ``/app/backups`` (falling back to
-    #         ``./backups`` if the former cannot be created).
-    #     create: Whether the directory should be created when missing.
+    #     directory: Chemin alternatif. Si omis, on utilise la variable d'env
+    #         BACKUP_DIR ou ``/app/backups`` (puis ``./backups`` si la création échoue).
+    #     create: Indique si le répertoire doit être créé s'il est manquant.
     #
     # Returns:
-    #     A :class:`~pathlib.Path` object pointing to the backup folder.
+    #     Un objet :class:`~pathlib.Path` pointant vers le dossier de sauvegarde.
 
     candidates: Tuple[Path, ...]  # Liste de candidats
     if directory is not None:  # Si un répertoire est fourni
@@ -154,12 +153,12 @@ def get_backup_directory(
                 continue  # Essaie le prochain candidat
         return path  # Retourne le premier valide
 
-    # If all automatic locations failed because of permissions, fall back to a
-    # relative directory that Streamlit can create in the working tree.
-    fallback = Path("backups")  # Dossier relatif fallback
+    # Si tous les emplacements automatiques échouent par manque de droits,
+    # repli vers un répertoire relatif que Streamlit peut créer dans l'arborescence.
+    fallback = Path("backups")  # Dossier relatif de repli
     if create:
-        fallback.mkdir(parents=True, exist_ok=True)  # Crée le fallback
-    return fallback  # Retourne le fallback
+        fallback.mkdir(parents=True, exist_ok=True)  # Crée le dossier de repli
+    return fallback  # Retourne le répertoire de repli
 
 
 def _select_binary(
@@ -169,7 +168,7 @@ def _select_binary(
     default: str,
     argument_label: str,
 ) -> Tuple[str, str]:
-    """Return the binary path and describe how it was resolved."""  # Docstring sélection binaire
+    """Retourne le chemin du binaire et explique comment il a été résolu."""  # Docstring sélection binaire
 
     if explicit:  # Si chemin explicitement fourni
         return explicit, f"l'argument {argument_label}"  # Retourne chemin + source
@@ -179,7 +178,7 @@ def _select_binary(
         if value:  # Si définie
             return value, f"la variable d'environnement {env_var}"  # Retourne valeur + source
 
-    return default, "la valeur par défaut du système"  # Fallback sur valeur par défaut
+    return default, "la valeur par défaut du système"  # Repli sur la valeur par défaut
 
 
 def _format_env_var_hint(env_vars: Tuple[str, ...]) -> str:
@@ -191,7 +190,7 @@ def _format_env_var_hint(env_vars: Tuple[str, ...]) -> str:
 
 
 def _resolve_binary_location(command: str) -> Optional[str]:
-    """Return the absolute location of *command* if available."""  # Docstring résolution chemin
+    """Retourne l'emplacement absolu de *command* si disponible."""  # Docstring résolution chemin
 
     path = Path(command)  # Convertit en Path
     if path.is_absolute() or path.parent != Path("."):  # Si absolu ou avec dossier
@@ -203,7 +202,7 @@ def _resolve_binary_location(command: str) -> Optional[str]:
 
 
 def _normalise_database_url(database_url: str) -> Tuple[str, Optional[str]]:
-    """Return a ``postgresql://`` URL compatible with psql/pg_dump."""  # Docstring normalisation URL
+    """Retourne une URL ``postgresql://`` compatible avec psql/pg_dump."""  # Docstring normalisation URL
 
     # SQLAlchemy URLs can embed the driver name (``postgresql+psycopg2``) which
     # is not understood by the PostgreSQL command line tools.  The function also
@@ -249,7 +248,7 @@ def _build_backup_name(label: Optional[str]) -> str:
 def list_backups(
     directory: str | os.PathLike[str] | None = None,
 ) -> List[BackupMetadata]:
-    """Return backup metadata sorted from newest to oldest."""  # Docstring listage backups
+    """Retourne les métadonnées de sauvegarde triées du plus récent au plus ancien."""  # Docstring listage backups
 
     # Le flux commence par l’inspection du dossier : la liste finale est
     # triée du plus récent au plus ancien pour alimenter le tableau de bord.
@@ -280,7 +279,7 @@ def list_backups(
 
 
 def build_backup_timeline(backups: Iterable[BackupMetadata]) -> List[dict]:
-    """Return a serialisable timeline structure for visualisations."""  # Docstring timeline
+    """Retourne une timeline sérialisable pour les visualisations."""  # Docstring timeline
 
     return [
         {
@@ -293,7 +292,7 @@ def build_backup_timeline(backups: Iterable[BackupMetadata]) -> List[dict]:
 
 
 def compute_backup_statistics(backups: Iterable[BackupMetadata]) -> Dict[str, float]:
-    """Compute aggregate statistics (min/max/average/total sizes)."""  # Docstring statistiques
+    """Calcule des statistiques agrégées (min/max/moyenne/taille totale)."""  # Docstring statistiques
 
     sizes = [backup.size_mb for backup in backups]  # Liste des tailles en Mo
     if not sizes:  # Si aucune sauvegarde
@@ -313,7 +312,7 @@ def suggest_retention_cleanup(
     retention_days: int | None = None,
     max_backups: int | None = None,
 ) -> List[BackupMetadata]:
-    """Return backups that should be pruned according to retention rules."""  # Docstring nettoyage rétention
+    """Retourne les sauvegardes à purger selon les règles de rétention."""  # Docstring nettoyage rétention
 
     retention = retention_days if retention_days is not None and retention_days > 0 else None  # Rétention en jours
     maximum = max_backups if max_backups is not None and max_backups > 0 else None  # Nombre max
@@ -326,11 +325,11 @@ def suggest_retention_cleanup(
         prune.extend([b for b in backups_list if b.created_at < threshold])  # Ajoute ceux trop vieux
 
     if maximum is not None and len(backups_list) > maximum:  # Si limitation en nombre
-        # Keep the newest entries first, drop the rest from the end
+        # Conserve en priorité les plus récents et supprime le surplus en fin de liste
         excess = backups_list[maximum:]  # Sélectionne les plus anciens au-delà du max
         prune.extend(excess)  # Ajoute à la liste de purge
 
-    # Deduplicate while preserving order of appearance in ``backups_list``
+    # Déduplique tout en conservant l'ordre d'apparition dans ``backups_list``
     seen: set[str] = set()  # Suivi des noms déjà vus
     ordered: List[BackupMetadata] = []  # Liste ordonnée sans doublon
     for item in backups_list:  # Parcourt les backups
@@ -346,7 +345,7 @@ def plan_next_backup(
     last_backup: Optional[BackupMetadata] = None,
     now: Optional[datetime] = None,
 ) -> Optional[datetime]:
-    """Compute the next scheduled backup datetime in local timezone."""  # Docstring planification
+    """Calcule la prochaine sauvegarde planifiée en horaire local."""  # Docstring planification
 
     frequency = str(settings.get("frequency", "manual"))  # Fréquence choisie
     if frequency == "manual":  # Manuel => aucune planification
@@ -359,7 +358,7 @@ def plan_next_backup(
     try:
         hour, minute = [int(part) for part in time_str.split(":", 1)]  # Parse HH:MM
     except (ValueError, TypeError):
-        hour, minute = 2, 0  # Fallback 02:00
+        hour, minute = 2, 0  # Repli 02:00
 
     candidate = datetime.combine(base_date, datetime.min.time()).astimezone()  # Base jour courant minuit
     candidate = candidate.replace(hour=hour, minute=minute)  # Applique l'heure choisie
@@ -386,7 +385,7 @@ def plan_next_backup(
 def check_backup_integrity(
     metadata: BackupMetadata,
 ) -> Tuple[bool, str]:
-    """Perform lightweight integrity checks on a backup file."""  # Docstring check intégrité
+    """Effectue des vérifications légères d'intégrité sur un fichier de sauvegarde."""  # Docstring check intégrité
 
     path = metadata.path  # Chemin du fichier
     if not path.exists():  # Fichier absent
@@ -406,7 +405,7 @@ def check_backup_integrity(
 
 
 def integrity_report(backups: Iterable[BackupMetadata]) -> List[dict]:
-    """Return integrity status for all provided backups."""  # Docstring rapport intégrité
+    """Retourne l'état d'intégrité pour chaque sauvegarde fournie."""  # Docstring rapport intégrité
 
     report: List[dict] = []  # Liste des statuts
     for backup in backups:  # Parcourt chaque backup
@@ -442,7 +441,7 @@ def create_backup(
     backup_dir: str | os.PathLike[str] | None = None,
     pg_dump_path: Optional[str] = None,
 ) -> BackupMetadata:
-    """Create a new backup using ``pg_dump`` and return its metadata."""  # Docstring création backup
+    """Crée une nouvelle sauvegarde via ``pg_dump`` et retourne ses métadonnées."""  # Docstring création backup
 
     database_url = database_url or os.getenv("DATABASE_URL")  # URL DB
     if not database_url:  # Si absent
@@ -497,7 +496,7 @@ def delete_backup(
     *,
     backup_dir: str | os.PathLike[str] | None = None,
 ) -> None:
-    """Delete an existing backup file."""  # Docstring suppression backup
+    """Supprime un fichier de sauvegarde existant."""  # Docstring suppression backup
 
     path = _resolve_backup_path(filename, directory=backup_dir)  # Valide le chemin
     path.unlink()  # Supprime le fichier
@@ -510,7 +509,7 @@ def restore_backup(
     backup_dir: str | os.PathLike[str] | None = None,
     psql_path: Optional[str] = None,
 ) -> None:
-    """Restore the database using the provided backup file."""  # Docstring restauration
+    """Restaure la base de données à partir du fichier de sauvegarde fourni."""  # Docstring restauration
 
     database_url = database_url or os.getenv("DATABASE_URL")  # URL DB
     if not database_url:  # Absente
@@ -559,7 +558,7 @@ def check_backup_tools(
     pg_dump_path: Optional[str] = None,
     psql_path: Optional[str] = None,
 ) -> Tuple[BinaryStatus, BinaryStatus]:
-    """Return diagnostic information about pg_dump and psql availability."""  # Docstring diagnostic binaires
+    """Retourne un diagnostic de disponibilité de pg_dump et psql."""  # Docstring diagnostic binaires
 
     pg_dump, pg_dump_source = _select_binary(
         pg_dump_path,

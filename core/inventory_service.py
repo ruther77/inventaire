@@ -472,15 +472,17 @@ def suggest_product_matches(
     invoice_df: pd.DataFrame,
     *,
     tenant_id: int = 1,
+    auto_match_threshold: float = 0.65,
 ) -> pd.DataFrame:
     """Enrichit les lignes de facture non-matchées avec des suggestions de produits similaires.
 
     Pour chaque ligne sans produit_id, cherche des produits similaires par nom
-    et ajoute les suggestions.
+    et ajoute les suggestions. AUTO-MATCH si score >= auto_match_threshold.
 
     Args:
         invoice_df: DataFrame avec les lignes de facture
         tenant_id: ID du tenant
+        auto_match_threshold: Score minimum pour auto-matcher (défaut: 0.65)
 
     Returns:
         DataFrame enrichi avec colonnes:
@@ -489,6 +491,7 @@ def suggest_product_matches(
         - suggestion_nom: Nom du produit suggéré
         - suggestion_score: Score de similarité (0-1)
         - suggestion_type: Type de match (name_similarity)
+        - produit_id: Rempli automatiquement si score >= auto_match_threshold
     """
     if not isinstance(invoice_df, pd.DataFrame) or invoice_df.empty:
         return invoice_df
@@ -512,6 +515,7 @@ def suggest_product_matches(
         return result
 
     # Pour chaque ligne sans match, chercher des suggestions
+    auto_matched_count = 0
     for idx in result[mask_no_match].index:
         nom = result.at[idx, "nom"] if "nom" in result.columns else None
         if not nom or not str(nom).strip():
@@ -531,6 +535,19 @@ def suggest_product_matches(
             result.at[idx, "suggestion_nom"] = best["produit_nom"]
             result.at[idx, "suggestion_score"] = best["similarity_score"]
             result.at[idx, "suggestion_type"] = best["match_type"]
+
+            # AUTO-MATCH si score suffisant
+            if best["similarity_score"] >= auto_match_threshold:
+                result.at[idx, "produit_id"] = best["produit_id"]
+                result.at[idx, "catalogue_id"] = best["produit_id"]
+                result.at[idx, "catalogue_nom"] = best["produit_nom"]
+                auto_matched_count += 1
+
+    if auto_matched_count > 0:
+        import logging
+        logging.getLogger(__name__).info(
+            f"Auto-matched {auto_matched_count} products by name similarity (threshold={auto_match_threshold})"
+        )
 
     return result
 

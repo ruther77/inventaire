@@ -1,1 +1,1 @@
-"""Business services for FastAPI routes."""
+"""Services métier pour les routeurs FastAPI."""

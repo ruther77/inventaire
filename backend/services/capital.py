@@ -56,7 +56,7 @@ def _fetch_entities() -> list[dict[str, object]]:
     except SQLAlchemyError as exc:
         LOGGER.warning("Impossible de charger finance_entities, fallback tenant unique: %s", exc)
         return _tenant_entities_fallback()
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception as exc:  # pragma: no cover - cas defensif
         LOGGER.warning("Erreur inattendue finance_entities: %s", exc)
         return _tenant_entities_fallback()
     if df.empty:
@@ -103,12 +103,11 @@ def _bank_balance(tenant_id: int) -> Decimal:
         text(
             """
             SELECT COALESCE(
-                SUM(CASE WHEN t.direction = 'IN' THEN tl.montant_ttc ELSE 0 END) -
-                SUM(CASE WHEN t.direction = 'OUT' THEN tl.montant_ttc ELSE 0 END),
+                SUM(CASE WHEN t.direction = 'IN' THEN t.amount ELSE 0 END) -
+                SUM(CASE WHEN t.direction = 'OUT' THEN t.amount ELSE 0 END),
                 0
             ) AS balance
-            FROM finance_transaction_lines tl
-            JOIN finance_transactions t ON t.id = tl.transaction_id
+            FROM finance_transactions t
             WHERE t.entity_id IN (
                 SELECT entity_id FROM finance_entity_members WHERE tenant_id = :tenant_id
             )

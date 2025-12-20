@@ -28,12 +28,17 @@ def create_cost_center(entity_id: int, code: str, name: str) -> dict:
 
 
 def list_cost_centers(entity_id: int | None = None, is_active: bool | None = None) -> List[dict]:
-    """Retourne les centres de coûts finance disponibles, optionnellement filtrés."""
+    """Retourne les centres de coûts finance disponibles, optionnellement filtrés.
+
+    Si entity_id est fourni, retourne les centres de coûts de cette entité ET les centres
+    partagés (entity_id = NULL) accessibles par toutes les entités.
+    """
 
     clauses: List[str] = []
     params: Dict[str, Any] = {}
     if entity_id is not None:
-        clauses.append("entity_id = :entity_id")
+        # Inclure les centres de l'entité + les centres partagés (entity_id IS NULL)
+        clauses.append("(entity_id = :entity_id OR entity_id IS NULL)")
         params["entity_id"] = int(entity_id)
     if is_active is not None:
         clauses.append("is_active = :is_active")

@@ -1,4 +1,4 @@
-"""Schemas for maintenance endpoints."""
+"""Schémas pour les endpoints de maintenance."""
 
 from __future__ import annotations
 

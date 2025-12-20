@@ -267,7 +267,7 @@ export default function StockMovementsPage() {
             </Card>
             <Card className="flex flex-col gap-4">
               <div className="grid gap-6 lg:grid-cols-2">
-                <div className="h-72">
+                <div className="h-72" key={`daily-chart-${windowDays}-${selectedProduct}`}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dailySeries}>
                       <XAxis dataKey="jour" tick={{ fontSize: 12 }} />
@@ -278,7 +278,7 @@ export default function StockMovementsPage() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="h-72">
+                <div className="h-72" key={`cumulative-chart-${windowDays}-${selectedProduct}`}>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={cumulative}>
                       <XAxis dataKey="jour" tick={{ fontSize: 12 }} />

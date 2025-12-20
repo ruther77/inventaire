@@ -1,4 +1,4 @@
-"""Pydantic schemas for restaurant-specific endpoints."""
+"""Schémas Pydantic pour les endpoints spécifiques au restaurant."""
 
 from __future__ import annotations
 
@@ -63,6 +63,14 @@ class RestaurantIngredient(BaseModel):
     unite_base: str
     cout_unitaire: float
     stock_actuel: float
+    stock_min: Optional[float] = None
+    categorie: Optional[str] = None
+    fournisseur: Optional[str] = None
+    produit_epicerie_id: Optional[int] = None
+    ratio_epicerie: float = 1.0
+    price_trend: Optional[str] = None
+    price_evolution: Optional[float] = None
+    price_history: Optional[List[dict]] = None
 
 
 class RestaurantIngredientPriceUpdate(BaseModel):
@@ -82,6 +90,29 @@ class RestaurantIngredientCreate(BaseModel):
     unite_base: str = Field(default="kg")
     cout_unitaire: float = 0
     stock_actuel: float = 0
+    categorie: Optional[str] = None
+    fournisseur: Optional[str] = None
+    produit_epicerie_id: Optional[int] = None
+
+
+class RestaurantIngredientEpicerieLink(BaseModel):
+    produit_epicerie_id: int = Field(..., description="ID du produit épicerie à lier")
+    ratio: float = Field(default=1.0, ge=0.0001, description="Ratio de conversion")
+
+
+class RestaurantIngredientRatioUpdate(BaseModel):
+    ratio: float = Field(..., ge=0.0001, description="Ratio de conversion")
+
+
+class RestaurantIngredientUpdate(BaseModel):
+    """Schema pour mise à jour d'un ingrédient."""
+    nom: Optional[str] = Field(None, min_length=1)
+    unite_base: Optional[str] = None
+    cout_unitaire: Optional[float] = Field(None, ge=0)
+    stock_actuel: Optional[float] = Field(None, ge=0)
+    stock_min: Optional[float] = Field(None, ge=0)
+    categorie: Optional[str] = None
+    fournisseur: Optional[str] = None
 
 
 class RestaurantPlatIngredient(BaseModel):
@@ -90,6 +121,13 @@ class RestaurantPlatIngredient(BaseModel):
     nom: str
     quantite: float
     unite: Optional[str] = None
+    unit_price: Optional[float] = None
+    total_cost: Optional[float] = None
+
+
+class RestaurantPlatPriceHistoryItem(BaseModel):
+    prix: float
+    date: str
 
 
 class RestaurantPlat(BaseModel):
@@ -101,7 +139,9 @@ class RestaurantPlat(BaseModel):
     cout_matiere: float
     marge_brute: float
     marge_pct: float
+    food_cost_pct: Optional[float] = None
     ingredients: List[RestaurantPlatIngredient] = []
+    price_history: List[RestaurantPlatPriceHistoryItem] = []
 
 
 class RestaurantPlatCreate(BaseModel):
@@ -126,6 +166,12 @@ class RestaurantPlatPriceHistoryEntry(BaseModel):
 class RestaurantPlatIngredientCreate(BaseModel):
     ingredient_id: int
     quantite: float
+    unite: Optional[str] = None
+
+
+class RestaurantPlatIngredientUpdate(BaseModel):
+    """Schema pour mise à jour d'un ingrédient sur un plat (quantité/unité)."""
+    quantite: Optional[float] = None
     unite: Optional[str] = None
 
 
@@ -220,6 +266,7 @@ class RestaurantConsumptionEntry(BaseModel):
     tenant_id: int
     produit_restaurant_id: int
     restaurant_plat: str | None = None
+    ingredient_id: int | None = None
     produit_epicerie_id: int | None = None
     epicerie_nom: str
     epicerie_categorie: str
@@ -242,23 +289,6 @@ class RestaurantPriceHistoryComparisonEntry(BaseModel):
     epicerie_nom: str | None = None
     prix_achat: float | None = None
     epicerie_changed_at: Optional[datetime] = None
-
-
-class RestaurantPlatEpicerieLink(BaseModel):
-    plat_id: int
-    plat_nom: str
-    plat_categorie: str | None = None
-    produit_epicerie_id: int | None = None
-    epicerie_nom: str | None = None
-    epicerie_categorie: str | None = None
-    prix_achat: float | None = None
-    prix_vente: float | None = None
-    ratio: float | None = None
-
-
-class RestaurantPlatMappingCreate(BaseModel):
-    produit_epicerie_id: int
-    ratio: float = Field(default=1.0, ge=0.0001)
 
 
 class RestaurantBankStatementSummaryPreset(BaseModel):

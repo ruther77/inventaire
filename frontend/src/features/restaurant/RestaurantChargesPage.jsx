@@ -22,7 +22,8 @@ import {
 } from '../../hooks/useFinanceCategories.js';
 import { useFinanceTransactions } from '../../hooks/useFinance.js';
 
-// Entity IDs pour le multi-tenant
+// Entity IDs pour le multi-tenant (alignés sur finance_entities)
+// 1 = Epicerie HQ, 2 = Restaurant HQ
 const ENTITY_IDS = {
   EPICERIE: 1,
   RESTO: 2,
@@ -34,16 +35,25 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
   // Déterminer l'entity_id selon le contexte
   const entityId = context === 'epicerie' ? ENTITY_IDS.EPICERIE : ENTITY_IDS.RESTO;
 
-  // Hooks Finance API avec entity_id
-  const categories = useFinanceCategories({ entityId });
-  const costCenters = useFinanceCostCenters({ entityId });
-  const transactionsQuery = useFinanceTransactions({ entityId, size: 500 });
-  const createCategory = useCreateFinanceCategory();
-  const createCostCenter = useCreateFinanceCostCenter();
-
   const [categoryName, setCategoryName] = useState('');
   const [costCenterName, setCostCenterName] = useState('');
   const [timelineWindow, setTimelineWindow] = useState('6');
+
+  // Calculer dateFrom basé sur la fenêtre temporelle
+  const dateFrom = useMemo(() => {
+    if (timelineWindow === 'all') return undefined;
+    const months = Number(timelineWindow) || 6;
+    const date = new Date();
+    date.setMonth(date.getMonth() - months);
+    return date.toISOString().split('T')[0];
+  }, [timelineWindow]);
+
+  // Hooks Finance API avec entity_id et filtre de date
+  const categories = useFinanceCategories({ entityId });
+  const costCenters = useFinanceCostCenters({ entityId });
+  const transactionsQuery = useFinanceTransactions({ entityId, dateFrom, size: 500 });
+  const createCategory = useCreateFinanceCategory();
+  const createCostCenter = useCreateFinanceCostCenter();
 
   const contextLabel = context === 'epicerie' ? 'Épicerie HQ' : 'Restaurant HQ';
   const chargesTitle = context === 'epicerie' ? 'Charges épicerie' : 'Pilotage des dépenses';
@@ -59,7 +69,7 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
     return items.map((tx) => ({
       id: tx.id,
       date_operation: tx.date_operation,
-      libelle: tx.label,
+      libelle: (tx.label && String(tx.label).trim()) || tx.category_name || tx.source || '—',
       montant_ht: Math.abs(Number(tx.amount) || 0),
       categorie: tx.category_name || tx.category_code || '—',
       categorie_id: tx.category_id,
@@ -207,7 +217,7 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
             </div>
           </div>
           {timelineChartData.length ? (
-            <div className="h-64 w-full">
+            <div className="h-64 w-full" key={`timeline-${timelineWindow}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={timelineChartData} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
                   <defs>
@@ -244,7 +254,7 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
           </div>
           {topCategories.length ? (
             <>
-              <div className="h-64 w-full">
+              <div className="h-64 w-full" key={`categories-${timelineWindow}`}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topCategories} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -283,7 +293,7 @@ export default function RestaurantChargesPage({ context = 'restaurant' }) {
           </div>
           {topCostCenters.length ? (
             <>
-              <div className="h-64 w-full">
+              <div className="h-64 w-full" key={`costcenters-${timelineWindow}`}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topCostCenters} layout="vertical" margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />

@@ -99,7 +99,9 @@ def _ensure_table() -> None:
         CREATE TABLE IF NOT EXISTS produits_price_history (
             id SERIAL PRIMARY KEY,
             tenant_id INT NOT NULL DEFAULT 1,
+            produit_id INT,
             code TEXT NOT NULL,
+            nom TEXT,
             fournisseur TEXT,
             prix_achat NUMERIC(12, 4) NOT NULL,
             quantite NUMERIC(12, 3),
@@ -109,6 +111,8 @@ def _ensure_table() -> None:
         )
         """,
         "ALTER TABLE produits_price_history ADD COLUMN IF NOT EXISTS tenant_id INT NOT NULL DEFAULT 1",
+        "ALTER TABLE produits_price_history ADD COLUMN IF NOT EXISTS produit_id INT",
+        "ALTER TABLE produits_price_history ADD COLUMN IF NOT EXISTS nom TEXT",
         "CREATE INDEX IF NOT EXISTS idx_price_history_code ON produits_price_history (tenant_id, code)",
         "CREATE INDEX IF NOT EXISTS idx_price_history_date ON produits_price_history (tenant_id, facture_date DESC)",
     ]  # Script DDL idempotent pour créer/ajouter colonnes et indexes
@@ -291,9 +295,17 @@ def record_price_history(
         facture_value = record.get(facture_column) if facture_column else record.get("facture_date")  # Date brute
         facture_dt = _parse_facture_date(facture_value, invoice_dt)  # Date normalisée
 
+        # Récupère le nom du produit pour l'afficher dans l'historique
+        nom_value = record.get(nom_column) if nom_column else record.get("nom")
+        if isinstance(nom_value, str):
+            nom_value = nom_value.strip() or None
+        else:
+            nom_value = None
+
         payloads.append(
             {
                 "code": code_value,
+                "nom": nom_value,
                 "fournisseur": supplier_name,
                 "prix_achat": round(price_value, 4),
                 "quantite": quantity_value,
@@ -310,10 +322,10 @@ def record_price_history(
     insert_sql = text(
         """
         INSERT INTO produits_price_history (
-            code, fournisseur, prix_achat, quantite, facture_date, source_context, tenant_id
+            code, nom, fournisseur, prix_achat, quantite, facture_date, source_context, tenant_id
         )
         VALUES (
-            :code, :fournisseur, :prix_achat, :quantite, :facture_date, :source_context, :tenant_id
+            :code, :nom, :fournisseur, :prix_achat, :quantite, :facture_date, :source_context, :tenant_id
         )
         """
     )  # Requête batch d'insertion dans l'historique
@@ -374,7 +386,7 @@ def fetch_price_history(
         filters.append("ph.code ILIKE :code")  # Clause LIKE
         params["code"] = f"%{code.strip()}%"  # Paramètre LIKE
     if search:  # Filtre recherche générique
-        filters.append("(ph.code ILIKE :search OR prod_data.nom ILIKE :search)")  # Cherche dans code/nom
+        filters.append("(ph.code ILIKE :search OR ph.nom ILIKE :search)")  # Cherche dans code/nom stocké
         params["search"] = f"%{search.strip()}%"  # Paramètre de recherche
     if supplier:  # Filtre fournisseur
         filters.append("ph.fournisseur ILIKE :supplier")  # Clause fournisseur
@@ -430,7 +442,10 @@ def fetch_price_history(
             f.source_context,
             f.created_at,
             prod_data.produit_id,
-            prod_data.nom,
+            COALESCE(
+                NULLIF(NULLIF(prod_data.nom, '-'), '—'),
+                NULLIF(NULLIF(f.nom, '-'), '—')
+            ) AS nom,
             prod_data.tva,
             prod_data.prix_vente,
             prod_data.stock_actuel,
@@ -468,11 +483,18 @@ def fetch_price_history(
                          AND COALESCE(sr.sorties_recent, 0) >= :stockout_repeat_min
                         THEN TRUE ELSE FALSE
                 END AS stockout_repeated
-            FROM produits_barcodes pb
-            JOIN produits p ON p.id = pb.produit_id AND p.tenant_id = :tenant_id
+            FROM produits p
+            LEFT JOIN produits_barcodes pb ON pb.produit_id = p.id AND pb.tenant_id = :tenant_id
             LEFT JOIN sorties_recentes sr ON sr.produit_id = p.id
-            WHERE pb.tenant_id = :tenant_id AND pb.code = f.code
-            ORDER BY pb.is_principal DESC NULLS LAST, pb.created_at ASC
+            WHERE p.tenant_id = :tenant_id
+              AND (
+                (f.code IS NOT NULL AND f.code <> '' AND pb.code = f.code)
+                OR (f.produit_id IS NOT NULL AND p.id = f.produit_id)
+              )
+            ORDER BY
+                CASE WHEN pb.code = f.code THEN 0 ELSE 1 END,
+                pb.is_principal DESC NULLS LAST,
+                pb.created_at ASC
             LIMIT 1
         ) AS prod_data ON TRUE
         ORDER BY f.facture_date DESC

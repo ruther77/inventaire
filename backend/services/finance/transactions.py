@@ -277,7 +277,7 @@ def search_transactions(
         clauses.append("t.account_id = :account_id")
         params["account_id"] = int(account_id)
     if category_id is not None:
-        clauses.append("tl.category_id = :category_id")
+        clauses.append("COALESCE(tl.category_id, tc.category_id) = :category_id")
         params["category_id"] = int(category_id)
     if date_from:
         clauses.append("t.date_operation >= :date_from")
@@ -285,7 +285,7 @@ def search_transactions(
     if date_to:
         clauses.append("t.date_operation <= :date_to")
         params["date_to"] = date_to
-    amount_expr = "COALESCE(tl.montant_ttc, tl.montant_ht, 0)"
+    amount_expr = "t.amount"
     if amount_min is not None:
         clauses.append(f"{amount_expr} >= :amount_min")
         params["amount_min"] = float(amount_min)
@@ -303,30 +303,32 @@ def search_transactions(
         where_sql = "WHERE " + " AND ".join(clauses)
 
     sort_map = {
-        "date_operation": "t.date_operation ASC, tl.id ASC",
-        "-date_operation": "t.date_operation DESC, tl.id DESC",
-        "amount": f"{amount_expr} ASC, tl.id ASC",
-        "-amount": f"{amount_expr} DESC, tl.id DESC",
-        "category": "c.name ASC NULLS LAST, tl.id ASC",
-        "-category": "c.name DESC NULLS LAST, tl.id DESC",
-        "account": "a.label ASC NULLS LAST, tl.id ASC",
-        "-account": "a.label DESC NULLS LAST, tl.id DESC",
+        "date_operation": "t.date_operation ASC, t.id ASC",
+        "-date_operation": "t.date_operation DESC, t.id DESC",
+        "amount": "t.amount ASC, t.id ASC",
+        "-amount": "t.amount DESC, t.id DESC",
+        "category": "c.name ASC NULLS LAST, t.id ASC",
+        "-category": "c.name DESC NULLS LAST, t.id DESC",
+        "account": "a.label ASC NULLS LAST, t.id ASC",
+        "-account": "a.label DESC NULLS LAST, t.id DESC",
     }
     order_by = sort_map.get(sort, sort_map["-date_operation"])
 
     base_select = f"""
-        FROM finance_transaction_lines tl
-        JOIN finance_transactions t ON t.id = tl.transaction_id
+        FROM finance_transactions t
         JOIN finance_accounts a ON a.id = t.account_id
-        LEFT JOIN finance_categories c ON c.id = tl.category_id
+        LEFT JOIN finance_transaction_lines tl ON tl.transaction_id = t.id
+        LEFT JOIN finance_transaction_classification tc ON tc.transaction_id = t.id
+        LEFT JOIN finance_categories c ON c.id = COALESCE(tl.category_id, tc.category_id)
+        LEFT JOIN finance_cost_centers cc ON cc.id = tl.cost_center_id
         LEFT JOIN LATERAL (
           SELECT b2.libelle_banque
           FROM finance_bank_statement_lines b2
           JOIN finance_bank_statements bs ON bs.id = b2.statement_id
           WHERE (
-            (t.ref_externe LIKE 'stmtline:%' AND b2.checksum = substring(t.ref_externe FROM 'stmtline:(.+)'))
+            (t.ref_externe ~ '^stmtline:[0-9]+$' AND b2.id = CAST(substring(t.ref_externe FROM 'stmtline:([0-9]+)$') AS BIGINT))
             OR (
-              (t.ref_externe IS NULL OR t.ref_externe = '')
+              (t.ref_externe IS NULL OR t.ref_externe = '' OR t.ref_externe !~ '^stmtline:[0-9]+$')
               AND bs.account_id = t.account_id
               AND b2.date_operation = t.date_operation
               AND ABS(ABS(b2.montant) - t.amount) < 0.01
@@ -347,7 +349,7 @@ def search_transactions(
         text(
             f"""
             SELECT
-              tl.id AS line_id,
+              t.id AS line_id,
               t.id AS transaction_id,
               t.entity_id,
               t.account_id,
@@ -357,13 +359,17 @@ def search_transactions(
               t.date_operation,
               t.date_value,
               t.amount AS transaction_amount,
-              {amount_expr} AS amount,
-              tl.category_id,
-              c.code AS category_code,
-              c.name AS category_name,
-              COALESCE(b.libelle_banque, t.note, '') AS label,
+              t.amount AS amount,
+              COALESCE(tl.category_id, tc.category_id, 0) AS category_id,
+              COALESCE(c.code, 'uncategorized') AS category_code,
+              COALESCE(c.name, 'Non catégorisé') AS category_name,
+              cc.id AS cost_center_id,
+              cc.name AS cost_center_name,
+              t.label,
               t.currency,
-              t.status
+              t.status,
+              tc.confidence AS ai_confidence,
+              tc.source AS classification_source
             {base_select}
             ORDER BY {order_by}
             LIMIT :limit OFFSET :offset
@@ -429,8 +435,8 @@ def batch_categorize(payload: FinanceBatchCategorizeRequest) -> Dict[str, Any]:
           JOIN finance_transactions t ON t.id = tl.transaction_id
           LEFT JOIN finance_categories c ON c.id = tl.category_id
           LEFT JOIN finance_bank_statement_lines b
-            ON t.ref_externe LIKE 'stmtline:%'
-           AND b.id = CAST(substring(t.ref_externe FROM 'stmtline:(\\d+)') AS BIGINT)
+            ON t.ref_externe ~ '^stmtline:[0-9]+$'
+           AND b.id = CAST(substring(t.ref_externe FROM 'stmtline:([0-9]+)$') AS BIGINT)
           WHERE {where_sql}
         )
         UPDATE finance_transaction_lines tl
@@ -452,24 +458,26 @@ def suggest_autre_top(entity_id: Optional[int] = None, limit: int = 50) -> List[
     """Retourne les libellés fréquents restés en fourre-tout (ici frais_generaux)."""
 
     safe_limit = max(1, min(int(limit), 200))
-    clauses = ["c.code = 'frais_generaux'"]
+    clauses = ["(c.code = 'frais_generaux' OR c.code IS NULL)"]
     params: Dict[str, Any] = {}
     if entity_id is not None:
         clauses.append("t.entity_id = :entity_id")
         params["entity_id"] = int(entity_id)
     where_sql = "WHERE " + " AND ".join(clauses)
+    # Inclut finance_transaction_classification pour les auto-catégorisations
     sql = text(
         f"""
         SELECT
           lower(regexp_replace(COALESCE(b.libelle_banque, t.note, ''), '\\s+', ' ', 'g')) AS key,
           COUNT(*) AS cnt,
           array_agg(DISTINCT COALESCE(b.libelle_banque, t.note, '') ORDER BY COALESCE(b.libelle_banque, t.note, '')) AS examples
-        FROM finance_transaction_lines tl
-        JOIN finance_transactions t ON t.id = tl.transaction_id
-        LEFT JOIN finance_categories c ON c.id = tl.category_id
+        FROM finance_transactions t
+        LEFT JOIN finance_transaction_lines tl ON tl.transaction_id = t.id
+        LEFT JOIN finance_transaction_classification tc ON tc.transaction_id = t.id
+        LEFT JOIN finance_categories c ON c.id = COALESCE(tl.category_id, tc.category_id)
         LEFT JOIN finance_bank_statement_lines b
-          ON t.ref_externe LIKE 'stmtline:%'
-         AND b.id = CAST(substring(t.ref_externe FROM 'stmtline:(\\d+)') AS BIGINT)
+          ON t.ref_externe ~ '^stmtline:[0-9]+$'
+         AND b.id = CAST(substring(t.ref_externe FROM 'stmtline:([0-9]+)$') AS BIGINT)
         {where_sql}
         GROUP BY key
         ORDER BY cnt DESC
@@ -490,13 +498,18 @@ def suggest_autre_top(entity_id: Optional[int] = None, limit: int = 50) -> List[
 
 
 def autocomplete_categories(q: str, entity_id: Optional[int] = None, limit: int = 20) -> List[Dict[str, Any]]:
-    """Autocomplete sur les catégories (code/nom)."""
+    """Autocomplete sur les catégories (code/nom).
+
+    Si entity_id est fourni, retourne les catégories de cette entité ET les catégories
+    partagées (entity_id = NULL) accessibles par toutes les entités.
+    """
 
     safe_limit = max(1, min(int(limit), 100))
     params: Dict[str, Any] = {"limit": safe_limit, "q": f"%{q}%"}
     clause = ""
     if entity_id is not None:
-        clause = "AND c.entity_id = :entity_id"
+        # Inclure les catégories de l'entité + les catégories partagées (entity_id IS NULL)
+        clause = "AND (c.entity_id = :entity_id OR c.entity_id IS NULL)"
         params["entity_id"] = int(entity_id)
     sql = text(
         f"""

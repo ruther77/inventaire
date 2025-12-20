@@ -1,29 +1,94 @@
-# Workflow n8n : Inventaire API + IA locale
+# Workflows n8n - Inventaire
 
-Ce dossier contient le workflow `inventaire-api-ia.json` importé automatiquement au démarrage du conteneur `n8n`.
+Ce dossier contient les workflows n8n importes automatiquement au demarrage du conteneur.
 
-## Utilisation
-- Lancer `docker compose up n8n ollama api` (ou l'ensemble des services) pour démarrer l'API, Ollama et n8n.
-- Endpoint d'entrée : `POST http://localhost:5678/webhook/analyse`
-- Payload recommandé :
+## Workflows disponibles
 
+### 1. inventaire-api-ia.json
+**Assistant IA pour l'inventaire**
+
+Combine l'API Inventaire avec Ollama pour analyser les donnees.
+
+- Endpoint : `POST http://localhost:5678/webhook/analyse`
+- Payload :
 ```json
 {
-  "endpoint": "/inventaire",   // chemin API à appeler sur le service `api`
-  "question": "Quelles priorités pour aujourd'hui ?",
+  "endpoint": "/inventaire",
+  "question": "Quelles priorites pour aujourd'hui ?",
   "user": "manager-restaurant"
 }
 ```
 
-## Sécurité & configuration
-- Authentification basique n8n activée par défaut. Surcharger via variables d'environnement :
-  - `N8N_BASIC_AUTH_USER`
-  - `N8N_BASIC_AUTH_PASSWORD`
-  - désactiver via `N8N_BASIC_AUTH_ACTIVE=false` (déconseillé).
-- Vérifier les droits d'écriture du volume `n8n_data` pour l'utilisateur `node` dans le conteneur si des erreurs de persistance apparaissent (`chown -R 1000:1000 n8n_data`).
+### 2. bank-import-orchestrator.json
+**Orchestrateur principal d'import bancaire**
 
-## Comportement du workflow
-1. Valide/sanétise le `endpoint` et limite la question à 600 caractères.
-2. Appelle l'API interne `http://api:8000{endpoint}` (tolère les codes non-2xx).
-3. Fusionne la question + réponse API puis construit un prompt concis (sections Analyse + Actions).
-4. Envoie le prompt à Ollama (modèle `llama3.1`) et retourne un JSON `{ answer, endpoint, apiStatus, model, generatedAt }` en réponse HTTP.
+- Endpoint : `POST http://localhost:5678/webhook/bank-import`
+- Payload :
+```json
+{
+  "bank_type": "bnp|lcl_noutam|lcl_incontournable|sumup",
+  "account_id": 1
+}
+```
+
+**Mapping des comptes:**
+| bank_type | Account ID | Description |
+|-----------|------------|-------------|
+| `bnp` | 1 | BNP - Angele |
+| `lcl_noutam` | 2 | LCL - Noutam |
+| `lcl_incontournable` | 3 | LCL - L'Incontournable |
+| `sumup` | 4 | SumUp - L'Incontournable |
+
+### 3. sumup-import.json
+**Import simplifie pour SumUp**
+
+- Endpoint : `POST http://localhost:5678/webhook/import-sumup`
+- Importe directement vers le compte SumUp (ID 4)
+
+## Exemples d'utilisation
+
+```bash
+# Import releve BNP
+curl -X POST http://localhost:5678/webhook/bank-import \
+  -F "bank_type=bnp" \
+  -F "file=@releve_bnp.pdf"
+
+# Import releve SumUp (simplifie)
+curl -X POST http://localhost:5678/webhook/import-sumup \
+  -F "file=@sumup_releve.pdf"
+
+# Import LCL Noutam
+curl -X POST http://localhost:5678/webhook/bank-import \
+  -F "bank_type=lcl_noutam" \
+  -F "file=@releve_lcl.pdf"
+
+# Analyse IA
+curl -X POST http://localhost:5678/webhook/analyse \
+  -H "Content-Type: application/json" \
+  -d '{"endpoint": "/finance/accounts", "question": "Quel est le solde total?"}'
+```
+
+## Configuration
+
+### Authentification n8n
+- `N8N_BASIC_AUTH_USER` : utilisateur (defaut: admin)
+- `N8N_BASIC_AUTH_PASSWORD` : mot de passe (defaut: changeme)
+- `N8N_BASIC_AUTH_ACTIVE` : activer/desactiver (defaut: true)
+
+### Permissions
+Si erreurs de persistance :
+```bash
+chown -R 1000:1000 n8n_data
+```
+
+## Architecture
+
+```
+n8n (localhost:5678)
+  |
+  +-- /webhook/analyse --> API + Ollama --> Reponse IA
+  |
+  +-- /webhook/bank-import --> API /finance/bank-statements/import-pdf
+  |
+  +-- /webhook/import-sumup --> API (account_id=4)
+```

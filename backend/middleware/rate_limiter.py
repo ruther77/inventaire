@@ -1,12 +1,12 @@
 """
-Rate Limiter Middleware - Token bucket algorithm with sliding window.
+Middleware de limitation de débit - algorithme du seau à jetons avec fenêtre glissante.
 
-Provides configurable rate limiting for API endpoints using in-memory
-or Redis-backed storage.
+Fournit une limitation configurable des endpoints API avec stockage en mémoire
+ou via Redis.
 
-Usage:
+Usage :
     @router.get("/api/data")
-    @rate_limit(requests=100, window=60)  # 100 requests per minute
+    @rate_limit(requests=100, window=60)  # 100 requêtes par minute
     async def get_data(request: Request):
         ...
 """
@@ -27,12 +27,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RateLimitConfig:
-    """Configuration for rate limiting."""
+    """Configuration pour la limitation de débit."""
 
-    requests: int = 100  # Maximum requests
-    window: int = 60  # Time window in seconds
-    burst: int = 10  # Burst allowance above limit
-    key_prefix: str = "rl"  # Prefix for rate limit keys
+    requests: int = 100  # Nombre maximum de requêtes
+    window: int = 60  # Fenêtre temporelle en secondes
+    burst: int = 10  # Tolérance de rafale au-delà de la limite
+    key_prefix: str = "rl"  # Préfixe pour les clés de limitation
 
     @property
     def key(self) -> str:
@@ -41,7 +41,7 @@ class RateLimitConfig:
 
 @dataclass
 class RateLimitEntry:
-    """Tracks rate limit state for a single client."""
+    """Suit l'état de limitation pour un client."""
 
     tokens: float
     last_update: float
@@ -50,9 +50,9 @@ class RateLimitEntry:
 
 class RateLimiter:
     """
-    In-memory rate limiter using token bucket algorithm.
+    Rate limiter en mémoire utilisant l'algorithme du seau à jetons.
 
-    For production with multiple workers, consider using Redis.
+    Pour la production multi-workers, préférer Redis.
     """
 
     def __init__(self, config: RateLimitConfig | None = None):
@@ -63,12 +63,12 @@ class RateLimiter:
                 last_update=time.time(),
             )
         )
-        self._cleanup_interval = 300  # Clean up every 5 minutes
+        self._cleanup_interval = 300  # Nettoyage toutes les 5 minutes
         self._last_cleanup = time.time()
 
     def _get_client_key(self, request: Request) -> str:
-        """Extract client identifier from request."""
-        # Priority: X-Forwarded-For > X-Real-IP > client host
+        """Extrait l'identifiant client depuis la requête."""
+        # Priorité : X-Forwarded-For > X-Real-IP > host client
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
             client_ip = forwarded.split(",")[0].strip()
@@ -77,14 +77,14 @@ class RateLimiter:
                 request.client.host if request.client else "unknown"
             )
 
-        # Include path for per-endpoint limiting
+        # Inclure le chemin pour limiter par endpoint
         path = request.url.path
         return f"{self.config.key}:{client_ip}:{path}"
 
     def _refill_tokens(self, entry: RateLimitEntry, now: float) -> None:
-        """Refill tokens based on time elapsed."""
+        """Recharge les jetons selon le temps écoulé."""
         elapsed = now - entry.last_update
-        # Refill rate: requests per window
+        # Taux de remplissage : requêtes par fenêtre
         refill_rate = self.config.requests / self.config.window
         new_tokens = elapsed * refill_rate
         entry.tokens = min(
@@ -94,7 +94,7 @@ class RateLimiter:
         entry.last_update = now
 
     def _cleanup_expired(self, now: float) -> None:
-        """Remove expired entries to prevent memory bloat."""
+        """Supprime les entrées expirées pour éviter la surcharge mémoire."""
         if now - self._last_cleanup < self._cleanup_interval:
             return
 
@@ -122,19 +122,19 @@ class RateLimiter:
         key = self._get_client_key(request)
         entry = self._buckets[key]
 
-        # Refill tokens
+        # Recharger les jetons
         self._refill_tokens(entry, now)
 
-        # Periodic cleanup
+        # Nettoyage périodique
         self._cleanup_expired(now)
 
-        # Check if request is allowed
+        # Vérifier si la requête est autorisée
         is_allowed = entry.tokens >= 1.0
         if is_allowed:
             entry.tokens -= 1.0
             entry.request_count += 1
 
-        # Calculate remaining and reset time
+        # Calculer le reste et le temps de réinitialisation
         remaining = max(0, int(entry.tokens))
         reset_time = int(now + self.config.window)
 
@@ -145,7 +145,7 @@ class RateLimiter:
         }
 
         if not is_allowed:
-            # Calculate retry-after
+            # Calculer le retry-after
             tokens_needed = 1.0 - entry.tokens
             refill_rate = self.config.requests / self.config.window
             retry_after = int(tokens_needed / refill_rate) + 1
@@ -154,12 +154,12 @@ class RateLimiter:
         return is_allowed, headers
 
 
-# Global rate limiter instance
+# Instance globale du rate limiter
 _rate_limiter: RateLimiter | None = None
 
 
 def get_rate_limiter(config: RateLimitConfig | None = None) -> RateLimiter:
-    """Get or create global rate limiter instance."""
+    """Obtient ou crée l'instance globale du rate limiter."""
     global _rate_limiter
     if _rate_limiter is None or config is not None:
         _rate_limiter = RateLimiter(config)
@@ -192,7 +192,7 @@ def rate_limit(
 
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Find Request in args or kwargs
+            # Chercher Request dans args ou kwargs
             request = None
             for arg in args:
                 if isinstance(arg, Request):
@@ -202,7 +202,7 @@ def rate_limit(
                 request = kwargs.get("request")
 
             if request is None:
-                # Can't rate limit without request, proceed
+                # Impossible de limiter sans requête, on continue
                 return await func(*args, **kwargs)
 
             is_allowed, headers = await limiter.check(request)
@@ -216,7 +216,7 @@ def rate_limit(
 
             response = await func(*args, **kwargs)
 
-            # Note: Headers would need to be added via middleware for full support
+            # Remarque : il faudrait ajouter les en-têtes via un middleware pour un support complet
             return response
 
         return wrapper
@@ -226,9 +226,9 @@ def rate_limit(
 
 class RateLimitMiddleware:
     """
-    ASGI middleware for global rate limiting.
+    Middleware ASGI pour la limitation de débit globale.
 
-    Usage in main.py:
+    Usage dans main.py :
         app.add_middleware(RateLimitMiddleware, requests=1000, window=60)
     """
 
@@ -252,12 +252,12 @@ class RateLimitMiddleware:
 
         path = scope.get("path", "")
 
-        # Skip excluded paths
+        # Ignorer les chemins exclus
         if any(path.startswith(p) for p in self.exclude_paths):
             await self.app(scope, receive, send)
             return
 
-        # Create fake request for rate limiter
+        # Créer une fausse requête pour le rate limiter
         from starlette.requests import Request
 
         request = Request(scope, receive)
@@ -265,7 +265,7 @@ class RateLimitMiddleware:
         is_allowed, headers = await self.limiter.check(request)
 
         if not is_allowed:
-            # Return 429 response
+            # Retourner une réponse 429
             response_headers = [
                 (b"content-type", b"application/json"),
             ]

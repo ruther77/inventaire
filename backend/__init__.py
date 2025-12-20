@@ -1,4 +1,4 @@
-"""Backend package exposing the FastAPI application for the SPA."""
+"""Package backend exposant l'application FastAPI pour la SPA."""
 
 import os
 
@@ -6,9 +6,9 @@ if os.getenv("SKIP_BACKEND_APP"):
     app = None
 else:
     try:
-        # Re-export the FastAPI application when the dependency is available.
+        # Réexporter l'application FastAPI quand la dépendance est disponible.
         from .main import app  # type: ignore[import]
-    except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency for tests
+    except ModuleNotFoundError as exc:  # pragma: no cover - dépendance optionnelle pour les tests
         if exc.name != "fastapi":
             raise
         app = None

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Test script to validate newcms finance endpoint compilation."""
+"""Script de test pour valider la compilation des endpoints finance de newcms."""
 
 import sys
 

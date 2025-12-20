@@ -17,6 +17,7 @@ import {
   Clock,
   Link2,
 } from 'lucide-react';
+import useCommandBarLiveSuggestions, { useContextualSuggestions } from '../hooks/useCommandBarLiveSuggestions.js';
 
 // ============================================================================
 // COMMAND BAR CONTEXT - Gestion centralisée de la Command Bar
@@ -158,7 +159,33 @@ export function CommandBarProvider({ children }) {
     return section || navigationSections[0];
   }, [location.pathname]);
 
+  // Section actuelle pour les suggestions contextuelles
+  const currentSectionId = useMemo(() => {
+    const path = location.pathname;
+    if (path.startsWith('/operations')) return 'operations';
+    if (path.startsWith('/finances')) return 'finances';
+    if (path.startsWith('/intelligence')) return 'intelligence';
+    return 'cockpit';
+  }, [location.pathname]);
+
+  // Suggestions temps réel avec debounce
+  const { liveSuggestions, isLoading: isLoadingLive } = useCommandBarLiveSuggestions(query, {
+    enabled: isOpen,
+    debounceMs: 300,
+    minQueryLength: 2,
+  });
+
+  // Suggestions contextuelles statiques
+  const contextualSuggestions = useContextualSuggestions(currentSectionId);
+
+  // Anciens items contextuels (fallback si les nouveaux ne marchent pas)
   const contextualItems = useMemo(() => {
+    // On utilise maintenant contextualSuggestions, mais on garde la logique legacy pour compatibilité
+    if (contextualSuggestions.length > 0) {
+      return contextualSuggestions;
+    }
+
+    // Fallback legacy
     switch (currentContext?.id) {
       case 'operations':
         return [
@@ -218,41 +245,10 @@ export function CommandBarProvider({ children }) {
           },
         ];
     }
-  }, [currentContext]);
+  }, [currentContext, contextualSuggestions]);
 
-  // Suggestions basées sur les données présentes en cache (pas d’appel réseau)
-  const liveSuggestions = useMemo(() => {
-    const items = [];
-    const cockpit = queryClient.getQueryData(['cockpit-overview']);
-    if (cockpit?.alerts?.length) {
-      items.push({
-        id: 'live-alerts',
-        label: `${cockpit.alerts.length} alertes cockpit`,
-        description: 'Traiter les alertes du jour',
-        icon: AlertTriangle,
-        category: 'context',
-        action: (navigate) => navigate('/'),
-        keywords: ['alertes', 'cockpit'],
-      });
-    }
-
-    const productsCache = queryClient.getQueryData(['products']);
-    const products = Array.isArray(productsCache?.items) ? productsCache.items : Array.isArray(productsCache) ? productsCache : [];
-    const lowStock = products.filter((p) => (p.stock_actuel || 0) < (p.seuil_alerte || 8));
-    if (lowStock.length) {
-      items.push({
-        id: 'live-low-stock',
-        label: `${lowStock.length} produits en alerte stock`,
-        description: 'Ouvrir le catalogue filtré stock critique',
-        icon: Package,
-        category: 'context',
-        action: (navigate) => navigate('/operations/catalogue?filter=low-stock'),
-        keywords: ['stock', 'rupture'],
-      });
-    }
-
-    return items;
-  }, [queryClient]);
+  // Note: liveSuggestions est maintenant géré par le hook useCommandBarLiveSuggestions
+  // (défini plus haut dans le composant)
 
   const recentItems = useMemo(() => (
     recentSearches.map((r, idx) => ({
@@ -268,7 +264,13 @@ export function CommandBarProvider({ children }) {
   // Recherche fuzzy simple
   const searchItems = useCallback((searchQuery) => {
     const lowerQuery = searchQuery.toLowerCase();
-    const allItems = [...quickActions, ...navigationItems, ...sectionItems, ...contextualItems];
+    const allItems = [
+      ...quickActions,
+      ...navigationItems,
+      ...sectionItems,
+      ...contextualItems,
+      ...liveSuggestions, // Intégrer les suggestions temps réel
+    ];
 
     return allItems
       .map((item) => {
@@ -291,24 +293,31 @@ export function CommandBarProvider({ children }) {
           }
         });
 
+        // Boost pour les items live (fraîchement récupérés)
+        if (item.category?.startsWith('live-')) {
+          score += 20;
+        }
+
         return { ...item, score };
       })
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
-  }, [contextualItems]);
+      .slice(0, 12); // Augmenter légèrement le nombre de résultats
+  }, [contextualItems, liveSuggestions]);
 
   // Résultats de recherche
   const results = useMemo(() => {
     if (!query.trim()) {
+      // Vue par défaut : prioriser les suggestions temps réel et contextuelles
       return [
-        ...liveSuggestions.slice(0, 2),
-        ...contextualItems.slice(0, 3),
-        ...recentItems.slice(0, 3),
-        ...sectionItems.slice(0, 4),
-        ...quickActions.slice(0, 4),
+        ...liveSuggestions.slice(0, 3), // Suggestions temps réel en premier
+        ...contextualItems.slice(0, 3), // Suggestions contextuelles
+        ...recentItems.slice(0, 2),     // Recherches récentes
+        ...sectionItems.slice(0, 3),    // Sections principales
+        ...quickActions.slice(0, 3),    // Actions rapides
       ];
     }
+    // Vue de recherche : utiliser la recherche fuzzy avec les suggestions live
     return searchItems(query);
   }, [query, contextualItems, recentItems, searchItems, liveSuggestions]);
 
@@ -394,10 +403,14 @@ export function CommandBarProvider({ children }) {
     quickActions,
     navigationItems,
     sectionItems,
+    liveSuggestions,
+    isLoadingLive,
+    currentSectionId,
   }), [
     isOpen, open, close, toggle, query, results,
     selectedIndex, executeItem, handleKeyDown,
-    currentContext, recentSearches,
+    currentContext, recentSearches, liveSuggestions,
+    isLoadingLive, currentSectionId,
   ]);
 
   return (

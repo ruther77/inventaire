@@ -3,31 +3,25 @@ import axios from 'axios';
 /**
  * Client HTTP Axios centralisé pour toutes les interactions SPA ↔ FastAPI.
  * - `baseURL` est configurable via `VITE_API_BASE_URL`.
- * - Le header `Authorization: Bearer <token>` est géré via `setAccessToken`.
+ * - Authentification via cookies HTTP-Only (envoyés automatiquement).
  */
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Envoie automatiquement les cookies HTTP-Only
 });
 
 let unauthorizedHandler = null;
-let currentToken = null;
 
-export const setAccessToken = (token) => {
-  if (token) {
-    api.defaults.headers.common.Authorization = `Bearer ${token}`;
-    currentToken = token;
-  } else {
-    delete api.defaults.headers.common.Authorization;
-    currentToken = null;
-  }
+// Note: Les tokens sont gérés via cookies HTTP-Only, pas besoin de les stocker côté JS
+export const setAccessToken = () => {
+  // No-op: les cookies sont gérés automatiquement par le navigateur
 };
 
 export const clearAccessToken = () => {
-  delete api.defaults.headers.common.Authorization;
-  currentToken = null;
+  // No-op: les cookies sont supprimés par le backend via /auth/logout
 };
 
 export const registerUnauthorizedHandler = (handler) => {
@@ -56,13 +50,7 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     config.headers['X-Tenant'] = 2;
   }
-  if (currentToken) {
-    const headers = config.headers ?? {};
-    if (!headers.Authorization) {
-      headers.Authorization = `Bearer ${currentToken}`;
-    }
-    config.headers = headers;
-  }
+  // Note: pas besoin d'ajouter le token, les cookies HTTP-Only sont envoyés automatiquement
   return config;
 });
 
@@ -79,8 +67,8 @@ export const fetchInventorySummary = async () => {
   return data;
 };
 
-export const fetchRestaurantConsumptions = async () => {
-  const { data } = await api.get('/restaurant/consumptions');
+export const fetchRestaurantConsumptions = async (period = 'all') => {
+  const { data } = await api.get('/restaurant/consumptions', { params: { period } });
   return data;
 };
 
@@ -89,28 +77,45 @@ export const fetchRestaurantPriceHistoryComparison = async () => {
   return data;
 };
 
-export const fetchRestaurantPlatMappings = async () => {
-  const { data } = await api.get('/restaurant/plats/mappings');
-  return data;
-};
-
-export const syncRestaurantIngredients = async () => {
-  const { data } = await api.post('/restaurant/ingredients/sync');
-  return data;
-};
-
 export const fetchEpicerieProducts = async () => {
   const { data } = await api.get('/restaurant/epicerie/products');
   return data;
 };
 
-export const updatePlatMapping = async (platId, payload) => {
-  const { data } = await api.put(`/restaurant/plats/${platId}/mapping`, payload);
+export const syncRestaurantIngredientPrices = async (forceUpdate = false) => {
+  const params = new URLSearchParams();
+  if (forceUpdate) params.set('force_update', forceUpdate);
+  const query = params.toString();
+  const { data } = await api.post(query ? `/restaurant/ingredients/sync-prices?${query}` : '/restaurant/ingredients/sync-prices');
   return data;
 };
 
-export const deletePlatMapping = async (platId) => {
-  const { data } = await api.delete(`/restaurant/plats/${platId}/mapping`);
+export const fetchRestaurantPriceSyncStatus = async () => {
+  const { data } = await api.get('/restaurant/ingredients/price-sync-status');
+  const payload = data?.data ?? data;
+  return {
+    ...payload,
+    synced_count: payload?.synced_count ?? payload?.synced ?? 0,
+    linked_count: payload?.linked_count ?? payload?.linked_to_epicerie ?? 0,
+    total_count: payload?.total_count ?? payload?.total_ingredients ?? 0,
+  };
+};
+
+export const linkIngredientToEpicerie = async (ingredientId, epicerieProductId, ratio = 1.0) => {
+  const { data } = await api.put(`/restaurant/ingredients/${ingredientId}/link-epicerie`, {
+    produit_epicerie_id: epicerieProductId,
+    ratio,
+  });
+  return data;
+};
+
+export const unlinkIngredientFromEpicerie = async (ingredientId) => {
+  const { data } = await api.delete(`/restaurant/ingredients/${ingredientId}/link-epicerie`);
+  return data;
+};
+
+export const updateIngredientRatio = async (ingredientId, ratio) => {
+  const { data } = await api.patch(`/restaurant/ingredients/${ingredientId}/ratio`, { ratio });
   return data;
 };
 
@@ -126,6 +131,21 @@ export const fetchRestaurantIngredientPriceHistory = async (ingredientId) => {
 
 export const updateRestaurantPlatPrice = async (platId, payload) => {
   const { data } = await api.patch(`/restaurant/plats/${platId}/price`, payload);
+  return data;
+};
+
+export const addIngredientToPlat = async (platId, payload) => {
+  const { data } = await api.post(`/restaurant/plats/${platId}/ingredients`, payload);
+  return data;
+};
+
+export const updateIngredientOnPlat = async (platId, ingredientId, payload) => {
+  const { data } = await api.patch(`/restaurant/plats/${platId}/ingredients/${ingredientId}`, payload);
+  return data;
+};
+
+export const removeIngredientFromPlat = async (platId, ingredientId) => {
+  const { data } = await api.delete(`/restaurant/plats/${platId}/ingredients/${ingredientId}`);
   return data;
 };
 
@@ -197,9 +217,10 @@ export const fetchRestaurantAlerts = async (filters = {}) => {
 
 export const fetchRestaurantFoodCostAnalysis = async (filters = {}) => {
   const params = new URLSearchParams();
+  if (filters.period) params.set('period', filters.period);
+  if (filters.target_food_cost !== undefined) params.set('target_food_cost', filters.target_food_cost);
   if (filters.dateFrom) params.set('date_from', filters.dateFrom);
   if (filters.dateTo) params.set('date_to', filters.dateTo);
-  if (filters.granularity) params.set('granularity', filters.granularity);
   const query = params.toString();
   const { data } = await api.get(query ? `/restaurant/food-cost/analysis?${query}` : '/restaurant/food-cost/analysis');
   return data;
@@ -349,6 +370,58 @@ export const zeroClickInvoiceImport = async ({ file, marginPercent = 40, supplie
   return data;
 };
 
+// Zero-click avec jobs async (pour gros fichiers)
+export const zeroClickInvoiceJob = async ({ file, marginPercent = 40, supplierHint = null, autoConfirm = true, sessionId = null }) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('margin_percent', marginPercent);
+  if (supplierHint) {
+    formData.append('supplier_hint', supplierHint);
+  }
+  formData.append('auto_confirm', autoConfirm ? 'true' : 'false');
+  if (sessionId) {
+    formData.append('session_id', sessionId);
+  }
+
+  const { data } = await api.post('/invoices/zero-click/jobs', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+};
+
+// Polling du statut d'un job zero-click
+export const fetchZeroClickJobStatus = async (jobId) => {
+  const { data } = await api.get(`/invoices/zero-click/jobs/${jobId}`);
+  return data;
+};
+
+// Liste des jobs zero-click récents
+export const fetchZeroClickJobs = async ({ status = null, sessionId = null, limit = 50, offset = 0 } = {}) => {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (sessionId) params.set('session_id', sessionId);
+  if (limit) params.set('limit', limit);
+  if (offset) params.set('offset', offset);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/invoices/zero-click/jobs?${query}` : '/invoices/zero-click/jobs');
+  return data;
+};
+
+// Sessions d'import
+export const fetchImportSessions = async ({ limit = 50, offset = 0 } = {}) => {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', limit);
+  if (offset) params.set('offset', offset);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/invoices/sessions?${query}` : '/invoices/sessions');
+  return data;
+};
+
+export const fetchImportSessionDetails = async (sessionId) => {
+  const { data } = await api.get(`/invoices/sessions/${encodeURIComponent(sessionId)}`);
+  return data;
+};
+
 export const importInvoiceLines = async ({ lines, supplier, movementType, username, invoiceDate }) => {
   const { data } = await api.post('/invoices/import', {
     lines,
@@ -398,6 +471,15 @@ export const importInvoiceToCatalog = async ({ lines, supplier, username, initia
     invoice_date: invoiceDate ?? null,
   });
   return data;
+};
+
+export const fetchProductMatchSuggestions = async ({ query, maxResults = 5, minScore = 60.0 }) => {
+  const params = new URLSearchParams();
+  params.set('query', query);
+  params.set('max_results', maxResults);
+  params.set('min_score', minScore);
+  const { data } = await api.get(`/invoices/match-suggestions?${params.toString()}`);
+  return data.suggestions ?? [];
 };
 
 export const fetchInvoiceHistory = async (filters = {}) => {
@@ -596,6 +678,16 @@ export const batchCategorizeFinanceTransactions = async (payload) => {
   return data;
 };
 
+export const updateFinanceTransaction = async ({ transactionId, payload }) => {
+  const { data } = await api.patch(`/finance/transactions/${transactionId}`, payload);
+  return data;
+};
+
+export const lockFinanceTransaction = async (transactionId) => {
+  const { data } = await api.post(`/finance/transactions/${transactionId}/lock`);
+  return data;
+};
+
 export const updateTransactionCategory = async ({ transactionId, categoryId }) => {
   const { data } = await api.post('/finance/transactions/batch-categorize', {
     transaction_ids: [transactionId],
@@ -604,11 +696,54 @@ export const updateTransactionCategory = async ({ transactionId, categoryId }) =
   return data;
 };
 
+// ============================================================================
+// PHASE 4: FEEDBACK CATÉGORISATION (ML Learning Loop)
+// ============================================================================
+
+/**
+ * Enregistre un feedback de correction de catégorie pour améliorer le ML.
+ * @param {number} transactionId - ID de la transaction corrigée
+ * @param {Object} payload - { actual_category_id, predicted_category_id, confidence_score, correction_source }
+ */
+export const recordCategoryFeedback = async (transactionId, payload) => {
+  const { data } = await api.post(`/finance/transactions/${transactionId}/feedback`, payload);
+  return data;
+};
+
+/**
+ * Récupère les statistiques globales de feedback de catégorisation.
+ * @returns {Object} { total_corrections, unique_transactions, avg_wrong_confidence, ... }
+ */
+export const fetchCategoryFeedbackStats = async () => {
+  const { data } = await api.get('/finance/categorization/feedback/stats');
+  return data;
+};
+
+/**
+ * Récupère les corrections de catégories les plus fréquentes.
+ * @param {number} limit - Nombre max de patterns à retourner (défaut: 10)
+ * @returns {Array} Liste des patterns de correction fréquents
+ */
+export const fetchCommonCorrections = async (limit = 10) => {
+  const { data } = await api.get(`/finance/categorization/feedback/common-corrections?limit=${limit}`);
+  return data;
+};
+
 export const importFinanceBankStatements = async ({ accountId, file }) => {
   if (!accountId || !file) throw new Error('accountId et file requis');
   const formData = new FormData();
   formData.append('file', file);
   const { data } = await api.post(`/finance/bank-statements/import?account_id=${accountId}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+};
+
+export const importFinanceBankStatementsPDF = async ({ accountId, file }) => {
+  if (!accountId || !file) throw new Error('accountId et file requis');
+  const formData = new FormData();
+  formData.append('file', file);
+  const { data } = await api.post(`/finance/bank-statements/import-pdf?account_id=${accountId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;
@@ -647,6 +782,16 @@ export const fetchFinanceMatches = async (status) => {
 
 export const fetchFinanceImports = async () => {
   const { data } = await api.get('/finance/imports');
+  return data;
+};
+
+export const deduplicateFinanceTransactions = async () => {
+  const { data } = await api.post('/finance/deduplicate');
+  return data;
+};
+
+export const refreshFinanceStats = async () => {
+  const { data } = await api.post('/finance/stats/refresh');
   return data;
 };
 
@@ -1284,6 +1429,11 @@ export const fetchSupplierAlerts = async ({ severity, acknowledged, limit = 50 }
   return data;
 };
 
+export const acknowledgeSupplierAlert = async (alertId) => {
+  const { data } = await api.post(`/supplier-scoring/alerts/${alertId}/acknowledge`);
+  return data;
+};
+
 export const recalculateSupplierScores = async ({ supplierIds, forceRecalculate = false } = {}) => {
   const { data } = await api.post('/supplier-scoring/recalculate', {
     supplier_ids: supplierIds,
@@ -1429,6 +1579,54 @@ export const scanNewCMSMobileProduct = async (ean) => {
 
 export const adjustNewCMSMobileStock = async (payload) => {
   const { data } = await api.post('/newcms/mobile/adjust', payload);
+  return data;
+};
+
+// ============================================================================
+// RESTAURANT STOCK (INDÉPENDANT DE L'ÉPICERIE)
+// ============================================================================
+
+export const fetchRestaurantStockSummary = async () => {
+  const { data } = await api.get('/restaurant/stock/summary');
+  return data;
+};
+
+export const fetchRestaurantStockMovements = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.ingredientId) params.set('ingredient_id', filters.ingredientId);
+  if (filters.source) params.set('source', filters.source);
+  if (filters.typeMouvement) params.set('type_mouvement', filters.typeMouvement);
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters.dateTo) params.set('date_to', filters.dateTo);
+  if (filters.limit) params.set('limit', filters.limit);
+  if (filters.offset) params.set('offset', filters.offset);
+  const query = params.toString();
+  const { data } = await api.get(query ? `/restaurant/stock/movements?${query}` : '/restaurant/stock/movements');
+  return data;
+};
+
+export const fetchRestaurantStockAnalytics = async (days = 30) => {
+  const { data } = await api.get(`/restaurant/stock/analytics?days=${days}`);
+  return data;
+};
+
+export const createRestaurantStockMovement = async (payload) => {
+  const { data } = await api.post('/restaurant/stock/movements', payload);
+  return data;
+};
+
+export const transferFromEpicerie = async (payload) => {
+  const { data } = await api.post('/restaurant/stock/transfer-from-epicerie', payload);
+  return data;
+};
+
+export const recordRestaurantConsumption = async (payload) => {
+  const { data } = await api.post('/restaurant/stock/consumption', payload);
+  return data;
+};
+
+export const adjustRestaurantStock = async (payload) => {
+  const { data } = await api.post('/restaurant/stock/adjustment', payload);
   return data;
 };
 

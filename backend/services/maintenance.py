@@ -1,4 +1,4 @@
-"""Maintenance helpers (backups listing)."""
+"""Helpers de maintenance (liste des sauvegardes)."""
 
 from __future__ import annotations
 

@@ -1,0 +1,96 @@
+{
+  "id": "sumup-import",
+  "name": "Import SumUp Statements",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "import-sumup",
+        "responseMode": "lastNode",
+        "options": {
+          "responseContentType": "application/json"
+        }
+      },
+      "id": "webhook-sumup",
+      "name": "Webhook SumUp Import",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "sumup-import-webhook"
+    },
+    {
+      "parameters": {
+        "url": "http://api:8000/finance/bank-statements/import-pdf",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "account_id",
+              "value": "4"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "import-api",
+      "name": "Call Import API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const result = items[0].json;\nconst success = result.success ?? false;\nconst data = result.data ?? result;\n\nreturn [{\n  json: {\n    success: success,\n    message: success ? 'Import SumUp réussi' : 'Erreur lors de l\\'import',\n    inserted: data.inserted ?? 0,\n    duplicates: data.duplicates ?? 0,\n    total_parsed: data.total_parsed ?? 0,\n    bank_type: data.bank_type ?? 'sumup',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [720, 300]
+    }
+  ],
+  "connections": {
+    "Webhook SumUp Import": {
+      "main": [
+        [
+          {
+            "node": "Call Import API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Import API": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionTimeout": 300,
+    "timezone": "Europe/Paris"
+  },
+  "pinData": {},
+  "tags": ["finance", "sumup", "import"]
+}

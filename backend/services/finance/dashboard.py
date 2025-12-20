@@ -16,7 +16,8 @@ def dashboard_summary(entity_id: int | None = None) -> Dict[str, Any]:
         clause_entity = "AND t.entity_id = :entity_id"
         params["entity_id"] = int(entity_id)
 
-    # Part "frais_generaux" (ancien 'autre') et totaux
+    # Part "frais_generaux" (ancien 'autre') et totaux - utilise finance_transactions.amount directement
+    # Inclut finance_transaction_classification pour les auto-catégorisations
     part_df = query_df(
         text(
             f"""
@@ -24,17 +25,18 @@ def dashboard_summary(entity_id: int | None = None) -> Dict[str, Any]:
               SELECT
                 t.direction,
                 COALESCE(c.code, 'frais_generaux') AS code,
-                tl.montant_ttc
-              FROM finance_transaction_lines tl
-              JOIN finance_transactions t ON t.id = tl.transaction_id
-              LEFT JOIN finance_categories c ON c.id = tl.category_id
+                t.amount
+              FROM finance_transactions t
+              LEFT JOIN finance_transaction_lines tl ON tl.transaction_id = t.id
+              LEFT JOIN finance_transaction_classification tc ON tc.transaction_id = t.id
+              LEFT JOIN finance_categories c ON c.id = COALESCE(tl.category_id, tc.category_id)
               WHERE t.direction IN ('IN','OUT') {clause_entity}
             )
             SELECT
-              SUM(CASE WHEN direction = 'IN' THEN montant_ttc ELSE 0 END) AS inflow,
-              SUM(CASE WHEN direction = 'OUT' THEN montant_ttc ELSE 0 END) AS outflow,
-              SUM(montant_ttc) AS total,
-              SUM(CASE WHEN code = 'frais_generaux' THEN montant_ttc ELSE 0 END) AS autre_amount,
+              SUM(CASE WHEN direction = 'IN' THEN amount ELSE 0 END) AS inflow,
+              SUM(CASE WHEN direction = 'OUT' THEN amount ELSE 0 END) AS outflow,
+              SUM(amount) AS total,
+              SUM(CASE WHEN code = 'frais_generaux' THEN amount ELSE 0 END) AS autre_amount,
               COUNT(*) AS lines,
               SUM(CASE WHEN code = 'frais_generaux' THEN 1 ELSE 0 END) AS autre_lines
             FROM base

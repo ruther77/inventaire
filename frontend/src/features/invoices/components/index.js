@@ -9,3 +9,5 @@ export { default as InvoiceImportActions } from './InvoiceImportActions.jsx';
 export { default as InvoiceHistoryPanel } from './InvoiceHistoryPanel.jsx';
 export { default as InvoiceDocumentSelector } from './InvoiceDocumentSelector.jsx';
 export { default as InvoiceProcessingCard } from './InvoiceProcessingCard.jsx';
+export { default as ProductMatchSuggestions } from './ProductMatchSuggestions.jsx';
+export { default as InvoicePDFWorkspace } from './InvoicePDFWorkspace.jsx';

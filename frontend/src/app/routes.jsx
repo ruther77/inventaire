@@ -1,6 +1,5 @@
 import { lazy, Suspense } from 'react';
 import {
-  LayoutDashboard,
   Boxes,
   ShoppingBag,
   Activity,
@@ -15,7 +14,6 @@ import {
   LineChart,
   Gauge,
   Link2,
-  History,
   Settings,
   Wallet,
   FileText,
@@ -28,9 +26,10 @@ import {
 } from 'lucide-react';
 
 // ============================================================================
-// LAZY LOADING - Performance optimisée
+// LAZY LOADING - Performance optimisée (100% lazy pour réduire bundle initial)
 // ============================================================================
 
+// Cockpit
 const CockpitPage = lazy(() => import('@/features/cockpit/CockpitUnifiedPage.jsx'));
 
 // Vues unifiées (Phase 2)
@@ -38,30 +37,27 @@ const OperationsPage = lazy(() => import('@/features/operations/OperationsPage.j
 const FinanceUnifiedPage = lazy(() => import('@/features/finance/FinanceUnifiedPage.jsx'));
 const IntelligenceUnifiedPage = lazy(() => import('@/features/intelligence/IntelligenceUnifiedPage.jsx'));
 
-// Operations (pages individuelles pour rétrocompatibilité)
-import CatalogPage from '@/features/catalog/CatalogPage.jsx';
-import ImportPage from '@/features/invoices/ImportPage.jsx';
-import PricesPage from '@/features/prices/PricesPage.jsx';
-import DashboardPage from '@/features/dashboard/DashboardPage.jsx';
-import StockMovementsPage from '@/features/stock/StockMovementsPage.jsx';
+// Operations (pages individuelles)
+const CatalogPage = lazy(() => import('@/features/catalog/CatalogPage.jsx'));
+const ImportPage = lazy(() => import('@/features/invoices/ImportPage.jsx'));
+const PricesPage = lazy(() => import('@/features/prices/PricesPage.jsx'));
+const StockMovementsPage = lazy(() => import('@/features/stock/StockMovementsPage.jsx'));
 
-// Restaurant
-import RestaurantDashboard from '@/features/restaurant/RestaurantDashboard.jsx';
-import RestaurantChargesPage from '@/features/restaurant/RestaurantChargesPage.jsx';
-import RestaurantMenuPage from '@/features/restaurant/RestaurantMenuPage.jsx';
-import RestaurantPriceTrends from '@/features/restaurant/RestaurantPriceTrends.jsx';
-import RestaurantStockMovementsPage from '@/features/restaurant/RestaurantStockMovementsPage.jsx';
-import RestaurantConsumptionPage from '@/features/restaurant/RestaurantConsumptionPage.jsx';
-import RestaurantPriceHistoryComparisonPage from '@/features/restaurant/RestaurantPriceHistoryComparisonPage.jsx';
-import RestaurantEpicerieLinkPage from '@/features/restaurant/RestaurantEpicerieLinkPage.jsx';
-import ForecastsPage from '@/features/restaurant/ForecastsPage.jsx';
-import RestaurantOverviewPage from '@/features/restaurant/RestaurantOverviewPage.jsx';
-import PlatsCatalogPage from '@/features/restaurant/PlatsCatalogPage.jsx';
-import IngredientsPage from '@/features/restaurant/IngredientsPage.jsx';
-import RestaurantMenusCostsPage from '@/features/restaurant/RestaurantMenusCostsPage.jsx';
+// Inventory
+const ProductDetailPage = lazy(() => import('@/features/inventory/ProductDetailPage.jsx'));
 
-// Finances (pages individuelles pour rétrocompatibilité)
-import PortfolioPage from '@/features/portfolio/PortfolioPage.jsx';
+// Restaurant (toutes les pages en lazy)
+const RestaurantChargesPage = lazy(() => import('@/features/restaurant/RestaurantChargesPage.jsx'));
+const RestaurantStockMovementsPage = lazy(() => import('@/features/restaurant/RestaurantStockMovementsPage.jsx'));
+const RestaurantConsumptionPage = lazy(() => import('@/features/restaurant/RestaurantConsumptionPage.jsx'));
+const ForecastsPage = lazy(() => import('@/features/restaurant/ForecastsPage.jsx'));
+const PlatsCatalogPage = lazy(() => import('@/features/restaurant/PlatsCatalogPage.jsx'));
+const IngredientsPage = lazy(() => import('@/features/restaurant/IngredientsPage.jsx'));
+const FoodCostAnalysisPage = lazy(() => import('@/features/restaurant/FoodCostAnalysisPage.jsx'));
+const IngredientEpicerieLinkPage = lazy(() => import('@/features/restaurant/IngredientEpicerieLinkPage.jsx'));
+
+// Finances (pages individuelles)
+const PortfolioPage = lazy(() => import('@/features/portfolio/PortfolioPage.jsx'));
 const FinanceOverview = lazy(() => import('@/features/finance/FinanceOverview.jsx'));
 const FinanceTransactionsPage = lazy(() => import('@/features/finance/FinanceTransactionsPage.jsx'));
 const FinanceAccountsPage = lazy(() => import('@/features/finance/FinanceAccountsPage.jsx'));
@@ -70,12 +66,17 @@ const FinanceRulesPage = lazy(() => import('@/features/finance/FinanceRulesPage.
 const FinanceAnomaliesPage = lazy(() => import('@/features/finance/FinanceAnomaliesPage.jsx'));
 const BankReconciliationPage = lazy(() => import('@/features/finance/BankReconciliationPage.jsx'));
 
-// Intelligence (pages individuelles pour rétrocompatibilité)
+// Intelligence (pages individuelles)
+const SupplierScoringOverviewPage = lazy(() => import('@/features/intelligence/SupplierScoringOverviewPage.jsx'));
+const SuppliersListPage = lazy(() => import('@/features/intelligence/SuppliersListPage.jsx'));
+const SupplierDetailsPage = lazy(() => import('@/features/intelligence/SupplierDetailsPage.jsx'));
+const ScoringCriteriaPage = lazy(() => import('@/features/intelligence/ScoringCriteriaPage.jsx'));
+const SupplierAlertsPage = lazy(() => import('@/features/intelligence/SupplierAlertsPage.jsx'));
+
 const IntelligencePage = lazy(() => import('@/features/intelligence/IntelligencePage.jsx'));
 const InventoryIntelligencePage = lazy(() => import('@/features/intelligence/InventoryIntelligencePage.jsx'));
 const ForecastPage = lazy(() => import('@/features/intelligence/ForecastPage.jsx'));
 const AnomaliesPage = lazy(() => import('@/features/intelligence/AnomaliesPage.jsx'));
-const ScoringPage = lazy(() => import('@/features/intelligence/ScoringPage.jsx'));
 const MarginsPage = lazy(() => import('@/features/intelligence/MarginsPage.jsx'));
 
 // Admin
@@ -141,19 +142,11 @@ export const operationsUnifiedRoute = {
 export const operationsRoutes = [
   operationsUnifiedRoute,
   {
-    path: '/operations/epicerie',
-    label: 'Pilotage',
-    description: 'Marges & cash',
-    icon: LayoutDashboard,
-    element: <DashboardPage />,
-    hidden: true, // Masqué dans la sidebar car inclus dans vue unifiée
-  },
-  {
     path: '/operations/factures',
     label: 'Factures',
     description: 'Import → Stock',
     icon: FileText,
-    element: <ImportPage />,
+    element: <LazyPage><ImportPage /></LazyPage>,
     hidden: true,
   },
   {
@@ -161,7 +154,7 @@ export const operationsRoutes = [
     label: 'Catalogue',
     description: 'Produits & stocks',
     icon: Boxes,
-    element: <CatalogPage />,
+    element: <LazyPage><CatalogPage /></LazyPage>,
     hidden: true,
   },
   {
@@ -169,7 +162,7 @@ export const operationsRoutes = [
     label: 'Mouvements',
     description: 'Entrées / Sorties',
     icon: Activity,
-    element: <StockMovementsPage />,
+    element: <LazyPage><StockMovementsPage /></LazyPage>,
     hidden: true,
   },
   {
@@ -177,7 +170,15 @@ export const operationsRoutes = [
     label: 'Suivi Prix',
     description: 'Historique fournisseurs',
     icon: TrendingUp,
-    element: <PricesPage />,
+    element: <LazyPage><PricesPage /></LazyPage>,
+    hidden: true,
+  },
+  {
+    path: '/inventory/product/:productId',
+    label: 'Fiche Produit',
+    description: 'Detail produit',
+    icon: Package,
+    element: <LazyPage><ProductDetailPage /></LazyPage>,
     hidden: true,
   },
 ];
@@ -232,7 +233,7 @@ export const financesRoutes = [
     label: 'Portefeuille',
     description: 'Capital & cash',
     icon: BarChart3,
-    element: <PortfolioPage />,
+    element: <LazyPage><PortfolioPage /></LazyPage>,
     hidden: true,
   },
   {
@@ -245,91 +246,63 @@ export const financesRoutes = [
   },
 ];
 
-// Section RESTAURANT (garde la structure actuelle)
+// Section RESTAURANT (structure simplifiée - pages essentielles uniquement)
 export const restaurantRoutes = [
   {
-    path: '/restaurant/overview',
-    label: 'Overview',
-    description: 'Food Cost & Rentabilité',
-    icon: Gauge,
-    element: <RestaurantOverviewPage />,
+    path: '/restaurant/food-cost',
+    label: 'Food Cost',
+    description: 'Analyse & optimisation',
+    icon: BarChart3,
+    element: <LazyPage><FoodCostAnalysisPage /></LazyPage>,
   },
   {
     path: '/restaurant/plats',
     label: 'Catalogue Plats',
     description: 'Marges & prix',
     icon: Utensils,
-    element: <PlatsCatalogPage />,
+    element: <LazyPage><PlatsCatalogPage /></LazyPage>,
   },
   {
     path: '/restaurant/ingredients',
     label: 'Ingrédients',
     description: 'Prix & stocks',
     icon: Package,
-    element: <IngredientsPage />,
+    element: <LazyPage><IngredientsPage /></LazyPage>,
   },
   {
-    path: '/restaurant/pilotage',
-    label: 'Pilotage',
-    description: 'Charges & menus',
-    icon: LayoutDashboard,
-    element: <RestaurantDashboard />,
-  },
-  {
-    path: '/restaurant/menus',
-    label: 'Menus',
-    description: 'Fiches & coûts',
-    icon: Utensils,
-    element: <RestaurantMenusCostsPage />,
+    path: '/restaurant/liens',
+    label: 'Liens Épicerie',
+    description: 'Ingrédients ↔ Produits',
+    icon: Link2,
+    element: <LazyPage><IngredientEpicerieLinkPage /></LazyPage>,
   },
   {
     path: '/restaurant/charges',
     label: 'Charges',
     description: 'Dépenses',
     icon: ReceiptText,
-    element: <RestaurantChargesPage />,
+    element: <LazyPage><RestaurantChargesPage /></LazyPage>,
   },
   {
     path: '/restaurant/consommations',
     label: 'Consommations',
     description: 'Sorties & coûts',
     icon: Package,
-    element: <RestaurantConsumptionPage />,
-  },
-  {
-    path: '/restaurant/liens',
-    label: 'Liens Épicerie',
-    description: 'Plats ↔ Produits',
-    icon: Link2,
-    element: <RestaurantEpicerieLinkPage />,
+    element: <LazyPage><RestaurantConsumptionPage /></LazyPage>,
   },
   {
     path: '/restaurant/stock',
     label: 'Stock',
     description: 'Mouvements',
     icon: Activity,
-    element: <RestaurantStockMovementsPage />,
-  },
-  {
-    path: '/restaurant/prix',
-    label: 'Prix',
-    description: 'Historique',
-    icon: TrendingUp,
-    element: <RestaurantPriceHistoryComparisonPage />,
-  },
-  {
-    path: '/restaurant/tendances',
-    label: 'Tendances',
-    description: 'Évolutions',
-    icon: LineChart,
-    element: <RestaurantPriceTrends />,
+    element: <LazyPage><RestaurantStockMovementsPage /></LazyPage>,
   },
   {
     path: '/restaurant/previsions',
     label: 'Prévisions',
     description: 'Projections',
     icon: Sparkles,
-    element: <ForecastsPage context="restaurant" />,
+    element: <LazyPage><ForecastsPage context="restaurant" /></LazyPage>,
   },
 ];
 
@@ -383,7 +356,35 @@ export const intelligenceRoutes = [
     label: 'Scoring',
     description: 'Fournisseurs',
     icon: Users,
-    element: <LazyPage><ScoringPage /></LazyPage>,
+    element: <LazyPage><SupplierScoringOverviewPage /></LazyPage>,
+    hidden: true,
+  },
+  {
+    path: '/intelligence/scoring/suppliers',
+    label: 'Fournisseurs',
+    icon: Package,
+    element: <LazyPage><SuppliersListPage /></LazyPage>,
+    hidden: true,
+  },
+  {
+    path: '/intelligence/scoring/suppliers/:supplierId',
+    label: 'Détails fournisseur',
+    icon: Users,
+    element: <LazyPage><SupplierDetailsPage /></LazyPage>,
+    hidden: true,
+  },
+  {
+    path: '/intelligence/scoring/criteria',
+    label: 'Critères de scoring',
+    icon: Settings,
+    element: <LazyPage><ScoringCriteriaPage /></LazyPage>,
+    hidden: true,
+  },
+  {
+    path: '/intelligence/scoring/alerts',
+    label: 'Alertes fournisseurs',
+    icon: AlertTriangle,
+    element: <LazyPage><SupplierAlertsPage /></LazyPage>,
     hidden: true,
   },
   {
@@ -442,9 +443,38 @@ export const navigationSections = [
     label: 'Opérations',
     description: 'Stock & Factures',
     icon: ShoppingBag,
-    routes: [operationsUnifiedRoute],
-    isUnified: true, // Lien direct sans sous-menu
-    directPath: '/operations',
+    routes: [
+      {
+        path: '/operations',
+        label: 'Pilotage',
+        description: 'Vue consolidée',
+        icon: Gauge,
+      },
+      {
+        path: '/operations/factures',
+        label: 'Factures',
+        description: 'Import → Stock',
+        icon: FileText,
+      },
+      {
+        path: '/operations/catalogue',
+        label: 'Catalogue',
+        description: 'Produits & stocks',
+        icon: Boxes,
+      },
+      {
+        path: '/operations/stock',
+        label: 'Mouvements',
+        description: 'Entrées / Sorties',
+        icon: Activity,
+      },
+      {
+        path: '/operations/prix',
+        label: 'Suivi Prix',
+        description: 'Historique fournisseurs',
+        icon: TrendingUp,
+      },
+    ],
     gradient: 'from-emerald-500 to-teal-400',
     color: 'emerald',
   },
@@ -453,9 +483,38 @@ export const navigationSections = [
     label: 'Finances',
     description: 'Trésorerie & Marges',
     icon: Wallet,
-    routes: [financesUnifiedRoute],
-    isUnified: true, // Lien direct sans sous-menu
-    directPath: '/finances',
+    routes: [
+      {
+        path: '/finances',
+        label: 'Trésorerie',
+        description: 'Vue consolidée',
+        icon: Wallet,
+      },
+      {
+        path: '/finances/transactions',
+        label: 'Transactions',
+        description: 'Relevés & mouvements',
+        icon: Activity,
+      },
+      {
+        path: '/finances/comptes',
+        label: 'Comptes',
+        description: 'Soldes & aperçu',
+        icon: Landmark,
+      },
+      {
+        path: '/finances/rapprochement',
+        label: 'Rapprochement',
+        description: 'Auto-matching',
+        icon: Link2,
+      },
+      {
+        path: '/finances/imports',
+        label: 'Imports',
+        description: 'CSV / PDF',
+        icon: Download,
+      },
+    ],
     gradient: 'from-violet-500 to-purple-400',
     color: 'violet',
   },

@@ -1,4 +1,4 @@
-"""Expense management services for restaurant module."""
+"""Services de gestion des dépenses pour le module restaurant."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from backend.services.restaurant.utils import _safe_float
 
 
 def list_depense_categories(tenant_id: int) -> List[dict[str, Any]]:
-    """List all expense categories for a tenant."""
+    """Liste toutes les catégories de dépense pour un tenant."""
     df = query_df(
         text(
             """
@@ -27,7 +27,7 @@ def list_depense_categories(tenant_id: int) -> List[dict[str, Any]]:
 
 
 def create_depense_category(tenant_id: int, nom: str) -> dict[str, Any]:
-    """Create a new expense category."""
+    """Crée une nouvelle catégorie de dépense."""
     with get_engine().begin() as conn:
         row = conn.execute(
             text(
@@ -43,7 +43,7 @@ def create_depense_category(tenant_id: int, nom: str) -> dict[str, Any]:
 
 
 def list_cost_centers(tenant_id: int) -> List[dict[str, Any]]:
-    """List all cost centers for a tenant."""
+    """Liste tous les centres de coûts pour un tenant."""
     df = query_df(
         text(
             """
@@ -59,7 +59,7 @@ def list_cost_centers(tenant_id: int) -> List[dict[str, Any]]:
 
 
 def create_cost_center(tenant_id: int, nom: str) -> dict[str, Any]:
-    """Create a new cost center."""
+    """Crée un nouveau centre de coûts."""
     with get_engine().begin() as conn:
         row = conn.execute(
             text(
@@ -75,7 +75,7 @@ def create_cost_center(tenant_id: int, nom: str) -> dict[str, Any]:
 
 
 def list_fournisseurs(tenant_id: int) -> List[dict[str, Any]]:
-    """List all suppliers for a tenant."""
+    """Liste tous les fournisseurs pour un tenant."""
     df = query_df(
         text(
             """
@@ -91,7 +91,7 @@ def list_fournisseurs(tenant_id: int) -> List[dict[str, Any]]:
 
 
 def create_fournisseur(tenant_id: int, nom: str) -> dict[str, Any]:
-    """Create a new supplier."""
+    """Crée un nouveau fournisseur."""
     with get_engine().begin() as conn:
         row = conn.execute(
             text(
@@ -107,7 +107,7 @@ def create_fournisseur(tenant_id: int, nom: str) -> dict[str, Any]:
 
 
 def list_expenses(tenant_id: int) -> List[dict[str, Any]]:
-    """List all expenses for a tenant with enriched data."""
+    """Liste toutes les dépenses d'un tenant avec données enrichies."""
     sql = """
         SELECT d.id,
                d.libelle,
@@ -129,7 +129,7 @@ def list_expenses(tenant_id: int) -> List[dict[str, Any]]:
 
 
 def get_expense_detail(tenant_id: int, expense_id: int) -> dict[str, Any] | None:
-    """Get detailed information about a specific expense."""
+    """Récupère le détail d'une dépense donnée."""
     sql = """
         SELECT d.id,
                d.libelle,
@@ -153,7 +153,7 @@ def get_expense_detail(tenant_id: int, expense_id: int) -> dict[str, Any] | None
 
 
 def create_expense(tenant_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-    """Insert an expense and return the enriched record."""
+    """Insère une dépense et renvoie l'enregistrement enrichi."""
     with get_engine().begin() as conn:
         row = conn.execute(
             text(
@@ -179,7 +179,7 @@ def create_expense(tenant_id: int, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def expense_summary_by_month(tenant_id: int, months: int = 6) -> List[dict[str, Any]]:
-    """Aggregate expenses by month for the requested period."""
+    """Agrège les dépenses par mois sur la période demandée."""
     sql = """
         SELECT TO_CHAR(DATE_TRUNC('month', date_operation), 'YYYY-MM') AS label,
                SUM(COALESCE(montant_ht, quantite * prix_unitaire)) AS total_ht
@@ -194,7 +194,7 @@ def expense_summary_by_month(tenant_id: int, months: int = 6) -> List[dict[str, 
 
 
 def expense_summary_by_cost_center(tenant_id: int, months: int = 3) -> List[dict[str, Any]]:
-    """Distribute expenses by cost center for the recent period."""
+    """Répartit les dépenses par centre de coûts sur la période récente."""
     window = max(1, months)
     sql = """
         SELECT
@@ -213,7 +213,7 @@ def expense_summary_by_cost_center(tenant_id: int, months: int = 3) -> List[dict
 
 
 def expense_summary_by_tva(tenant_id: int, months: int = 6) -> List[dict[str, Any]]:
-    """Summarize amounts HT/TVA/TTC for tax declaration."""
+    """Résume les montants HT/TVA/TTC pour la déclaration fiscale."""
     window = max(1, months)
     sql = """
         SELECT

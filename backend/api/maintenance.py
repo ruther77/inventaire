@@ -1,4 +1,4 @@
-"""Maintenance endpoints (backups)."""
+"""Endpoints de maintenance (sauvegardes)."""
 
 from __future__ import annotations
 

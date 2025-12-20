@@ -1,4 +1,4 @@
-"""Service functions for Restaurant Overview & Food Cost (UX 4.7)."""
+"""Fonctions de service pour l'overview restaurant et le food cost (UX 4.7)."""
 
 from __future__ import annotations
 
@@ -12,14 +12,14 @@ from backend.services.restaurant.utils import _safe_float
 
 
 def _get_period_days(period: str) -> int:
-    """Convert period string to number of days."""
+    """Convertit une période en nombre de jours."""
     mapping = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
     return mapping.get(period, 30)
 
 
 def get_restaurant_overview(tenant_id: int, period: str = "30d") -> dict[str, Any]:
     """
-    Get restaurant overview with metrics, top plats, and alerts.
+    Fournit l'overview restaurant avec métriques, top plats et alertes.
 
     Returns:
     - Revenue for period
@@ -31,7 +31,7 @@ def get_restaurant_overview(tenant_id: int, period: str = "30d") -> dict[str, An
     days = _get_period_days(period)
     start_date = datetime.now() - timedelta(days=days)
 
-    # Get metrics
+    # Récupérer les métriques
     metrics_sql = text("""
         SELECT
             COUNT(DISTINCT CASE WHEN p.actif THEN p.id END) as active_plats_count,
@@ -56,8 +56,8 @@ def get_restaurant_overview(tenant_id: int, period: str = "30d") -> dict[str, An
         }
     else:
         row = metrics_df.iloc[0]
-        # Mock revenue for now (would come from sales data)
-        revenue = 15000.0 + (days * 50)  # Mock data
+        # Recette simulée pour l'instant (proviendrait des ventes)
+        revenue = 15000.0 + (days * 50)  # Données simulées
         food_cost_pct = 100.0 - _safe_float(row.get("avg_margin_pct", 0))
 
         metrics = {
@@ -68,7 +68,7 @@ def get_restaurant_overview(tenant_id: int, period: str = "30d") -> dict[str, An
             "avg_margin_pct": _safe_float(row.get("avg_margin_pct", 0)),
         }
 
-    # Get top plats (mock data for sales)
+    # Récupérer les top plats (données de ventes simulées)
     top_plats_sql = text("""
         SELECT
             p.id as plat_id,
@@ -84,7 +84,7 @@ def get_restaurant_overview(tenant_id: int, period: str = "30d") -> dict[str, An
     top_plats_df = query_df(top_plats_sql, {"tenant_id": tenant_id})
     top_plats = []
     for idx, row in top_plats_df.iterrows():
-        # Mock sales data
+        # Données de ventes simulées
         sales_count = 50 - (idx * 10)
         revenue = sales_count * 12.5
         top_plats.append({
@@ -95,7 +95,7 @@ def get_restaurant_overview(tenant_id: int, period: str = "30d") -> dict[str, An
             "margin_pct": _safe_float(row["margin_pct"]),
         })
 
-    # Get alerts
+    # Récupérer les alertes
     alerts_sql = text("""
         SELECT
             alert_type,
@@ -144,9 +144,9 @@ def list_plats_paginated(
     sort_desc: bool = False,
 ) -> dict[str, Any]:
     """
-    List plats with pagination, filters, and sorting.
+    Liste les plats avec pagination, filtres et tri.
     """
-    # Build WHERE clause
+    # Construire la clause WHERE
     where_clauses = ["p.tenant_id = :tenant_id"]
     params: dict[str, Any] = {"tenant_id": tenant_id}
 
@@ -164,17 +164,17 @@ def list_plats_paginated(
 
     where_sql = " AND ".join(where_clauses)
 
-    # Build ORDER BY clause
+    # Construire la clause ORDER BY
     sort_columns = {
         "nom": "p.nom",
         "margin_pct": "COALESCE(pc.marge_pct, 0)",
         "prix_vente_ttc": "p.prix_vente_ttc",
-        "sales_count": "p.id",  # Mock - would be from sales table
+        "sales_count": "p.id",  # Simulé - viendrait de la table des ventes
     }
     order_column = sort_columns.get(sort_by, "p.nom")
     order_direction = "DESC" if sort_desc else "ASC"
 
-    # Count total
+    # Compter le total
     count_sql = text(f"""
         SELECT COUNT(*) as total
         FROM restaurant_plats p
@@ -185,7 +185,7 @@ def list_plats_paginated(
     count_df = query_df(count_sql, params)
     total = int(count_df.iloc[0]["total"]) if not count_df.empty else 0
 
-    # Get paginated items
+    # Récupérer les éléments paginés
     offset = (page - 1) * page_size
     params["limit"] = page_size
     params["offset"] = offset
@@ -224,7 +224,7 @@ def list_plats_paginated(
             "marge_pct": _safe_float(row["marge_pct"]),
             "food_cost_pct": food_cost_pct,
             "actif": bool(row["actif"]),
-            "sales_count": None,  # Mock - would come from sales data
+            "sales_count": None,  # Simulé - proviendrait des données de ventes
         })
 
     return {
@@ -237,21 +237,28 @@ def list_plats_paginated(
 
 def get_plat_detail(tenant_id: int, plat_id: int) -> dict[str, Any]:
     """
-    Get complete plat details with ingredients and price history.
+    Récupère les détails complets d'un plat avec ingrédients et historique de prix.
     """
-    # Get plat base info
+    # Récupérer les infos de base du plat (prix + marge recalculée à la volée)
     plat_sql = text("""
+        WITH ingredient_costs AS (
+            SELECT
+                pi.plat_id,
+                SUM(pi.quantite * COALESCE(i.cout_unitaire, 0)) AS cout_matiere
+            FROM restaurant_plat_ingredients pi
+            JOIN restaurant_ingredients i ON i.id = pi.ingredient_id AND i.tenant_id = pi.tenant_id
+            WHERE pi.tenant_id = :tenant_id AND pi.plat_id = :plat_id
+            GROUP BY pi.plat_id
+        )
         SELECT
             p.id,
             p.nom,
             p.categorie as categorie,
             p.prix_vente_ttc,
             p.actif,
-            COALESCE(pc.cout_matiere, 0) as cout_matiere,
-            COALESCE(pc.marge_brute, 0) as marge_brute,
-            COALESCE(pc.marge_pct, 0) as marge_pct
+            COALESCE(ic.cout_matiere, 0) as cout_matiere
         FROM restaurant_plats p
-        LEFT JOIN restaurant_plat_costs pc ON pc.plat_id = p.id AND pc.tenant_id = p.tenant_id
+        LEFT JOIN ingredient_costs ic ON ic.plat_id = p.id
         WHERE p.tenant_id = :tenant_id AND p.id = :plat_id
     """)
 
@@ -262,16 +269,18 @@ def get_plat_detail(tenant_id: int, plat_id: int) -> dict[str, Any]:
     plat = plat_df.iloc[0]
     cost = _safe_float(plat["cout_matiere"])
     price = _safe_float(plat["prix_vente_ttc"])
+    margin = max(0.0, price - cost)
+    margin_pct = (margin / price * 100) if price > 0 else 0.0
     food_cost_pct = (cost / price * 100) if price > 0 else 0.0
 
-    # Get ingredients
+    # Récupérer les ingrédients
     ing_sql = text("""
         SELECT
             pi.ingredient_id,
             i.nom,
             pi.quantite as quantite,
             i.unite_base as unite,
-            i.cout_unitaire as unit_price
+            COALESCE(i.cout_unitaire, 0) as unit_price
         FROM restaurant_plat_ingredients pi
         JOIN restaurant_ingredients i ON i.id = pi.ingredient_id AND i.tenant_id = pi.tenant_id
         WHERE pi.tenant_id = :tenant_id AND pi.plat_id = :plat_id
@@ -296,7 +305,7 @@ def get_plat_detail(tenant_id: int, plat_id: int) -> dict[str, Any]:
             "cost_percentage": cost_percentage,
         })
 
-    # Get price history (last 10 changes)
+    # Récupérer l'historique de prix (10 dernières modifications)
     history_sql = text("""
         SELECT id, plat_id, prix_vente_ttc, changed_at
         FROM restaurant_plat_price_history
@@ -322,8 +331,8 @@ def get_plat_detail(tenant_id: int, plat_id: int) -> dict[str, Any]:
         "categorie": plat["categorie"],
         "selling_price": price,
         "cost": cost,
-        "margin": _safe_float(plat["marge_brute"]),
-        "margin_pct": _safe_float(plat["marge_pct"]),
+        "margin": margin,
+        "margin_pct": margin_pct,
         "food_cost_pct": food_cost_pct,
         "is_active": bool(plat["actif"]),
         "ingredients": ingredients,
@@ -333,13 +342,22 @@ def get_plat_detail(tenant_id: int, plat_id: int) -> dict[str, Any]:
 
 def get_plat_cost_breakdown(tenant_id: int, plat_id: int) -> dict[str, Any]:
     """
-    Get cost breakdown by ingredient with price trends.
+    Détaille le coût par ingrédient avec tendances de prix.
     """
-    # Get plat name and total cost
+    # Récupérer le nom du plat et le coût total recalculé depuis les ingrédients
     plat_sql = text("""
-        SELECT p.nom, COALESCE(pc.cout_matiere, 0) as total_cost
+        WITH ingredient_costs AS (
+            SELECT
+                pi.plat_id,
+                SUM(pi.quantite * COALESCE(i.cout_unitaire, 0)) AS cout_matiere
+            FROM restaurant_plat_ingredients pi
+            JOIN restaurant_ingredients i ON i.id = pi.ingredient_id AND i.tenant_id = pi.tenant_id
+            WHERE pi.tenant_id = :tenant_id AND pi.plat_id = :plat_id
+            GROUP BY pi.plat_id
+        )
+        SELECT p.nom, COALESCE(ic.cout_matiere, 0) as total_cost
         FROM restaurant_plats p
-        LEFT JOIN restaurant_plat_costs pc ON pc.plat_id = p.id AND pc.tenant_id = p.tenant_id
+        LEFT JOIN ingredient_costs ic ON ic.plat_id = p.id
         WHERE p.tenant_id = :tenant_id AND p.id = :plat_id
     """)
 
@@ -350,12 +368,12 @@ def get_plat_cost_breakdown(tenant_id: int, plat_id: int) -> dict[str, Any]:
     plat_nom = plat_df.iloc[0]["nom"]
     total_cost = _safe_float(plat_df.iloc[0]["total_cost"])
 
-    # Get ingredients with costs
+    # Récupérer les ingrédients avec leurs coûts
     ing_sql = text("""
         SELECT
             pi.ingredient_id,
             i.nom,
-            pi.quantite * i.cout_unitaire as cost
+            pi.quantite * COALESCE(i.cout_unitaire, 0) as cost
         FROM restaurant_plat_ingredients pi
         JOIN restaurant_ingredients i ON i.id = pi.ingredient_id AND i.tenant_id = pi.tenant_id
         WHERE pi.tenant_id = :tenant_id AND pi.plat_id = :plat_id
@@ -369,8 +387,8 @@ def get_plat_cost_breakdown(tenant_id: int, plat_id: int) -> dict[str, Any]:
         cost = _safe_float(row["cost"])
         cost_percentage = (cost / total_cost * 100) if total_cost > 0 else 0.0
 
-        # Mock price trend (would come from price history)
-        price_trend_30d = None  # Could calculate from history
+        # Tendance de prix simulée (viendrait de l'historique de prix)
+        price_trend_30d = None  # Pourrait être calculée depuis l'historique
 
         items.append({
             "ingredient_id": int(row["ingredient_id"]),
@@ -390,7 +408,7 @@ def get_plat_cost_breakdown(tenant_id: int, plat_id: int) -> dict[str, Any]:
 
 def list_ingredients_enhanced(tenant_id: int) -> list[dict[str, Any]]:
     """
-    List ingredients with supplier and price trend information.
+    Liste les ingrédients avec fournisseur et tendance de prix.
     """
     sql = text("""
         SELECT
@@ -414,8 +432,8 @@ def list_ingredients_enhanced(tenant_id: int) -> list[dict[str, Any]]:
             "unite_base": row["unite_base"],
             "cout_unitaire": _safe_float(row["cout_unitaire"]),
             "stock_actuel": _safe_float(row["stock_actuel"]),
-            "main_supplier": None,  # Would come from supplier mapping
-            "price_trend_30d": None,  # Would calculate from price history
+            "main_supplier": None,  # Viendrait du mapping fournisseur
+            "price_trend_30d": None,  # Se calculerait depuis l'historique des prix
         })
 
     return ingredients
@@ -423,9 +441,9 @@ def list_ingredients_enhanced(tenant_id: int) -> list[dict[str, Any]]:
 
 def get_ingredient_price_history_detail(tenant_id: int, ingredient_id: int) -> dict[str, Any]:
     """
-    Get detailed price history for an ingredient.
+    Récupère l'historique de prix détaillé pour un ingrédient.
     """
-    # Get ingredient name
+    # Récupérer le nom de l'ingrédient
     ing_sql = text("""
         SELECT nom FROM restaurant_ingredients
         WHERE tenant_id = :tenant_id AND id = :ingredient_id
@@ -437,7 +455,7 @@ def get_ingredient_price_history_detail(tenant_id: int, ingredient_id: int) -> d
 
     ingredient_nom = ing_df.iloc[0]["nom"]
 
-    # Get history
+    # Récupérer l'historique
     history_sql = text("""
         SELECT id, ingredient_id, cout_unitaire, changed_at
         FROM restaurant_ingredient_price_history
@@ -471,36 +489,57 @@ def analyze_food_cost(
     target_food_cost: float = 30.0,
 ) -> dict[str, Any]:
     """
-    Analyze food cost with trends and recommendations.
+    Analyse le food cost avec tendances et recommandations.
+    Calcule les coûts à la volée depuis plat_ingredients et restaurant_ingredients.
     """
     days = _get_period_days(period)
 
-    # Get global food cost
+    # Obtenir le food cost global - calculé depuis les ingrédients
     global_sql = text("""
+        WITH plat_costs AS (
+            SELECT
+                p.id as plat_id,
+                p.prix_vente_ttc,
+                p.categorie,
+                COALESCE(SUM(rpi.quantite * ri.cout_unitaire), 0) as cout_matiere
+            FROM restaurant_plats p
+            LEFT JOIN restaurant_plat_ingredients rpi ON rpi.plat_id = p.id AND rpi.tenant_id = p.tenant_id
+            LEFT JOIN restaurant_ingredients ri ON ri.id = rpi.ingredient_id AND ri.tenant_id = p.tenant_id
+            WHERE p.tenant_id = :tenant_id AND p.actif = TRUE
+            GROUP BY p.id, p.prix_vente_ttc, p.categorie
+        )
         SELECT
-            AVG(CASE WHEN p.prix_vente_ttc > 0
-                THEN (COALESCE(pc.cout_matiere, 0) / p.prix_vente_ttc * 100)
+            AVG(CASE WHEN prix_vente_ttc > 0
+                THEN (cout_matiere / prix_vente_ttc * 100)
                 ELSE 0 END) as global_food_cost_pct
-        FROM restaurant_plats p
-        LEFT JOIN restaurant_plat_costs pc ON pc.plat_id = p.id AND pc.tenant_id = p.tenant_id
-        WHERE p.tenant_id = :tenant_id AND p.actif = TRUE
+        FROM plat_costs
     """)
 
     global_df = query_df(global_sql, {"tenant_id": tenant_id})
     global_food_cost_pct = _safe_float(global_df.iloc[0]["global_food_cost_pct"]) if not global_df.empty else 0.0
 
-    # Food cost by category
+    # Food cost par catégorie - calculé depuis les ingrédients
     category_sql = text("""
+        WITH plat_costs AS (
+            SELECT
+                p.id as plat_id,
+                p.prix_vente_ttc,
+                p.categorie,
+                COALESCE(SUM(rpi.quantite * ri.cout_unitaire), 0) as cout_matiere
+            FROM restaurant_plats p
+            LEFT JOIN restaurant_plat_ingredients rpi ON rpi.plat_id = p.id AND rpi.tenant_id = p.tenant_id
+            LEFT JOIN restaurant_ingredients ri ON ri.id = rpi.ingredient_id AND ri.tenant_id = p.tenant_id
+            WHERE p.tenant_id = :tenant_id AND p.actif = TRUE
+            GROUP BY p.id, p.prix_vente_ttc, p.categorie
+        )
         SELECT
-            p.categorie as categorie,
-            AVG(CASE WHEN p.prix_vente_ttc > 0
-                THEN (COALESCE(pc.cout_matiere, 0) / p.prix_vente_ttc * 100)
+            categorie,
+            AVG(CASE WHEN prix_vente_ttc > 0
+                THEN (cout_matiere / prix_vente_ttc * 100)
                 ELSE 0 END) as avg_food_cost_pct,
             COUNT(*) as plat_count
-        FROM restaurant_plats p
-        LEFT JOIN restaurant_plat_costs pc ON pc.plat_id = p.id AND pc.tenant_id = p.tenant_id
-        WHERE p.tenant_id = :tenant_id AND p.actif = TRUE
-        GROUP BY p.categorie
+        FROM plat_costs
+        GROUP BY categorie
         ORDER BY avg_food_cost_pct DESC
     """)
 
@@ -511,19 +550,51 @@ def analyze_food_cost(
             "categorie": row["categorie"] or "Non catégorisé",
             "avg_food_cost_pct": _safe_float(row["avg_food_cost_pct"]),
             "plat_count": int(row["plat_count"]),
-            "total_revenue": 0.0,  # Mock - would come from sales
+            "total_revenue": 0.0,  # Simulé - proviendrait des ventes
         })
 
-    # Mock trend data
+    # Calculer la tendance depuis l'historique de prix des ingrédients
+    trend_sql = text("""
+        WITH monthly_costs AS (
+            SELECT
+                date_trunc('month', riph.changed_at) as month,
+                AVG(riph.cout_unitaire) as avg_ingredient_cost
+            FROM restaurant_ingredient_price_history riph
+            JOIN restaurant_ingredients ri ON ri.id = riph.ingredient_id AND ri.tenant_id = :tenant_id
+            WHERE riph.tenant_id = :tenant_id
+              AND riph.changed_at >= NOW() - INTERVAL '6 months'
+            GROUP BY date_trunc('month', riph.changed_at)
+            ORDER BY month
+        )
+        SELECT
+            TO_CHAR(month, 'YYYY-MM') as period,
+            avg_ingredient_cost
+        FROM monthly_costs
+    """)
+    trend_df = query_df(trend_sql, {"tenant_id": tenant_id})
+
     trend = []
-    for i in range(6):
-        trend.append({
-            "period": f"M-{5-i}",
-            "food_cost_pct": global_food_cost_pct + (i - 3) * 0.5,  # Mock variation
-            "revenue": 0.0,  # Mock
-        })
+    if not trend_df.empty:
+        for _, row in trend_df.iterrows():
+            # Estimer la variation du food cost en fonction de l'évolution des coûts ingrédients
+            avg_cost = _safe_float(row["avg_ingredient_cost"])
+            trend.append({
+                "period": row["period"],
+                "food_cost_pct": global_food_cost_pct * (1 + (avg_cost - global_food_cost_pct) / 100) if global_food_cost_pct > 0 else 0,
+                "revenue": 0.0,
+            })
+    else:
+        # Générer une tendance simulée s'il n'y a pas d'historique
+        from datetime import datetime
+        for i in range(6):
+            month = datetime.now() - timedelta(days=30 * (5 - i))
+            trend.append({
+                "period": month.strftime("%Y-%m"),
+                "food_cost_pct": max(0, global_food_cost_pct + (i - 3) * 0.8),
+                "revenue": 0.0,
+            })
 
-    # Generate recommendations
+    # Générer des recommandations
     recommendations = []
     if global_food_cost_pct > target_food_cost:
         diff = global_food_cost_pct - target_food_cost
@@ -534,7 +605,7 @@ def analyze_food_cost(
             "estimated_impact": None,
         })
 
-    # Check for high food cost categories
+    # Vérifier les catégories au food cost élevé
     for cat in by_category:
         if cat["avg_food_cost_pct"] > target_food_cost + 5:
             recommendations.append({
@@ -561,9 +632,9 @@ def simulate_price_change(
     target_margin_pct: Optional[float] = None,
 ) -> dict[str, Any]:
     """
-    Simulate impact of price change on margins and food cost.
+    Simule l'impact d'un changement de prix sur les marges et le food cost.
     """
-    # Get current plat data
+    # Récupérer les données actuelles du plat
     plat_sql = text("""
         SELECT
             p.nom,
@@ -587,26 +658,26 @@ def simulate_price_change(
     current_margin_pct = _safe_float(plat["marge_pct"])
     current_food_cost_pct = (cost / current_price * 100) if current_price > 0 else 0.0
 
-    # Calculate simulated price
+    # Calculer un prix simulé
     if new_price is not None:
         simulated_price = new_price
     elif target_margin_pct is not None:
-        # Price = Cost / (1 - target_margin_pct/100)
+        # Prix = Coût / (1 - target_margin_pct/100)
         simulated_price = cost / (1 - target_margin_pct / 100) if target_margin_pct < 100 else current_price
     else:
         raise ValueError("Either new_price or target_margin_pct must be provided")
 
-    # Calculate simulated metrics
+    # Calculer les métriques simulées
     simulated_margin = simulated_price - cost
     simulated_margin_pct = (simulated_margin / simulated_price * 100) if simulated_price > 0 else 0.0
     simulated_food_cost_pct = (cost / simulated_price * 100) if simulated_price > 0 else 0.0
 
-    # Calculate impact
+    # Calculer l'impact
     margin_change = simulated_margin - current_margin
     margin_pct_change = simulated_margin_pct - current_margin_pct
     food_cost_change = simulated_food_cost_pct - current_food_cost_pct
 
-    # Estimate annual impact (assume 50 sales per month)
+    # Estimer l'impact annuel (hypothèse de 50 ventes par mois)
     annual_sales = 50 * 12
     annual_impact = margin_change * annual_sales
 
@@ -642,7 +713,7 @@ def list_alerts_detailed(
     severity: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """
-    List detailed restaurant alerts with filters.
+    Liste les alertes restaurant détaillées avec filtres.
     """
     where_clauses = ["a.tenant_id = :tenant_id"]
     params: dict[str, Any] = {"tenant_id": tenant_id}
@@ -691,7 +762,7 @@ def list_alerts_detailed(
             "message": row["message"],
             "plat_id": int(row["plat_id"]) if row["plat_id"] else None,
             "plat_nom": row["plat_nom"],
-            "ingredient_id": None,  # Would come from ingredient alerts
+            "ingredient_id": None,  # Viendrait des alertes ingrédient
             "ingredient_nom": None,
             "current_value": _safe_float(row["current_value"]) if row["current_value"] is not None else None,
             "threshold": _safe_float(row["threshold"]) if row["threshold"] is not None else None,

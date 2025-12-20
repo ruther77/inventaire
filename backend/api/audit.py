@@ -1,4 +1,4 @@
-"""Audit & discrepancies API routes."""
+"""Routes API d'audit et de gestion des écarts."""
 
 from __future__ import annotations
 
@@ -86,7 +86,7 @@ def update_action_status(
             note=payload.note,
             tenant_id=tenant.id,
         )
-        # Return updated representation
+        # Retourner la représentation mise à jour
         items = audit_service.list_actions(include_closed=True)
         for item in items:
             if item["id"] == action_id:

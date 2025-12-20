@@ -1,4 +1,4 @@
-"""Admin & tooling endpoints."""
+"""Endpoints d'administration et d'outillage."""
 
 from __future__ import annotations
 

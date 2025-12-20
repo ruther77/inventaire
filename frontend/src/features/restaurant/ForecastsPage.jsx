@@ -174,7 +174,7 @@ export default function ForecastsPage({ context = 'restaurant' }) {
           </p>
         </div>
         {timelineData.length ? (
-          <div className="h-80">
+          <div className="h-80" key={`timeline-chart-${horizon}-${granularity}`}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={timelineData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -264,7 +264,7 @@ export default function ForecastsPage({ context = 'restaurant' }) {
             <h3 className="text-lg font-semibold text-white">Poids des familles</h3>
           </div>
           {categoriesData.length ? (
-            <div className="h-80">
+            <div className="h-80" key={`categories-chart-${horizon}-${granularity}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart layout="vertical" data={categoriesData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />

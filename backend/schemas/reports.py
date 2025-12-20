@@ -1,4 +1,4 @@
-"""Pydantic schemas for reporting endpoints."""
+"""Schémas Pydantic pour les endpoints de reporting."""
 
 from __future__ import annotations
 

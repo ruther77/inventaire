@@ -27,20 +27,28 @@ from .performance import (
     get_performance_stats,
     create_performance_middleware,
 )
+from .idempotency import (
+    IdempotencyMiddleware,
+    IdempotencyKeyGenerator,
+    require_idempotency_key,
+    has_idempotency_key,
+    get_idempotency_status,
+    IDEMPOTENCY_KEY_HEADER,
+)
 
 __all__ = [
-    # Rate limiter
+    # Limiteur de débit
     "RateLimiter",
     "RateLimitConfig",
     "rate_limit",
     "get_rate_limiter",
-    # Request context
+    # Contexte requête
     "RequestContextMiddleware",
     "get_request_id",
     "get_request_context",
     "set_context_value",
     "get_elapsed_ms",
-    # Response wrapper
+    # Wrapper de réponse
     "ResponseWrapperMiddleware",
     "ErrorCodes",
     "build_success_response",
@@ -50,4 +58,11 @@ __all__ = [
     "CircuitBreaker",
     "get_performance_stats",
     "create_performance_middleware",
+    # Idempotency
+    "IdempotencyMiddleware",
+    "IdempotencyKeyGenerator",
+    "require_idempotency_key",
+    "has_idempotency_key",
+    "get_idempotency_status",
+    "IDEMPOTENCY_KEY_HEADER",
 ]

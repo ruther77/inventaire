@@ -1,18 +1,19 @@
 """
-Restaurant services module - refactored from monolithic restaurant.py
+Module des services Restaurant - refactorisé depuis le monolithe restaurant.py
 
-This module is organized into the following sub-modules:
-- constants: Category rules, regex patterns, presets
-- utils: Helper functions (_safe_float, _normalize_amount, etc.)
-- pdf_parser: Bank statement PDF parsing (LCL, SumUp)
-- expenses: Expense management (depenses, cost centers, fournisseurs)
-- ingredients: Ingredient and plat management
-- bank_statements: Bank statement operations and summaries
-- dashboard: Dashboard overview and forecast
-- mappings: Epicerie-Restaurant mappings and sync
+Le module est organisé en sous-modules :
+- constants : règles de catégories, motifs regex, préréglages
+- utils : fonctions utilitaires (_safe_float, _normalize_amount, etc.)
+- expenses : gestion des dépenses (dépenses, centres de coût, fournisseurs)
+- ingredients : gestion des ingrédients et des plats
+- bank_statements : opérations et synthèses des relevés bancaires
+- dashboard : vue d'ensemble et prévisions du tableau de bord
+- mappings : correspondances et synchronisation Épicerie-Restaurant
+
+Remarque : le parsing PDF a été migré vers le module core/bank_import/.
 """
 
-# Re-export all public functions for backwards compatibility
+# Ré-exporte toutes les fonctions publiques pour la rétrocompatibilité
 from backend.services.restaurant.constants import (
     CATEGORY_RULES,
     CATEGORY_GROUP_PRESETS,
@@ -21,9 +22,6 @@ from backend.services.restaurant.utils import (
     _safe_float,
     _normalize_amount,
     _get_restaurant_entity_id,
-)
-from backend.services.restaurant.pdf_parser import (
-    parse_bank_statement_pdf,
 )
 from backend.services.restaurant.expenses import (
     list_depense_categories,
@@ -42,12 +40,20 @@ from backend.services.restaurant.expenses import (
 from backend.services.restaurant.ingredients import (
     list_ingredients,
     create_ingredient,
+    update_ingredient,
+    delete_ingredient,
     update_ingredient_price,
+    update_ingredient_ratio,
+    link_ingredient_to_epicerie,
+    unlink_ingredient_from_epicerie,
     list_plats,
     refresh_plat_costs,
     list_plat_alerts,
     create_plat,
+    delete_plat,
     attach_ingredient_to_plat,
+    remove_ingredient_from_plat,
+    update_plat_ingredient,
     update_plat_price,
     list_ingredient_price_history,
     list_plat_price_history,
@@ -69,13 +75,11 @@ from backend.services.restaurant.dashboard import (
 )
 from backend.services.restaurant.mappings import (
     list_sales_consumptions,
-    sync_ingredients_from_mappings,
     list_combined_price_history,
-    list_plat_epicerie_links,
-    upsert_plat_epicerie_mapping,
-    delete_plat_epicerie_mapping,
     list_epicerie_products,
+    search_epicerie_products,
 )
+from backend.services.restaurant.price_sync import audit_epicerie_links
 from backend.services.restaurant.overview import (
     get_restaurant_overview,
     list_plats_paginated,
@@ -96,8 +100,6 @@ __all__ = [
     "_safe_float",
     "_normalize_amount",
     "_get_restaurant_entity_id",
-    # PDF Parser
-    "parse_bank_statement_pdf",
     # Expenses
     "list_depense_categories",
     "create_depense_category",
@@ -114,12 +116,20 @@ __all__ = [
     # Ingredients
     "list_ingredients",
     "create_ingredient",
+    "update_ingredient",
+    "delete_ingredient",
     "update_ingredient_price",
+    "update_ingredient_ratio",
+    "link_ingredient_to_epicerie",
+    "unlink_ingredient_from_epicerie",
     "list_plats",
     "refresh_plat_costs",
     "list_plat_alerts",
     "create_plat",
+    "delete_plat",
     "attach_ingredient_to_plat",
+    "remove_ingredient_from_plat",
+    "update_plat_ingredient",
     "update_plat_price",
     "list_ingredient_price_history",
     "list_plat_price_history",
@@ -136,14 +146,12 @@ __all__ = [
     # Dashboard
     "build_dashboard_overview",
     "build_forecast_overview",
-    # Mappings
+    # Mappings (ingredient→epicerie link utilities)
     "list_sales_consumptions",
-    "sync_ingredients_from_mappings",
     "list_combined_price_history",
-    "list_plat_epicerie_links",
-    "upsert_plat_epicerie_mapping",
-    "delete_plat_epicerie_mapping",
     "list_epicerie_products",
+    "search_epicerie_products",
+    "audit_epicerie_links",
     # Overview & Food Cost (UX 4.7)
     "get_restaurant_overview",
     "list_plats_paginated",

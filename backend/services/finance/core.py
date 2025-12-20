@@ -1,4 +1,4 @@
-"""Finance service exposing reconciliation helpers to the API."""
+"""Service finance exposant les helpers de rapprochement à l'API."""
 
 from __future__ import annotations
 

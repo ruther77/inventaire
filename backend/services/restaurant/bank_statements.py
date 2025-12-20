@@ -1,4 +1,4 @@
-"""Bank statement operations and summaries for restaurant module."""
+"""Opérations et synthèses de relevés bancaires pour le module restaurant."""
 
 from __future__ import annotations
 
@@ -18,30 +18,30 @@ from backend.services.restaurant.utils import (
     _resolve_group_name,
     _ensure_depense_category,
 )
-from backend.services.restaurant.pdf_parser import parse_bank_statement_pdf
 from backend.services.restaurant.expenses import get_expense_detail
 
 
 def list_bank_statements(tenant_id: int, account: str | None = None) -> List[dict[str, Any]]:
-    """Return bank statement lines using finance_* tables (optional account filter)."""
+    """Retourne les lignes de relevé bancaire via les tables finance_* (filtre compte optionnel)."""
     entity_id = _get_restaurant_entity_id()
     account_clause = "AND a.label = :account" if account else ""
     sql = text(
         f"""
         SELECT
-          tl.id AS id,
+          t.id AS id,
           a.label AS account,
           t.date_operation::date AS date,
           COALESCE(b.libelle_banque, t.note, '') AS libelle,
           c.name AS categorie,
-          COALESCE(tl.montant_ttc, tl.montant_ht, 0) AS montant,
+          t.amount AS montant,
           CASE WHEN t.direction = 'IN' THEN 'Entree' ELSE 'Sortie' END AS type,
           TO_CHAR(t.date_operation, 'YYYY-MM') AS mois,
           NULL::bigint AS depense_id
-        FROM finance_transaction_lines tl
-        JOIN finance_transactions t ON t.id = tl.transaction_id
+        FROM finance_transactions t
         JOIN finance_accounts a ON a.id = t.account_id
-        LEFT JOIN finance_categories c ON c.id = tl.category_id
+        LEFT JOIN finance_transaction_lines tl ON tl.transaction_id = t.id
+        LEFT JOIN finance_transaction_classification tc ON tc.transaction_id = t.id
+        LEFT JOIN finance_categories c ON c.id = COALESCE(tl.category_id, tc.category_id)
         LEFT JOIN finance_bank_statement_lines b
           ON t.ref_externe LIKE 'stmtline:%'
          AND b.id = CAST(substring(t.ref_externe FROM 'stmtline:(\\d+)') AS BIGINT)
@@ -49,7 +49,7 @@ def list_bank_statements(tenant_id: int, account: str | None = None) -> List[dic
           AND t.status = 'CONFIRMED'
           AND t.direction IN ('IN', 'OUT')
           {account_clause}
-        ORDER BY t.date_operation DESC, tl.id DESC
+        ORDER BY t.date_operation DESC, t.id DESC
         """
     )
     params: dict[str, Any] = {"entity_id": entity_id}
@@ -64,18 +64,17 @@ def list_bank_statements(tenant_id: int, account: str | None = None) -> List[dic
 
 
 def list_bank_accounts_overview(tenant_id: int) -> List[dict[str, Any]]:
-    """Summary by account (volume, flows, last activity)."""
+    """Synthèse par compte (volume, flux, dernière activité)."""
     entity_id = _get_restaurant_entity_id()
     sql = text(
         """
         SELECT
             a.label AS account,
             COUNT(*) AS operations,
-            SUM(CASE WHEN t.direction = 'IN' THEN COALESCE(tl.montant_ttc, tl.montant_ht, 0) ELSE 0 END) AS inflow,
-            SUM(CASE WHEN t.direction = 'OUT' THEN COALESCE(tl.montant_ttc, tl.montant_ht, 0) ELSE 0 END) AS outflow,
+            SUM(CASE WHEN t.direction = 'IN' THEN t.amount ELSE 0 END) AS inflow,
+            SUM(CASE WHEN t.direction = 'OUT' THEN t.amount ELSE 0 END) AS outflow,
             MAX(t.date_operation)::date AS last_activity
-        FROM finance_transaction_lines tl
-        JOIN finance_transactions t ON t.id = tl.transaction_id
+        FROM finance_transactions t
         JOIN finance_accounts a ON a.id = t.account_id
         WHERE t.entity_id = :entity_id
           AND t.status = 'CONFIRMED'
@@ -129,7 +128,7 @@ def list_bank_accounts_overview(tenant_id: int) -> List[dict[str, Any]]:
 
 
 def create_bank_statement(tenant_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-    """Insert an imported/edited bank statement line."""
+    """Insère une ligne de relevé bancaire importée/éditée."""
     with get_engine().begin() as conn:
         row = conn.execute(
             text(
@@ -151,7 +150,7 @@ def create_bank_statement(tenant_id: int, payload: dict[str, Any]) -> dict[str, 
 
 
 def update_bank_statement(tenant_id: int, entry_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-    """Update an existing statement and return enriched version."""
+    """Met à jour un relevé existant et renvoie la version enrichie."""
     with get_engine().begin() as conn:
         row = conn.execute(
             text(
@@ -181,48 +180,49 @@ def update_bank_statement(tenant_id: int, entry_id: int, payload: dict[str, Any]
 
 
 def import_bank_statements_from_pdf(tenant_id: int, account: str, pdf_bytes: bytes) -> dict[str, int]:
-    """Parse a PDF statement and insert new operations for the given account."""
-    entries = parse_bank_statement_pdf(pdf_bytes)
-    if not entries:
-        return {"inserted": 0, "total": 0}
+    """Analyse un relevé PDF et l'importe via l'orchestrateur unifié.
 
-    inserted = 0
-    with get_engine().begin() as conn:
-        for entry in entries:
-            params = {
-                "tenant": tenant_id,
-                "account": account,
-                "date": entry["date"],
-                "libelle": entry["libelle"],
-                "categorie": entry.get("categorie"),
-                "montant": entry["montant"],
-                "type": entry["type"],
-                "mois": entry["mois"],
-                "source": entry.get("source", "pdf"),
-            }
-            row = conn.execute(
-                text(
-                    """
-                    INSERT INTO restaurant_bank_statements (
-                        tenant_id, account, date, libelle, categorie,
-                        montant, type, mois, source
-                    ) VALUES (
-                        :tenant, :account, :date, :libelle, :categorie,
-                        :montant, :type, :mois, :source
-                    )
-                    ON CONFLICT DO NOTHING
-                    RETURNING id
-                    """
-                ),
-                params,
-            ).fetchone()
-            if row:
-                inserted += 1
-    return {"inserted": inserted, "total": len(entries)}
+    OBSOLÈTE : cette fonction délègue à core/bank_import/orchestrator.py.
+    Utiliser POST /finance/bank-statements/import à la place.
+    """
+    import logging
+    import warnings
+    from core.bank_import.orchestrator import BankImportOrchestrator
+
+    logger = logging.getLogger(__name__)
+    warnings.warn(
+        "import_bank_statements_from_pdf is deprecated. Use core/bank_import/orchestrator.py",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
+    try:
+        # Utiliser le nouvel orchestrateur unifié
+        orchestrator = BankImportOrchestrator()
+        result = orchestrator.import_pdf(
+            pdf_bytes=pdf_bytes,
+            account_label=account,
+            entity_id=_get_restaurant_entity_id(),
+        )
+
+        logger.info(
+            f"PDF import via orchestrator: {result.inserted_count} inserted, "
+            f"{result.duplicate_count} duplicates, {result.error_count} errors"
+        )
+
+        return {
+            "inserted": result.inserted_count,
+            "total": result.total_parsed,
+            "duplicates": result.duplicate_count,
+        }
+
+    except Exception as e:
+        logger.error(f"PDF import failed: {e}")
+        return {"inserted": 0, "total": 0, "error": str(e)}
 
 
 def create_expense_from_bank_statement(tenant_id: int, entry_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-    """Create an expense from a bank statement and link them."""
+    """Crée une dépense depuis un relevé bancaire et les relie."""
     eng = get_engine()
     with eng.begin() as conn:
         statement = conn.execute(
@@ -300,7 +300,7 @@ def create_expense_from_bank_statement(tenant_id: int, entry_id: int, payload: d
 
 
 def transfer_from_epicerie(tenant_id: int, produit_restaurant_id: int, quantite: float = 1.0) -> Dict[str, Any]:
-    """Call SQL function transfer_from_epicerie for cross movements epicerie -> restaurant."""
+    """Appelle la fonction SQL transfer_from_epicerie pour les mouvements épicerie -> restaurant."""
     eng = get_engine()
     with eng.begin() as conn:
         rows = conn.execute(
@@ -315,7 +315,7 @@ def transfer_from_epicerie(tenant_id: int, produit_restaurant_id: int, quantite:
 def get_bank_statement_summary(
     tenant_id: int, account: str | None = None, months: int = 6, grouping: str | None = None
 ) -> Dict[str, Any]:
-    """Build daily/weekly/monthly aggregates and category groups."""
+    """Construit les agrégats quotidiens/hebdomadaires/mensuels et les regroupements par catégorie."""
     entity_id = _get_restaurant_entity_id()
     window: int | None = None
     if months and months > 0:
@@ -331,18 +331,19 @@ def get_bank_statement_summary(
           t.date_operation::date AS date,
           TO_CHAR(t.date_operation, 'YYYY-MM') AS mois,
           c.name AS categorie,
-          COALESCE(tl.montant_ttc, tl.montant_ht, 0) AS montant,
+          t.amount AS montant,
           CASE WHEN t.direction = 'IN' THEN 'Entree' ELSE 'Sortie' END AS type
-        FROM finance_transaction_lines tl
-        JOIN finance_transactions t ON t.id = tl.transaction_id
+        FROM finance_transactions t
         JOIN finance_accounts a ON a.id = t.account_id
-        LEFT JOIN finance_categories c ON c.id = tl.category_id
+        LEFT JOIN finance_transaction_lines tl ON tl.transaction_id = t.id
+        LEFT JOIN finance_transaction_classification tc ON tc.transaction_id = t.id
+        LEFT JOIN finance_categories c ON c.id = COALESCE(tl.category_id, tc.category_id)
         WHERE t.entity_id = :entity_id
           AND t.status = 'CONFIRMED'
           AND t.direction IN ('IN', 'OUT')
           {account_clause}
           {date_clause}
-        ORDER BY t.date_operation ASC, tl.id ASC
+        ORDER BY t.date_operation ASC, t.id ASC
         """
     )
     params: Dict[str, Any] = {"entity_id": entity_id}

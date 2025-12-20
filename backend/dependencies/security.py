@@ -1,4 +1,4 @@
-"""JWT/OAuth2 utilities and reusable dependencies."""
+"""Utilitaires JWT/OAuth2 et dépendances réutilisables."""
 
 from __future__ import annotations
 
@@ -23,21 +23,21 @@ DEFAULT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
-# Cookie configuration
+# Configuration des cookies
 COOKIE_NAME_ACCESS = "access_token"
 COOKIE_NAME_REFRESH = "refresh_token"
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
-COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax")  # lax, strict, none
+COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax")  # lax, strict ou none
 
 logger = logging.getLogger(__name__)
 
 
-# OAuth2 scheme - auto_error=False allows fallback to cookie auth
+# Schéma OAuth2 - auto_error=False autorise le repli sur l'auth cookie
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 
 
 class AuthenticatedUser(BaseModel):
-    """User context extracted from a JWT access token."""
+    """Contexte utilisateur extrait d'un access token JWT."""
 
     id: int
     username: str
@@ -96,7 +96,7 @@ def _get_algorithm() -> str:
 
 
 def create_access_token(claims: dict[str, Any], expires_delta: timedelta | None = None) -> str:
-    """Serialize the provided claims into a signed JWT with rotation-friendly claims."""
+    """Sérialise les claims fournis dans un JWT signé avec des claims adaptés à la rotation."""
 
     payload = claims.copy()
     expire = datetime.now(timezone.utc) + (
@@ -107,7 +107,7 @@ def create_access_token(claims: dict[str, Any], expires_delta: timedelta | None 
 
 
 def create_refresh_token(claims: dict[str, Any], expires_delta: timedelta | None = None) -> str:
-    """Create a refresh token with longer expiration."""
+    """Crée un refresh token avec une durée d'expiration plus longue."""
 
     payload = {
         "sub": claims.get("sub"),
@@ -129,7 +129,7 @@ def set_auth_cookies(
     access_max_age: int | None = None,
     refresh_max_age: int | None = None,
 ) -> None:
-    """Set httpOnly cookies for access and refresh tokens."""
+    """Définit les cookies httpOnly pour les tokens d'accès et de rafraîchissement."""
 
     access_max_age = access_max_age or ACCESS_TOKEN_EXPIRE_MINUTES * 60
     refresh_max_age = refresh_max_age or REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
@@ -150,12 +150,12 @@ def set_auth_cookies(
         httponly=True,
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
-        path="/auth",  # Refresh token only accessible on /auth endpoints
+        path="/auth",  # Refresh token accessible uniquement sur les endpoints /auth
     )
 
 
 def clear_auth_cookies(response: Response) -> None:
-    """Clear authentication cookies (logout)."""
+    """Supprime les cookies d'authentification (logout)."""
 
     response.delete_cookie(key=COOKIE_NAME_ACCESS, path="/")
     response.delete_cookie(key=COOKIE_NAME_REFRESH, path="/auth")
@@ -174,7 +174,7 @@ def _decode_token(token: str) -> dict[str, Any]:
                 detail="Token expiré",
                 headers={"WWW-Authenticate": "Bearer"},
             ) from exc
-        except jwt.InvalidTokenError as exc:  # pragma: no cover - defensive
+        except jwt.InvalidTokenError as exc:  # pragma: no cover - cas defensif
             last_error = exc
             continue
 
@@ -186,23 +186,19 @@ def _decode_token(token: str) -> dict[str, Any]:
 
 
 def _extract_token_from_request(request: Request) -> str | None:
-    """Extract token from cookie or Authorization header."""
+    """Extrait le token depuis le cookie uniquement (mode HTTP-Only strict).
 
-    # 1. Try cookie first (preferred for httpOnly security)
+    Note : Le repli sur l'en-tête Authorization a été supprimé afin de
+    forcer l'utilisation exclusive des cookies HTTP-Only.
+    """
+
+    # Extraction uniquement depuis le cookie HTTP-Only
     token = request.cookies.get(COOKIE_NAME_ACCESS)
-    if token:
-        return token
-
-    # 2. Fallback to Authorization header for API clients
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.lower().startswith("bearer "):
-        return auth_header[7:]
-
-    return None
+    return token if token else None
 
 
 def get_current_user_from_request(request: Request) -> AuthenticatedUser:
-    """Get current user from cookie or header token."""
+    """Récupère l'utilisateur courant depuis le cookie HTTP-Only."""
 
     token = _extract_token_from_request(request)
     if not token:
@@ -214,7 +210,7 @@ def get_current_user_from_request(request: Request) -> AuthenticatedUser:
 
     payload = _decode_token(token)
 
-    # Verify it's an access token, not a refresh token
+    # Vérifie qu'il s'agit d'un access token, pas d'un refresh token
     if payload.get("type") == "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -245,7 +241,7 @@ def get_current_user_from_request(request: Request) -> AuthenticatedUser:
 
 
 def get_current_user(token: str | None = Depends(oauth2_scheme)) -> AuthenticatedUser:
-    """Legacy: Get current user from OAuth2 bearer token."""
+    """Héritage : récupère l'utilisateur depuis un token Bearer OAuth2."""
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -255,7 +251,7 @@ def get_current_user(token: str | None = Depends(oauth2_scheme)) -> Authenticate
 
     payload = _decode_token(token)
 
-    # Verify it's an access token
+    # Vérifie qu'il s'agit d'un access token
     if payload.get("type") == "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -267,7 +263,7 @@ def get_current_user(token: str | None = Depends(oauth2_scheme)) -> Authenticate
         username = str(payload["username"])
         role = str(payload["role"])
         tenant_id = int(payload["tenant_id"])
-    except (KeyError, TypeError, ValueError) as exc:  # pragma: no cover - defensive
+    except (KeyError, TypeError, ValueError) as exc:  # pragma: no cover - cas defensif
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token manquant des informations nécessaires",
@@ -286,7 +282,7 @@ def get_current_user(token: str | None = Depends(oauth2_scheme)) -> Authenticate
 
 
 def decode_refresh_token(token: str) -> dict[str, Any]:
-    """Decode and validate a refresh token."""
+    """Décode et valide un refresh token."""
 
     payload = _decode_token(token)
 
@@ -300,12 +296,12 @@ def decode_refresh_token(token: str) -> dict[str, Any]:
 
 
 async def require_user(request: Request) -> AuthenticatedUser:
-    """Get current user from cookie or header (hybrid authentication)."""
+    """Récupère l'utilisateur courant depuis le cookie HTTP-Only."""
     return get_current_user_from_request(request)
 
 
 def require_roles(*roles: str) -> Callable:
-    """Require specific roles for access."""
+    """Exige des rôles spécifiques pour accéder à la ressource."""
     allowed = {role.lower() for role in roles} or set(ALLOWED_ROLES)
 
     async def _checker(request: Request) -> AuthenticatedUser:
@@ -321,11 +317,9 @@ def require_roles(*roles: str) -> Callable:
 
 
 async def enforce_default_rbac(request: Request) -> AuthenticatedUser:
-    """Allow anyone authenticated to read, managers/admins to mutate.
+    """Autorise toute personne authentifiée à lire ; managers/admins pour modifier.
 
-    Supports both:
-    - httpOnly cookies (preferred for browsers)
-    - Authorization: Bearer header (for API clients)
+    Authentification uniquement via cookies HTTP-Only.
     """
 
     user = get_current_user_from_request(request)
@@ -340,7 +334,7 @@ async def enforce_default_rbac(request: Request) -> AuthenticatedUser:
 
 
 def revoke_token(token: str) -> None:
-    """Ajoute le jti d'un token à la liste de révocation jusqu'à son expiration."""
+    """Ajoute le jti d'un token à la liste de révocation jusqu'à expiration."""
 
     try:
         payload = jwt.decode(token, options={"verify_signature": False})

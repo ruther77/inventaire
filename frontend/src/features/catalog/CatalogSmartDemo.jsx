@@ -1,15 +1,81 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Package, Tag, AlertTriangle, TrendingUp, Calendar } from 'lucide-react';
+import { Package, Tag, AlertTriangle, TrendingUp, Calendar, Scan, Eye, Package2 } from 'lucide-react';
 import { SmartTable, SmartDrawer, SmartFilters, DrawerSection, DrawerField, DrawerActions } from '../../components/smart';
 import { useProducts } from '../../hooks/useProducts.js';
 import { useUpdateProduct } from '../../hooks/useCatalogMutations.js';
 import Button from '../../components/ui/Button.jsx';
+import { PullToRefresh } from '../../components/ui/PullToRefresh.jsx';
+import { SwipeableRow, SwipeableRowProvider } from '../../components/ui/SwipeableRow.jsx';
+import { TableSkeleton } from '../../components/ui/Skeleton.jsx';
+import QueryErrorState from '../../components/feedback/QueryErrorState.jsx';
 
 // ============================================================================
 // CATALOG SMART DEMO - Démonstration des composants Phase 3
 // ============================================================================
+
+/**
+ * ProductCard - Carte produit pour mobile
+ */
+function ProductCard({ product, onViewDetails, onScanBarcode, onQuickStock }) {
+  const stock = product.stock_actuel || 0;
+  const threshold = product.seuil_alerte || 8;
+  const status = stock === 0 ? 'critical' : stock < threshold ? 'warning' : 'ok';
+
+  const statusColors = {
+    critical: 'text-rose-400 bg-rose-500/20',
+    warning: 'text-amber-400 bg-amber-500/20',
+    ok: 'text-emerald-400 bg-emerald-500/20',
+  };
+
+  const achat = product.prix_achat || 0;
+  const vente = product.prix_vente || 0;
+  const marge = achat === 0 ? null : ((vente - achat) / achat * 100).toFixed(1);
+  const margeColor = marge === null ? 'text-slate-500' : parseFloat(marge) >= 30 ? 'text-emerald-400' : parseFloat(marge) >= 15 ? 'text-amber-400' : 'text-rose-400';
+
+  return (
+    <div
+      className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3"
+      onClick={() => onViewDetails(product)}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-white truncate">{product.nom}</h3>
+          <p className="text-xs text-slate-500">ID #{product.id}</p>
+        </div>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[status]} shrink-0 ml-2`}>
+          {stock} u
+        </span>
+      </div>
+
+      {/* Category */}
+      <div className="flex items-center gap-2">
+        <Tag className="h-4 w-4 text-slate-400" />
+        <span className="text-sm text-slate-300">{product.categorie || 'Non classé'}</span>
+      </div>
+
+      {/* Price & Margin */}
+      <div className="grid grid-cols-3 gap-3 pt-2 border-t border-white/10">
+        <div>
+          <p className="text-xs text-slate-500">Achat</p>
+          <p className="text-sm font-mono text-white">{achat.toFixed(2)} €</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Vente</p>
+          <p className="text-sm font-mono font-semibold text-emerald-400">{vente.toFixed(2)} €</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Marge</p>
+          <p className={`text-sm font-mono font-semibold ${margeColor}`}>
+            {marge === null ? '—' : `${marge}%`}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * CatalogSmartDemo - Page catalogue avec SmartTable, SmartDrawer et SmartFilters
@@ -18,17 +84,46 @@ import Button from '../../components/ui/Button.jsx';
  * - Édition inline des prix et stocks
  * - Drawer de détail produit
  * - Filtres intelligents avec suggestions
+ * - Mode mobile avec cartes et swipe actions
  */
 export default function CatalogSmartDemo({ embedded = false }) {
-  const { data: products = [], isLoading } = useProducts();
+  const { data: products = [], isLoading, isError, error, refetch } = useProducts();
   const updateMutation = useUpdateProduct();
   const queryClient = useQueryClient();
+
+  // Skeleton pendant le chargement initial
+  if (isLoading && products.length === 0) {
+    return (
+      <div className="space-y-6">
+        {!embedded && (
+          <div>
+            <h1 className="text-2xl font-bold text-white">Catalogue Intelligent</h1>
+            <p className="text-sm text-slate-400 mt-1">Chargement...</p>
+          </div>
+        )}
+        <TableSkeleton rows={8} columns={5} />
+      </div>
+    );
+  }
+
+  // Erreur
+  if (isError && products.length === 0) {
+    return <QueryErrorState error={error} onRetry={refetch} variant="full" />;
+  }
 
   // États
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [filterValues, setFilterValues] = useState({});
   const [searchValue, setSearchValue] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Détection mobile
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Configuration des colonnes SmartTable
   const columns = useMemo(() => [
@@ -333,47 +428,132 @@ export default function CatalogSmartDemo({ embedded = false }) {
     setSearchValue('');
   }, []);
 
+  // Handler pour le refresh (pull-to-refresh)
+  const handleRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['products'] });
+  }, [queryClient]);
+
+  // Handler pour le scan de code-barres
+  const handleScanBarcode = useCallback((product) => {
+    toast.info(`Scanner pour ${product.nom}`, {
+      description: 'Fonctionnalité de scan disponible bientôt',
+    });
+  }, []);
+
+  // Handler pour afficher les détails du produit
+  const handleViewDetails = useCallback((product) => {
+    setSelectedProduct(product);
+    setDrawerOpen(true);
+  }, []);
+
+  // Handler pour l'ajustement rapide du stock
+  const handleQuickStock = useCallback((product) => {
+    toast.info(`Ajustement stock pour ${product.nom}`, {
+      description: 'Cliquez pour ajuster le stock rapidement',
+      action: {
+        label: 'Ajuster',
+        onClick: () => {
+          // Logique d'ajustement de stock
+          const newStock = prompt(`Stock actuel: ${product.stock_actuel}. Nouveau stock:`, product.stock_actuel);
+          if (newStock !== null) {
+            handleUpdate(product, 'stock_actuel', parseFloat(newStock));
+          }
+        },
+      },
+    });
+  }, [handleUpdate]);
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      {!embedded && (
-        <div>
-          <h1 className="text-2xl font-bold text-white">Catalogue Intelligent</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Démonstration Phase 3 - SmartTable avec édition inline
-          </p>
-        </div>
-      )}
+    <PullToRefresh onRefresh={handleRefresh}>
+      <div className="space-y-6">
+        {/* Header */}
+        {!embedded && (
+          <div>
+            <h1 className="text-2xl font-bold text-white">Catalogue Intelligent</h1>
+            <p className="text-sm text-slate-400 mt-1">
+              Démonstration Phase 3 - SmartTable avec édition inline
+            </p>
+          </div>
+        )}
 
-      {/* Smart Filters */}
-      <SmartFilters
-        filters={filters}
-        values={filterValues}
-        onChange={handleFilterChange}
-        onReset={handleResetFilters}
-        suggestions={suggestions}
-        presets={presets}
-        searchable
-        searchValue={searchValue}
-        onSearchChange={setSearchValue}
-        searchPlaceholder="Rechercher un produit..."
-      />
+        {/* Smart Filters */}
+        <SmartFilters
+          filters={filters}
+          values={filterValues}
+          onChange={handleFilterChange}
+          onReset={handleResetFilters}
+          suggestions={suggestions}
+          presets={presets}
+          searchable
+          searchValue={searchValue}
+          onSearchChange={setSearchValue}
+          searchPlaceholder="Rechercher un produit..."
+        />
 
-      {/* Smart Table */}
-      <SmartTable
-        data={filteredProducts}
-        columns={columns}
-        loading={isLoading}
-        onUpdate={handleUpdate}
-        onRowClick={handleRowClick}
-        onRowAction={handleRowAction}
-        getRowId={(row) => row.id}
-        emptyMessage="Aucun produit trouvé"
-        pagination
-        pageSize={15}
-        sortable
-        striped
-      />
+        {/* Mobile View - Cards with Swipe */}
+        {isMobile ? (
+          <SwipeableRowProvider>
+            <div className="space-y-3">
+              {isLoading ? (
+                <div className="text-center py-8 text-slate-400">Chargement...</div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="text-center py-8 text-slate-400">Aucun produit trouvé</div>
+              ) : (
+                filteredProducts.map((product) => (
+                  <SwipeableRow
+                    key={product.id}
+                    id={`product-${product.id}`}
+                    leftActions={[
+                      {
+                        label: 'Scanner',
+                        icon: Scan,
+                        variant: 'primary',
+                        onAction: () => handleScanBarcode(product),
+                      },
+                    ]}
+                    rightActions={[
+                      {
+                        label: 'Détails',
+                        icon: Eye,
+                        variant: 'primary',
+                        onAction: () => handleViewDetails(product),
+                      },
+                      {
+                        label: 'Stock',
+                        icon: Package2,
+                        variant: 'success',
+                        onAction: () => handleQuickStock(product),
+                      },
+                    ]}
+                  >
+                    <ProductCard
+                      product={product}
+                      onViewDetails={handleViewDetails}
+                      onScanBarcode={handleScanBarcode}
+                      onQuickStock={handleQuickStock}
+                    />
+                  </SwipeableRow>
+                ))
+              )}
+            </div>
+          </SwipeableRowProvider>
+        ) : (
+          /* Desktop View - Smart Table */
+          <SmartTable
+            data={filteredProducts}
+            columns={columns}
+            loading={isLoading}
+            onUpdate={handleUpdate}
+            onRowClick={handleRowClick}
+            onRowAction={handleRowAction}
+            getRowId={(row) => row.id}
+            emptyMessage="Aucun produit trouvé"
+            pagination
+            pageSize={15}
+            sortable
+            striped
+          />
+        )}
 
       {/* Suggestions IA inline */}
       {aiSuggestions.length > 0 && (
@@ -469,6 +649,7 @@ export default function CatalogSmartDemo({ embedded = false }) {
           </div>
         )}
       </SmartDrawer>
-    </div>
+      </div>
+    </PullToRefresh>
   );
 }

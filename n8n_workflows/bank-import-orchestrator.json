@@ -1,0 +1,191 @@
+{
+  "id": "bank-import-orchestrator",
+  "name": "Bank Import Orchestrator",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bank-import",
+        "responseMode": "lastNode",
+        "options": {
+          "responseContentType": "application/json",
+          "responseHeaders": {
+            "entries": [
+              { "name": "Cache-Control", "value": "no-store" }
+            ]
+          }
+        }
+      },
+      "id": "webhook-entry",
+      "name": "Webhook Import",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const payload = items[0].json || {};\nconst bankType = (payload.bank_type ?? 'auto').toLowerCase();\nconst filePath = payload.file_path ?? '';\nconst accountId = payload.account_id ?? null;\n\n// Account mapping based on bank type\nconst accountMapping = {\n  'bnp': 1,       // BNP - Angele\n  'lcl_noutam': 2,      // LCL - Noutam\n  'lcl_incontournable': 3, // LCL - L'Incontournable\n  'sumup': 4      // SumUp - L'Incontournable\n};\n\nconst resolvedAccountId = accountId ?? accountMapping[bankType] ?? null;\n\nreturn [{\n  json: {\n    bank_type: bankType,\n    file_path: filePath,\n    account_id: resolvedAccountId,\n    auto_detect: bankType === 'auto',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.account_id}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "check-account",
+      "name": "Has Account ID?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://api:8000/finance/bank-statements/import-pdf?account_id={{$json.account_id}}",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 180000,
+          "fullResponse": true
+        }
+      },
+      "id": "call-import-api",
+      "name": "Import PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [980, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{\n  json: {\n    success: false,\n    error: 'account_id manquant. Specifiez bank_type (bnp, lcl_noutam, lcl_incontournable, sumup) ou account_id directement.',\n    valid_types: ['bnp', 'lcl_noutam', 'lcl_incontournable', 'sumup', 'auto']\n  }\n}];"
+      },
+      "id": "error-no-account",
+      "name": "Error No Account",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [980, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = items[0].json || {};\nconst response = input.body ?? input;\nconst statusCode = input.statusCode ?? 200;\nconst success = statusCode >= 200 && statusCode < 300;\nconst data = response.data ?? response;\n\nreturn [{\n  json: {\n    success: success,\n    status_code: statusCode,\n    bank_type: data.bank_type ?? 'unknown',\n    inserted: data.inserted ?? 0,\n    duplicates: data.duplicates ?? 0,\n    total_parsed: data.total_parsed ?? 0,\n    period: data.period ?? null,\n    message: success \n      ? `Import reussi: ${data.inserted ?? 0} nouvelles transactions, ${data.duplicates ?? 0} doublons ignores`\n      : `Erreur: ${response.detail ?? response.error ?? 'Erreur inconnue'}`,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "format-result",
+      "name": "Format Result",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [1240, 200]
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "id": "merge-output",
+      "name": "Merge Output",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [1500, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Import": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Has Account ID?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Account ID?": {
+      "main": [
+        [
+          {
+            "node": "Import PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error No Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Import PDF": {
+      "main": [
+        [
+          {
+            "node": "Format Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Result": {
+      "main": [
+        [
+          {
+            "node": "Merge Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error No Account": {
+      "main": [
+        [
+          {
+            "node": "Merge Output",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionTimeout": 600,
+    "timezone": "Europe/Paris"
+  },
+  "pinData": {},
+  "tags": ["finance", "import", "orchestrator"]
+}

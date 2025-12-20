@@ -1,4 +1,4 @@
-"""Schemas for admin utilities."""
+"""Schémas pour les utilitaires d'administration."""
 
 from __future__ import annotations
 

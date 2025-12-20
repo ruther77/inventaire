@@ -1,4 +1,4 @@
-"""Finance schemas for reconciliation endpoints."""
+"""Schémas finance pour les endpoints de rapprochement."""
 
 from __future__ import annotations
 

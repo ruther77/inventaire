@@ -14,9 +14,16 @@ COST_SQL = """
     WITH ingredient_costs AS (
         SELECT
             pi.plat_id,
-            SUM(pi.quantite_batch * COALESCE(i.cout_unitaire, 0)) AS cout_matiere
-        FROM plat_ingredients pi
-        JOIN ingredients i ON i.id = pi.ingredient_id
+            SUM(
+                pi.quantite * COALESCE(
+                    p.prix_achat * COALESCE(i.ratio_epicerie, 1.0),
+                    i.cout_unitaire,
+                    0
+                )
+            ) AS cout_matiere
+        FROM restaurant_plat_ingredients pi
+        JOIN restaurant_ingredients i ON i.id = pi.ingredient_id AND i.tenant_id = pi.tenant_id
+        LEFT JOIN produits p ON p.id = i.produit_epicerie_id
         WHERE pi.tenant_id = :tenant_id
         GROUP BY pi.plat_id
     )
@@ -24,7 +31,7 @@ COST_SQL = """
         p.id AS plat_id,
         p.prix_vente_ttc,
         COALESCE(ic.cout_matiere, 0) AS cout_matiere
-    FROM plats p
+    FROM restaurant_plats p
     LEFT JOIN ingredient_costs ic ON ic.plat_id = p.id
     WHERE p.tenant_id = :tenant_id
 """  # Requête SQL pour calculer le coût matière par plat
@@ -163,7 +170,7 @@ def list_margin_alerts(*, tenant_id: int) -> list[dict[str, Any]]:
                a.threshold,
                a.created_at
         FROM restaurant_alerts a
-        LEFT JOIN plats p ON p.id = a.plat_id
+        LEFT JOIN restaurant_plats p ON p.id = a.plat_id AND p.tenant_id = a.tenant_id
         WHERE a.tenant_id = :tenant_id
           AND a.alert_type = 'plat_margin'
         ORDER BY a.created_at DESC

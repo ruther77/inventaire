@@ -1,4 +1,4 @@
-"""Shared helpers for invoice data normalization."""
+"""Helpers partagés pour normaliser les données de facture."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pandas as pd
 
 
 def prepare_invoice_dataframe(source_df: pd.DataFrame, margin_rate: float) -> pd.DataFrame:
-    """Normalize numeric columns and compute margins/totals for invoice lines."""
+    """Normalise les colonnes numériques et calcule marges/totaux pour les lignes de facture."""
 
     if not isinstance(source_df, pd.DataFrame) or source_df.empty:
         return source_df

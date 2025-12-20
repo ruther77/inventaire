@@ -1,4 +1,4 @@
-"""Price history API endpoints."""
+"""Endpoints API pour l'historique des prix."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def get_price_history(
     if df.empty:
         return {"items": []}
 
-    # Convert DataFrame to JSON-safe dict using pandas built-in
+    # Convertir le DataFrame en dictionnaire JSON-safe avec l'utilitaire pandas
     import json
     items = json.loads(df.to_json(orient="records", date_format="iso", default_handler=str))
     return {"items": items}

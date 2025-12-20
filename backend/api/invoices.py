@@ -1,4 +1,4 @@
-"""Invoice ingestion endpoints."""
+"""Endpoints d'ingestion de factures."""
 
 from __future__ import annotations
 
@@ -12,6 +12,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from backend.schemas.invoices import (
+    ImportSession,
+    ImportSessionDetails,
+    ImportSessionListResponse,
     InvoiceCatalogImportRequest,
     InvoiceCatalogImportSummary,
     InvoiceExtractDocument,
@@ -32,6 +35,7 @@ from backend.schemas.invoices import (
 )
 from backend.services import invoices as invoices_service
 from backend.services import zero_click_jobs as job_service
+from backend.services import product_matching
 from core.invoice_extractor import extract_text_from_file
 from backend.dependencies.tenant import Tenant, get_current_tenant
 
@@ -220,12 +224,37 @@ def _process_zero_click_bytes(
     if lines_df.empty:
         raise HTTPException(status_code=400, detail="Aucune ligne extraite du PDF")
 
-    # 4. Enrichissement avec le catalogue
+    # 4. Enrichissement avec le catalogue (MATCHING AUTOMATIQUE)
     enriched = invoices_service.enrich_lines_with_catalog(
         lines_df,
         margin_percent=margin_percent,
         tenant_id=tenant.id,
     )
+
+    # 4b. CRÉATION AUTOMATIQUE DES PRODUITS MANQUANTS
+    unmatched_lines = enriched[enriched["produit_id"].isna()].copy()
+    products_created = 0
+    if not unmatched_lines.empty and auto_confirm:
+        LOGGER.info(f"Création automatique de {len(unmatched_lines)} produits manquants")
+        try:
+            catalog_summary = invoices_service.import_catalog_from_invoice(
+                unmatched_lines,
+                supplier=supplier_hint or "Import",
+                initialize_stock=False,  # Le stock sera mis à jour dans apply_invoice_import
+                invoice_date=None,
+                tenant_id=tenant.id,
+            )
+            products_created = catalog_summary.get("created", 0)
+
+            # Re-enrichir pour récupérer les nouveaux produit_id
+            enriched = invoices_service.enrich_lines_with_catalog(
+                lines_df,
+                margin_percent=margin_percent,
+                tenant_id=tenant.id,
+            )
+            LOGGER.info(f"✅ {products_created} produits créés automatiquement")
+        except Exception as create_exc:
+            LOGGER.warning(f"Échec création auto produits: {create_exc}")
 
     # 5. Analyse de qualité (optionnel)
     quality_report = None
@@ -248,6 +277,7 @@ def _process_zero_click_bytes(
             elif "TAIYAT" in filename_upper or "TAI" in filename_upper:
                 supplier = "TAIYAT"
 
+        # 6. APPLICATION AUTOMATIQUE (MISE À JOUR STOCK)
         summary = invoices_service.apply_invoice_import(
             enriched,
             username="zero_click",
@@ -257,7 +287,10 @@ def _process_zero_click_bytes(
             tenant_id=tenant.id,
         )
 
-        # 6. Synchroniser vers fact_invoices
+        # Ajouter le nombre de produits créés
+        summary["products_created"] = products_created
+
+        # 7. Synchroniser vers fact_invoices
         try:
             from core.consolidation_loader import sync_invoice_dataframe
 
@@ -312,7 +345,7 @@ def extract_invoice(payload: InvoiceExtractRequest, tenant: Tenant = Depends(get
         items = _serialize_minimal(enriched)
         documents = _group_items_by_invoice(items)
         return InvoiceExtractResponse(items=items, documents=documents)
-    except Exception as exc:  # pragma: no cover - fallback runtime
+    except Exception as exc:  # pragma: no cover - repli à l'exécution
         LOGGER.exception("Invoice text extraction failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -479,6 +512,7 @@ if MULTIPART_AVAILABLE:
         margin_percent: float = Form(40.0),
         supplier_hint: str | None = Form(default=None),
         auto_confirm: bool = Form(default=True),
+        session_id: str | None = Form(default=None),
         tenant: Tenant = Depends(get_current_tenant),
     ):
         """Lance un job zero-click async et retourne immédiatement le job_id pour polling."""
@@ -493,6 +527,7 @@ if MULTIPART_AVAILABLE:
                 supplier_hint=supplier_hint,
                 margin_percent=margin_percent,
                 auto_confirm=auto_confirm,
+                session_id=session_id,
             )
         except Exception as exc:
             LOGGER.exception("Échec de création du job %s", job_id)
@@ -559,6 +594,7 @@ if MULTIPART_AVAILABLE:
 @router.get("/zero-click/jobs", response_model=ZeroClickJobListResponse)
 def list_zero_click_jobs(
     status: str | None = None,
+    session_id: str | None = None,
     limit: int = 50,
     offset: int = 0,
     tenant: Tenant = Depends(get_current_tenant),
@@ -567,6 +603,7 @@ def list_zero_click_jobs(
     jobs_data, total = job_service.list_jobs(
         tenant_id=tenant.id,
         status=status,
+        session_id=session_id,
         limit=limit,
         offset=offset,
     )
@@ -628,6 +665,113 @@ def get_zero_click_job(job_id: str, tenant: Tenant = Depends(get_current_tenant)
         created_at=job_data.get("created_at"),
         updated_at=job_data.get("updated_at"),
         completed_at=job_data.get("completed_at"),
+    )
+
+
+@router.get("/match-suggestions")
+def get_product_match_suggestions(
+    query: str,
+    max_results: int = 5,
+    min_score: float = 60.0,
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """Retourne des suggestions de matching flou pour un nom de produit.
+
+    Args:
+        query: Nom de produit recherché
+        max_results: Nombre maximum de suggestions (défaut : 5)
+        min_score: Score de correspondance minimum 0-100 (défaut : 60.0)
+        tenant: Tenant courant
+
+    Returns:
+        Liste de suggestions produits avec scores de correspondance
+    """
+    if not query or not query.strip():
+        return {"suggestions": []}
+
+    suggestions = product_matching.get_fuzzy_product_matches(
+        query,
+        tenant_id=tenant.id,
+        max_results=max_results,
+        min_score=min_score,
+    )
+
+    return {"suggestions": suggestions}
+
+
+@router.get("/sessions", response_model=ImportSessionListResponse)
+def list_import_sessions(
+    limit: int = 50,
+    offset: int = 0,
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """Liste les sessions d'import avec statistiques agrégées."""
+    sessions_data, total = job_service.list_import_sessions(
+        tenant_id=tenant.id,
+        limit=limit,
+        offset=offset,
+    )
+
+    items = []
+    for session_data in sessions_data:
+        items.append(ImportSession(**session_data))
+
+    return ImportSessionListResponse(items=items, total=total)
+
+
+@router.get("/sessions/{session_id}", response_model=ImportSessionDetails)
+def get_import_session_details(
+    session_id: str,
+    tenant: Tenant = Depends(get_current_tenant),
+):
+    """Récupère les détails d'une session d'import avec tous ses imports."""
+    session_data = job_service.get_session_details(
+        session_id=session_id,
+        tenant_id=tenant.id,
+    )
+
+    if not session_data:
+        raise HTTPException(status_code=404, detail="Session introuvable")
+
+    # Convertir les imports en ZeroClickJobStatus
+    imports = []
+    for job_data in session_data.get("imports", []):
+        summary = None
+        if job_data.get("result"):
+            try:
+                summary = InvoiceImportSummary(**job_data["result"])
+            except Exception as exc:
+                LOGGER.warning("Impossible de reconstruire le summary pour job %s: %s", job_data["job_id"], exc)
+
+        imports.append(
+            ZeroClickJobStatus(
+                job_id=job_data["job_id"],
+                status=job_data["status"],
+                filename=job_data.get("filename"),
+                supplier_hint=job_data.get("supplier_hint"),
+                margin_percent=job_data.get("margin_percent", 40.0),
+                auto_confirm=job_data.get("auto_confirm", True),
+                summary=summary,
+                error=job_data.get("error"),
+                created_at=job_data.get("created_at"),
+                updated_at=job_data.get("updated_at"),
+                completed_at=job_data.get("completed_at"),
+            )
+        )
+
+    return ImportSessionDetails(
+        session_id=session_data["session_id"],
+        date_debut=session_data["date_debut"],
+        date_fin=session_data.get("date_fin"),
+        nb_imports=session_data["nb_imports"],
+        nb_completed=session_data.get("nb_completed", 0),
+        nb_failed=session_data.get("nb_failed", 0),
+        nb_pending=session_data.get("nb_pending", 0),
+        total_lignes=session_data.get("total_lignes", 0),
+        total_mouvements=session_data.get("total_mouvements", 0),
+        total_produits_crees=session_data.get("total_produits_crees", 0),
+        fournisseurs=session_data.get("fournisseurs", []),
+        imports=imports,
     )
 
 

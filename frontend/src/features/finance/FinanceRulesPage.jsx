@@ -6,7 +6,8 @@ import Input from '../../components/ui/Input.jsx';
 import Select from '../../components/ui/Select.jsx';
 import Modal, { ConfirmDialog } from '../../components/ui/Modal.jsx';
 import Badge, { StatusBadge } from '../../components/ui/Badge.jsx';
-import { Filter, Eye, Trash2, AlertCircle } from 'lucide-react';
+import SmartTable, { columnHelpers } from '../../components/ui/SmartTable.jsx';
+import { Filter, Eye, Trash2, AlertCircle, Edit2 } from 'lucide-react';
 import { useFinanceCategories, useFinanceRules, useFinanceRuleMutations } from '../../hooks/useFinanceCategories.js';
 import { searchFinanceTransactions } from '../../api/client.js';
 
@@ -108,6 +109,88 @@ export default function FinanceRulesPage() {
   const closeTestModal = () => {
     setTestingRule(null);
   };
+
+  // Define columns for SmartTable
+  const rulesColumns = useMemo(() => {
+    return [
+      {
+        key: 'name',
+        header: 'Nom',
+        sortable: true,
+        render: (value) => (
+          <span className="font-semibold text-slate-900">{value}</span>
+        ),
+      },
+      columnHelpers.number('entity_id', 'Entity', {}),
+      {
+        key: 'category_id',
+        header: 'Catégorie',
+        sortable: true,
+        render: (value, row) => {
+          return row.category_name || categoryById.get(value)?.name || value;
+        },
+      },
+      {
+        key: 'keywords',
+        header: 'Mots-clés',
+        sortable: false,
+        render: (value, row) => {
+          const keywords = value || [];
+          return (
+            <div className="flex items-center gap-2">
+              {keywords.length === 0 ? (
+                <span className="text-slate-400">—</span>
+              ) : (
+                <span className="truncate max-w-xs">{keywords.join(', ')}</span>
+              )}
+              {row.apply_to_autre_only && (
+                <Badge variant="info" size="xs" title="Limité aux lignes 'autre'">
+                  <Filter className="h-3 w-3" />
+                </Badge>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        key: 'match_count',
+        header: 'Transactions',
+        align: 'center',
+        sortable: true,
+        render: (value, row) => {
+          return <RuleMatchCount rule={row} />;
+        },
+      },
+      columnHelpers.status('is_active', 'Statut', {
+        true: { label: 'Active', color: 'emerald', icon: null },
+        false: { label: 'Inactive', color: 'slate', icon: null },
+      }),
+      columnHelpers.actions((row) => (
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openTestModal(row)}
+            disabled={!(row.keywords || []).length}
+            title="Tester la règle"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => openEdit(row)}>
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDeleteConfirm(row.id)}
+            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      )),
+    ];
+  }, [categoryById]);
 
   return (
     <div className="space-y-6">

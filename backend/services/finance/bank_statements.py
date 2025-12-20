@@ -42,7 +42,7 @@ def search_bank_statements(
     if clauses:
         where_sql = "WHERE " + " AND ".join(clauses)
 
-    # Define sort mapping
+    # Définir la correspondance de tri
     sort_map = {
         "imported_at": "bs.imported_at ASC, bs.id ASC",
         "-imported_at": "bs.imported_at DESC, bs.id DESC",
@@ -61,14 +61,14 @@ def search_bank_statements(
         {where_sql}
     """
 
-    # Count total
+    # Compter le total
     count_df = query_df(
         text(f"SELECT COUNT(*) AS total {base_select}"),
         params=params or None,
     )
     total = int(count_df.iloc[0]["total"]) if not count_df.empty else 0
 
-    # Get data
+    # Récupérer les données
     data_df = query_df(
         text(
             f"""

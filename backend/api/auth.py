@@ -1,8 +1,8 @@
-"""Authentication endpoints (OAuth2 password flow with JWT).
+"""Endpoints d'authentification (flux OAuth2 password avec JWT).
 
-Supports both:
-- Traditional OAuth2 bearer tokens (for API clients)
-- httpOnly cookies with refresh tokens (for browser clients)
+Prend en charge :
+- Les tokens bearer OAuth2 traditionnels (pour les clients API)
+- Les cookies httpOnly avec refresh tokens (pour les clients navigateur)
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def _resolve_tenant(tenant_identifier: str | int | None) -> Tenant:
 
 @router.post("/token", response_model=TokenResponse)
 def issue_token(form_data: OAuth2TenantRequestForm = Depends()) -> TokenResponse:
-    """Issue OAuth2 bearer token (for API clients)."""
+    """Émet un token bearer OAuth2 (pour les clients API)."""
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -104,16 +104,16 @@ def login_with_cookies(
     response: Response,
     form_data: OAuth2TenantRequestForm = Depends(),
 ) -> CookieTokenResponse:
-    """Login and set httpOnly cookies (recommended for browser clients).
+    """Connexion et pose des cookies httpOnly (recommandé pour les clients navigateur).
 
-    This endpoint:
-    1. Validates credentials
-    2. Creates access token (short-lived, 15 min)
-    3. Creates refresh token (long-lived, 7 days)
-    4. Sets both as httpOnly cookies
+    Cet endpoint :
+    1. Valide les identifiants
+    2. Crée l'access token (court, 15 min)
+    3. Crée le refresh token (long, 7 jours)
+    4. Place les deux en cookies httpOnly
 
-    The access token cookie is available on all paths.
-    The refresh token cookie is only available on /auth endpoints.
+    Le cookie d'access token est disponible sur tous les chemins.
+    Le cookie de refresh n'est disponible que sur les endpoints /auth.
     """
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
@@ -152,14 +152,14 @@ def login_with_cookies(
 
 @router.post("/refresh", response_model=RefreshResponse)
 def refresh_access_token(request: Request, response: Response) -> RefreshResponse:
-    """Refresh the access token using the refresh token cookie.
+    """Rafraîchit le token d'accès en utilisant le cookie de refresh.
 
-    This endpoint:
-    1. Reads the refresh token from httpOnly cookie
-    2. Validates the refresh token
-    3. Loads fresh user data from database
-    4. Issues new access + refresh tokens (rotation)
-    5. Revokes the old refresh token
+    Cet endpoint :
+    1. Lit le refresh token depuis le cookie httpOnly
+    2. Valide le refresh token
+    3. Charge les données utilisateur fraîches depuis la base
+    4. Émet un nouvel access + refresh token (rotation)
+    5. Révoque l'ancien refresh token
     """
     refresh_token = request.cookies.get(COOKIE_NAME_REFRESH)
     if not refresh_token:
@@ -168,13 +168,13 @@ def refresh_access_token(request: Request, response: Response) -> RefreshRespons
             detail="Refresh token manquant",
         )
 
-    # Decode and validate refresh token
+    # Décoder et valider le refresh token
     payload = decode_refresh_token(refresh_token)
 
     user_id = int(payload["sub"])
     tenant_id = int(payload["tenant_id"])
 
-    # Load fresh user data from database
+    # Charger les données utilisateur fraîches depuis la base
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(
@@ -184,7 +184,7 @@ def refresh_access_token(request: Request, response: Response) -> RefreshRespons
 
     tenant = _resolve_tenant(tenant_id)
 
-    # Create new tokens
+    # Créer de nouveaux tokens
     claims = {
         "sub": str(user["id"]),
         "username": user["username"],
@@ -196,10 +196,10 @@ def refresh_access_token(request: Request, response: Response) -> RefreshRespons
     new_access_token = create_access_token(claims)
     new_refresh_token = create_refresh_token(claims)
 
-    # Revoke old refresh token
+    # Révoquer l'ancien refresh token
     revoke_token(refresh_token)
 
-    # Set new cookies
+    # Poser les nouveaux cookies
     set_auth_cookies(response, new_access_token, new_refresh_token)
 
     return RefreshResponse(
@@ -210,11 +210,11 @@ def refresh_access_token(request: Request, response: Response) -> RefreshRespons
 
 @router.post("/logout")
 def logout(request: Request, response: Response) -> dict[str, str]:
-    """Logout and clear authentication cookies.
+    """Déconnecte et supprime les cookies d'authentification.
 
-    This endpoint:
-    1. Revokes the current refresh token
-    2. Clears both access and refresh cookies
+    Cet endpoint :
+    1. Révoque le refresh token courant
+    2. Supprime les cookies access et refresh
     """
     refresh_token = request.cookies.get(COOKIE_NAME_REFRESH)
     if refresh_token:

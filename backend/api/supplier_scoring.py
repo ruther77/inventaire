@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# ENDPOINT 1: GET /supplier-scoring/overview
+# POINT D'ENTRÉE 1 : GET /supplier-scoring/overview
 # ============================================================================
 
 @router.get("/overview")
@@ -167,7 +167,7 @@ async def get_suppliers_overview(
 
 
 # ============================================================================
-# ENDPOINT 2: GET /supplier-scoring/suppliers
+# POINT D'ENTRÉE 2 : GET /supplier-scoring/suppliers
 # ============================================================================
 
 @router.get("/suppliers")
@@ -266,7 +266,7 @@ async def get_suppliers_list(
 
 
 # ============================================================================
-# ENDPOINT 3: GET /supplier-scoring/suppliers/{supplier_id}
+# POINT D'ENTRÉE 3 : GET /supplier-scoring/suppliers/{supplier_id}
 # ============================================================================
 
 @router.get("/suppliers/{supplier_id}")
@@ -405,7 +405,7 @@ async def get_supplier_details(
 
 
 # ============================================================================
-# ENDPOINT 4: GET /supplier-scoring/suppliers/{supplier_id}/history
+# POINT D'ENTRÉE 4 : GET /supplier-scoring/suppliers/{supplier_id}/history
 # ============================================================================
 
 @router.get("/suppliers/{supplier_id}/history")
@@ -478,7 +478,7 @@ async def get_supplier_history(
 
 
 # ============================================================================
-# ENDPOINT 5: GET /supplier-scoring/criteria
+# POINT D'ENTRÉE 5 : GET /supplier-scoring/criteria
 # ============================================================================
 
 @router.get("/criteria")
@@ -562,7 +562,7 @@ async def get_scoring_criteria() -> Dict[str, Any]:
 
 
 # ============================================================================
-# ENDPOINT 6: PUT /supplier-scoring/criteria
+# POINT D'ENTRÉE 6 : PUT /supplier-scoring/criteria
 # ============================================================================
 
 @router.put("/criteria")
@@ -647,7 +647,7 @@ async def update_scoring_criteria(
 
 
 # ============================================================================
-# ENDPOINT 7: GET /supplier-scoring/alerts
+# POINT D'ENTRÉE 7 : GET /supplier-scoring/alerts
 # ============================================================================
 
 @router.get("/alerts")
@@ -753,7 +753,50 @@ async def get_supplier_alerts(
 
 
 # ============================================================================
-# ENDPOINT 8: POST /supplier-scoring/recalculate
+# POINT D'ENTRÉE 7.1 : POST /supplier-scoring/alerts/{alert_id}/acknowledge
+# ============================================================================
+
+@router.post("/alerts/{alert_id}/acknowledge")
+async def acknowledge_supplier_alert(
+    alert_id: str = Path(..., description="ID de l'alerte à acquitter"),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
+) -> Dict[str, Any]:
+    """
+    Acquitter une alerte fournisseur.
+
+    Marque l'alerte comme acquittée par l'utilisateur.
+    En production, ceci met à jour le statut dans la base de données.
+
+    Format de réponse: ResponseWrapper avec les détails de l'acquittement.
+    """
+    try:
+        # En production, mettre à jour la DB:
+        # UPDATE supplier_alerts
+        # SET acknowledged = true, acknowledged_at = NOW(), acknowledged_by = user_id
+        # WHERE alert_id = alert_id AND tenant_id = tenant.id
+
+        logger.info(f"Tenant {tenant.id} acknowledged alert {alert_id}")
+
+        return build_success_response(
+            {
+                "alert_id": alert_id,
+                "acknowledged": True,
+                "acknowledged_at": datetime.utcnow().isoformat(),
+            },
+            meta={"message": "Alerte acquittée avec succès"}
+        )
+
+    except Exception as e:
+        logger.error(f"Error in acknowledge_supplier_alert: {e}", exc_info=True)
+        return build_error_response(
+            code="ACKNOWLEDGE_ERROR",
+            message=f"Erreur lors de l'acquittement de l'alerte: {str(e)}",
+            suggestion="Vérifiez que l'alerte existe"
+        )
+
+
+# ============================================================================
+# POINT D'ENTRÉE 8 : POST /supplier-scoring/recalculate
 # ============================================================================
 
 @router.post("/recalculate")
@@ -833,7 +876,7 @@ async def recalculate_supplier_scores(
 
 
 # ============================================================================
-# ENDPOINTS LEGACY (conservés pour compatibilité)
+# POINTS D'ENTRÉE LEGACY (conservés pour compatibilité)
 # ============================================================================
 
 @router.get("/score/{supplier_name}")

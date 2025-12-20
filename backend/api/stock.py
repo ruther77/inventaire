@@ -1,4 +1,4 @@
-"""Stock & movement endpoints."""
+"""Endpoints stock et mouvements."""
 
 from __future__ import annotations
 

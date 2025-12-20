@@ -1,7 +1,8 @@
-"""Utility functions for restaurant services."""
+"""Fonctions utilitaires pour les services restaurant."""
 
 from __future__ import annotations
 
+import math
 import re
 from functools import lru_cache
 from typing import Any, Dict, Tuple
@@ -44,9 +45,13 @@ def _get_restaurant_entity_id() -> int:
 
 
 def _safe_float(value: Any) -> float:
-    """Convertit prudemment une valeur en float sans lever d'exception."""
+    """Convertit prudemment une valeur en float sans lever d'exception, gère NaN."""
     try:
-        return float(value or 0)
+        result = float(value or 0)
+        # Gérer les NaN : renvoyer 0.0 à la place
+        if math.isnan(result):
+            return 0.0
+        return result
     except (TypeError, ValueError):
         return 0.0
 
@@ -216,7 +221,7 @@ def _should_skip_line(line: str) -> bool:
 
 
 def _ensure_depense_category(conn, tenant_id: int, nom: str | None) -> int | None:
-    """Ensure a depense category exists, creating it if needed."""
+    """Garantit l'existence d'une catégorie de dépense, en la créant si nécessaire."""
     if not nom:
         return None
     normalized = nom.strip()

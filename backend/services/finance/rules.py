@@ -11,10 +11,16 @@ from backend.schemas.finance_rules import FinanceRuleCreate
 
 
 def list_rules(entity_id: int | None = None, is_active: bool | None = None) -> List[dict]:
+    """Liste les règles de catégorisation.
+
+    Si entity_id est fourni, retourne les règles de cette entité ET les règles
+    partagées (entity_id = NULL) accessibles par toutes les entités.
+    """
     clauses: List[str] = []
     params: Dict[str, Any] = {}
     if entity_id is not None:
-        clauses.append("r.entity_id = :entity_id")
+        # Inclure les règles de l'entité + les règles partagées (entity_id IS NULL)
+        clauses.append("(r.entity_id = :entity_id OR r.entity_id IS NULL)")
         params["entity_id"] = int(entity_id)
     if is_active is not None:
         clauses.append("r.is_active = :is_active")

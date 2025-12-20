@@ -104,6 +104,27 @@ export {
   useDeleteSupplierAlias,
 } from './useBankReconciliation.js';
 
+// Finance - Transactions & Categorization Feedback (Phase 4)
+export {
+  useFinanceTransactions,
+  useUpdateFinanceTransaction,
+  useLockFinanceTransaction,
+  useFinanceBatchCategorize,
+  useFinanceImport,
+  useFinanceImportPDF,
+  useFinanceAccounts,
+  useFinanceAccount,
+  useCreateFinanceAccount,
+  useUpdateFinanceAccount,
+  useDeleteFinanceAccount,
+  useDeduplicateTransactions,
+  useRefreshFinanceStats,
+  // Phase 4: Feedback ML Loop
+  useCategoryFeedback,
+  useCategoryFeedbackStats,
+  useCommonCorrections,
+} from './useFinance.js';
+
 // Admin - Audit Trail
 export {
   useAuditTrail,
@@ -207,3 +228,55 @@ export {
   errorMessages,
   useErrorMessage,
 } from './useQueryConfig.js';
+
+// CommandBar Live Suggestions
+export {
+  default as useCommandBarLiveSuggestions,
+  useContextualSuggestions,
+} from './useCommandBarLiveSuggestions.js';
+
+// PDF File Management
+export {
+  usePDFFile,
+  usePDFFileFromUpload,
+} from './usePDFFile.js';
+
+// Import Progress Notifications
+export {
+  useImportProgress,
+  useZeroClickJobWithProgress,
+} from './useImportProgress.jsx';
+
+// Mobile Navigation
+export { default as useMobileNav } from './useMobileNav.js';
+
+// PWA
+export { default as usePWA } from './usePWA.js';
+export { default as usePushNotifications } from './usePushNotifications.js';
+
+// Offline
+export { useOffline } from './useOffline.js';
+export {
+  useOfflineMutation,
+  useOfflineCreate,
+  useOfflineUpdate,
+  useOfflinePatch,
+  useOfflineDelete,
+} from './useOfflineMutation.js';
+
+// Barcode Scanner
+export { default as useBarcodeScanner } from './useBarcodeScanner.js';
+
+// Gestures
+export {
+  useGestures,
+  useSwipeable,
+  useLongPress,
+} from './useGestures.js';
+
+// Pull to Refresh
+export {
+  default as usePullToRefresh,
+  usePullToRefreshWithScroll,
+  PULL_STATES,
+} from './usePullToRefresh.js';

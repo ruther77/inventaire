@@ -309,10 +309,6 @@ export default function IntelligencePage() {
     window.location.href = `/intelligence/anomalies/${anomaly.id}`;
   };
 
-  if (isLoading) {
-    return <IntelligenceSkeleton />;
-  }
-
   if (hasError) {
     return (
       <QueryErrorState

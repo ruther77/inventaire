@@ -28,6 +28,7 @@ import Button from './Button.jsx';
  */
 export default function Modal({
   open,
+  isOpen, // Alias pour compatibilité
   title,
   description,
   children,
@@ -37,6 +38,8 @@ export default function Modal({
   closeOnOverlayClick = true,
   showCloseButton = true,
 }) {
+  // Support both 'open' and 'isOpen' props
+  const isModalOpen = open ?? isOpen;
   const titleId = useId();
   const descriptionId = useId();
   const modalRef = useRef(null);
@@ -65,11 +68,11 @@ export default function Modal({
 
   // Handle open/close visibility
   useEffect(() => {
-    if (open && !isVisible) {
+    if (isModalOpen && !isVisible) {
       setIsVisible(true);
       setIsClosing(false);
     }
-  }, [open, isVisible]);
+  }, [isModalOpen, isVisible]);
 
   // Handle Escape key to close modal (WCAG 2.1 SC 2.1.2)
   useEffect(() => {

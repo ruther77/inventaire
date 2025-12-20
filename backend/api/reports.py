@@ -1,4 +1,4 @@
-"""Reports API router."""
+"""Routeur API des rapports."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/overview", response_model=ReportsOverview)
 def get_reports_overview(tenant: Tenant = Depends(get_current_tenant)):
-    """Return aggregated analytics for the reports workspace."""
+    """Retourne les analytics agrégées pour l'espace rapports."""
 
     data = reports_service.build_overview(tenant_id=tenant.id)
     return ReportsOverview(**data)
@@ -26,7 +26,7 @@ def export_report_dataset(
     limit: int = Query(default=5000, ge=10, le=50_000),
     tenant: Tenant = Depends(get_current_tenant),
 ):
-    """Stream a CSV export for the requested dataset."""
+    """Diffuse un export CSV pour le dataset demandé."""
 
     try:
         filename, payload = reports_service.export_dataset(report_type, limit, tenant_id=tenant.id)

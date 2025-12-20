@@ -265,7 +265,7 @@ def search_invoices(
     if clauses:
         where_sql = "WHERE " + " AND ".join(clauses)
 
-    # Define sort mapping
+    # Définir la correspondance de tri
     sort_map = {
         "date_invoice": "inv.date_invoice ASC NULLS LAST, inv.id ASC",
         "-date_invoice": "inv.date_invoice DESC NULLS LAST, inv.id DESC",
@@ -287,14 +287,14 @@ def search_invoices(
         {where_sql}
     """
 
-    # Count total
+    # Compter le total
     count_df = query_df(
         text(f"SELECT COUNT(*) AS total {base_select}"),
         params=params or None,
     )
     total = int(count_df.iloc[0]["total"]) if not count_df.empty else 0
 
-    # Get data
+    # Récupérer les données
     data_df = query_df(
         text(
             f"""

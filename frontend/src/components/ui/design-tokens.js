@@ -1,30 +1,158 @@
 /**
- * Design Tokens - Tokens de design pour la consistance systémique
- * Centralise les espacements, rayons, couleurs et autres constantes visuelles
+ * Design Tokens - Dark Theme Design System (2025 Next-Gen)
  *
- * Version 2.0 - Refactoré selon audit UX/UI expert
+ * Centralise les tokens de design pour la consistance systémique.
+ * Basé sur le design system newCMS avec dark mode glass morphism.
+ *
+ * Version 3.0 - Unifié dark theme
  */
 
 // ============================================
-// SPACING - Échelle harmonique (ratio 1.5)
+// COLORS - Dark Theme Palette
 // ============================================
+
+export const colors = {
+  // Backgrounds (dark to light)
+  bg: {
+    primary: 'bg-slate-950',           // #0a0a0f - Darkest
+    secondary: 'bg-slate-900',          // #12121a
+    tertiary: 'bg-slate-800',           // #1e293b
+    card: 'bg-white/5',                 // Glass effect
+    cardHover: 'bg-white/10',
+    elevated: 'bg-slate-800/80',
+  },
+
+  // Text colors (light to dark for dark theme)
+  text: {
+    primary: 'text-white',              // Pure white
+    secondary: 'text-slate-300',        // #cbd5e1
+    muted: 'text-slate-400',            // #94a3b8
+    dimmed: 'text-slate-500',           // #64748b
+    inverse: 'text-slate-900',          // For light surfaces
+  },
+
+  // Borders
+  border: {
+    default: 'border-white/10',
+    hover: 'border-white/20',
+    active: 'border-white/30',
+    subtle: 'border-white/5',
+    strong: 'border-white/40',
+  },
+
+  // Accent colors
+  accent: {
+    blue: 'text-blue-400',
+    blueHover: 'text-blue-300',
+    purple: 'text-violet-400',
+    emerald: 'text-emerald-400',
+    amber: 'text-amber-400',
+    rose: 'text-rose-400',
+    orange: 'text-orange-400',
+  },
+};
+
+// ============================================
+// STATUS COLORS - Dark Theme Variants
+// ============================================
+
+export const statusColors = {
+  success: {
+    bg: 'bg-emerald-500/10',
+    bgSolid: 'bg-emerald-500',
+    text: 'text-emerald-400',
+    textLight: 'text-emerald-300',
+    border: 'border-emerald-500/30',
+    borderSolid: 'border-emerald-500',
+    dot: 'bg-emerald-500',
+    ring: 'ring-emerald-500/50',
+    glow: 'shadow-[0_0_20px_rgba(16,185,129,0.25)]',
+  },
+  warning: {
+    bg: 'bg-amber-500/10',
+    bgSolid: 'bg-amber-500',
+    text: 'text-amber-400',
+    textLight: 'text-amber-300',
+    border: 'border-amber-500/30',
+    borderSolid: 'border-amber-500',
+    dot: 'bg-amber-500',
+    ring: 'ring-amber-500/50',
+    glow: 'shadow-[0_0_20px_rgba(245,158,11,0.25)]',
+  },
+  error: {
+    bg: 'bg-rose-500/10',
+    bgSolid: 'bg-rose-500',
+    text: 'text-rose-400',
+    textLight: 'text-rose-300',
+    border: 'border-rose-500/30',
+    borderSolid: 'border-rose-500',
+    dot: 'bg-rose-500',
+    ring: 'ring-rose-500/50',
+    glow: 'shadow-[0_0_20px_rgba(244,63,94,0.25)]',
+  },
+  info: {
+    bg: 'bg-blue-500/10',
+    bgSolid: 'bg-blue-500',
+    text: 'text-blue-400',
+    textLight: 'text-blue-300',
+    border: 'border-blue-500/30',
+    borderSolid: 'border-blue-500',
+    dot: 'bg-blue-500',
+    ring: 'ring-blue-500/50',
+    glow: 'shadow-[0_0_20px_rgba(59,130,246,0.25)]',
+  },
+  neutral: {
+    bg: 'bg-slate-500/10',
+    bgSolid: 'bg-slate-500',
+    text: 'text-slate-400',
+    textLight: 'text-slate-300',
+    border: 'border-slate-500/30',
+    borderSolid: 'border-slate-500',
+    dot: 'bg-slate-500',
+    ring: 'ring-slate-500/50',
+    glow: 'shadow-none',
+  },
+  disabled: {
+    bg: 'bg-slate-800',
+    bgSolid: 'bg-slate-700',
+    text: 'text-slate-500',
+    textLight: 'text-slate-500',
+    border: 'border-slate-700',
+    borderSolid: 'border-slate-600',
+    dot: 'bg-slate-600',
+    ring: 'ring-slate-600/50',
+    glow: 'shadow-none',
+  },
+};
+
+// Trends (pour MetricCard, charts)
+export const trendColors = {
+  positive: 'bg-emerald-500/10 text-emerald-400',
+  negative: 'bg-rose-500/10 text-rose-400',
+  neutral: 'bg-slate-500/10 text-slate-400',
+};
+
+// ============================================
+// SPACING - Echelle harmonique (ratio 1.5)
+// ============================================
+
 export const spacing = {
-  xs: 'gap-1',      // 4px  - Micro (icons, inline)
-  sm: 'gap-2',      // 8px  - Compact (tight groups)
-  md: 'gap-3',      // 12px - Default (form fields)
-  lg: 'gap-4',      // 16px - Comfortable (cards)
-  xl: 'gap-6',      // 24px - Spacious (sections)
-  '2xl': 'gap-8',   // 32px - Large (page sections)
-  '3xl': 'gap-12',  // 48px - Extra large (page)
+  xs: 'gap-1',      // 4px
+  sm: 'gap-2',      // 8px
+  md: 'gap-3',      // 12px
+  lg: 'gap-4',      // 16px
+  xl: 'gap-6',      // 24px
+  '2xl': 'gap-8',   // 32px
+  '3xl': 'gap-12',  // 48px
 };
 
 export const padding = {
-  xs: 'p-1',        // 4px
-  sm: 'p-2',        // 8px
-  md: 'p-3',        // 12px
-  lg: 'p-4',        // 16px
-  xl: 'p-6',        // 24px
-  '2xl': 'p-8',     // 32px
+  xs: 'p-1',
+  sm: 'p-2',
+  md: 'p-3',
+  lg: 'p-4',
+  xl: 'p-6',
+  '2xl': 'p-8',
 };
 
 export const paddingX = {
@@ -46,192 +174,103 @@ export const paddingY = {
 };
 
 // ============================================
-// BORDER RADIUS - Échelle harmonique (3 niveaux principaux)
+// BORDER RADIUS
 // ============================================
+
 export const radius = {
-  none: 'rounded-none',   // 0px
-  xs: 'rounded',          // 4px  - Subtle
-  sm: 'rounded-md',       // 6px  - Small elements
-  md: 'rounded-lg',       // 8px  - Inputs, small buttons
-  lg: 'rounded-xl',       // 12px - Buttons, badges, inputs
-  xl: 'rounded-2xl',      // 16px - Cards, panels, modals
-  '2xl': 'rounded-3xl',   // 24px - Large panels, hero
-  full: 'rounded-full',   // Pills, avatars, chips
+  none: 'rounded-none',
+  xs: 'rounded',          // 4px
+  sm: 'rounded-md',       // 6px
+  md: 'rounded-lg',       // 8px
+  lg: 'rounded-xl',       // 12px - Buttons, badges
+  xl: 'rounded-2xl',      // 16px - Cards, panels
+  '2xl': 'rounded-3xl',   // 24px - Large panels
+  full: 'rounded-full',   // Pills, avatars
 };
 
-// Semantic radius aliases
 export const radiusSemantic = {
-  button: 'rounded-xl',     // 12px
-  input: 'rounded-xl',      // 12px
-  card: 'rounded-2xl',      // 16px
-  modal: 'rounded-2xl',     // 16px
-  panel: 'rounded-2xl',     // 16px
-  badge: 'rounded-full',    // Full
-  avatar: 'rounded-full',   // Full
-  chip: 'rounded-full',     // Full
+  button: 'rounded-xl',
+  input: 'rounded-xl',
+  card: 'rounded-2xl',
+  modal: 'rounded-2xl',
+  panel: 'rounded-2xl',
+  badge: 'rounded-full',
+  avatar: 'rounded-full',
 };
 
 // ============================================
-// SHADOWS - Échelle progressive
+// SHADOWS - Dark Theme
 // ============================================
+
 export const shadows = {
   none: 'shadow-none',
-  xs: 'shadow-[0_1px_2px_0_rgba(0,0,0,0.05)]',
-  sm: 'shadow-sm',
-  md: 'shadow',
-  lg: 'shadow-lg',
-  xl: 'shadow-xl',
-  '2xl': 'shadow-2xl',
-  soft: 'shadow-soft',    // Custom défini dans tailwind.config.js
+  sm: 'shadow-[0_2px_8px_rgba(0,0,0,0.3)]',
+  md: 'shadow-[0_4px_16px_rgba(0,0,0,0.4)]',
+  lg: 'shadow-[0_8px_24px_rgba(0,0,0,0.5)]',
+  xl: 'shadow-[0_12px_32px_rgba(0,0,0,0.6)]',
   inner: 'shadow-inner',
-  // Colored shadows
-  brand: 'shadow-lg shadow-brand-600/20',
-  success: 'shadow-lg shadow-emerald-600/20',
-  warning: 'shadow-lg shadow-amber-600/20',
-  error: 'shadow-lg shadow-rose-600/20',
+  // Glow effects
+  glowBlue: 'shadow-[0_0_20px_rgba(59,130,246,0.25)]',
+  glowPurple: 'shadow-[0_0_20px_rgba(139,92,246,0.25)]',
+  glowEmerald: 'shadow-[0_0_20px_rgba(16,185,129,0.25)]',
+  glowAmber: 'shadow-[0_0_20px_rgba(245,158,11,0.25)]',
+  glowRose: 'shadow-[0_0_20px_rgba(244,63,94,0.25)]',
 };
 
 // ============================================
-// COLORS - Couleurs sémantiques complètes
+// TYPOGRAPHY - Dark Theme
 // ============================================
-export const statusColors = {
-  success: {
-    bg: 'bg-emerald-50',
-    bgSolid: 'bg-emerald-500',
-    text: 'text-emerald-700',
-    textLight: 'text-emerald-600',
-    border: 'border-emerald-200',
-    borderSolid: 'border-emerald-500',
-    dot: 'bg-emerald-500',
-    ring: 'ring-emerald-500',
-  },
-  warning: {
-    bg: 'bg-amber-50',
-    bgSolid: 'bg-amber-500',
-    text: 'text-amber-700',
-    textLight: 'text-amber-600',
-    border: 'border-amber-200',
-    borderSolid: 'border-amber-500',
-    dot: 'bg-amber-500',
-    ring: 'ring-amber-500',
-  },
-  error: {
-    bg: 'bg-rose-50',
-    bgSolid: 'bg-rose-500',
-    text: 'text-rose-700',
-    textLight: 'text-rose-600',
-    border: 'border-rose-200',
-    borderSolid: 'border-rose-500',
-    dot: 'bg-rose-500',
-    ring: 'ring-rose-500',
-  },
-  info: {
-    bg: 'bg-sky-50',
-    bgSolid: 'bg-sky-500',
-    text: 'text-sky-700',
-    textLight: 'text-sky-600',
-    border: 'border-sky-200',
-    borderSolid: 'border-sky-500',
-    dot: 'bg-sky-500',
-    ring: 'ring-sky-500',
-  },
-  neutral: {
-    bg: 'bg-slate-50',
-    bgSolid: 'bg-slate-500',
-    text: 'text-slate-700',
-    textLight: 'text-slate-600',
-    border: 'border-slate-200',
-    borderSolid: 'border-slate-500',
-    dot: 'bg-slate-500',
-    ring: 'ring-slate-500',
-  },
-  disabled: {
-    bg: 'bg-slate-100',
-    bgSolid: 'bg-slate-300',
-    text: 'text-slate-400',
-    textLight: 'text-slate-400',
-    border: 'border-slate-200',
-    borderSolid: 'border-slate-300',
-    dot: 'bg-slate-300',
-    ring: 'ring-slate-300',
-  },
-};
 
-// Trends (pour MetricCard)
-export const trendColors = {
-  positive: 'bg-emerald-50 text-emerald-600',
-  negative: 'bg-rose-50 text-rose-600',
-  neutral: 'bg-slate-50 text-slate-600',
-};
-
-// Surface colors (pour backgrounds)
-export const surfaceColors = {
-  primary: 'bg-white',
-  secondary: 'bg-slate-50',
-  tertiary: 'bg-slate-100',
-  elevated: 'bg-white shadow-lg',
-  overlay: 'bg-slate-900/60 backdrop-blur-sm',
-  inverse: 'bg-slate-900',
-};
-
-// ============================================
-// TYPOGRAPHY - Typographie complète
-// ============================================
 export const typography = {
   // Labels
-  label: 'text-xs font-semibold uppercase tracking-widest text-slate-400',
-  labelSm: 'text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400',
-  labelMd: 'text-sm font-medium text-slate-600',
+  label: 'text-xs font-medium uppercase tracking-wider text-slate-400',
+  labelSm: 'text-[11px] font-medium uppercase tracking-widest text-slate-500',
+  labelMd: 'text-sm font-medium text-slate-400',
 
-  // Headings
-  h1: 'font-display text-4xl font-semibold text-slate-900 tracking-tight',
-  h2: 'font-display text-2xl font-semibold text-slate-900',
-  h3: 'text-xl font-semibold text-slate-900',
-  h4: 'text-lg font-semibold text-slate-900',
-  h5: 'text-base font-semibold text-slate-900',
-  h6: 'text-sm font-semibold text-slate-900',
+  // Headings - White for dark theme
+  h1: 'text-4xl font-bold text-white tracking-tight',
+  h2: 'text-2xl font-bold text-white',
+  h3: 'text-xl font-semibold text-white',
+  h4: 'text-lg font-semibold text-white',
+  h5: 'text-base font-semibold text-white',
+  h6: 'text-sm font-semibold text-white',
 
   // Body
-  body: 'text-sm text-slate-600 leading-relaxed',
-  bodySm: 'text-xs text-slate-500 leading-relaxed',
-  bodyLg: 'text-base text-slate-600 leading-relaxed',
-  bodyXl: 'text-lg text-slate-600 leading-relaxed',
+  body: 'text-sm text-slate-300 leading-relaxed',
+  bodySm: 'text-xs text-slate-400 leading-relaxed',
+  bodyLg: 'text-base text-slate-300 leading-relaxed',
 
-  // Values (pour MetricCard)
-  metric: 'text-3xl font-semibold text-slate-900 tabular-nums',
-  metricSm: 'text-2xl font-semibold text-slate-900 tabular-nums',
-  metricLg: 'text-4xl font-semibold text-slate-900 tabular-nums',
-  metricXl: 'text-5xl font-semibold text-slate-900 tabular-nums',
+  // Metrics - Large numbers
+  metric: 'text-3xl font-bold text-white tabular-nums',
+  metricSm: 'text-2xl font-bold text-white tabular-nums',
+  metricLg: 'text-4xl font-bold text-white tabular-nums',
+  metricXl: 'text-5xl font-bold text-white tabular-nums',
 
   // Interactive
-  link: 'text-brand-600 hover:text-brand-700 underline-offset-2 hover:underline',
-  linkSubtle: 'text-slate-600 hover:text-slate-900 hover:underline',
+  link: 'text-blue-400 hover:text-blue-300 underline-offset-2 hover:underline',
+  linkSubtle: 'text-slate-400 hover:text-white hover:underline',
 };
 
 // ============================================
-// TRANSITIONS - Animations et transitions
+// TRANSITIONS
 // ============================================
+
 export const transitions = {
-  // Durées
   fastest: 'transition-all duration-75',
   fast: 'transition-all duration-150',
   default: 'transition-all duration-200',
   slow: 'transition-all duration-300',
-  slower: 'transition-all duration-500',
 
-  // Propriétés spécifiques
   colors: 'transition-colors duration-150',
   opacity: 'transition-opacity duration-150',
   transform: 'transition-transform duration-200',
   shadow: 'transition-shadow duration-200',
 
-  // Combinaisons communes
   button: 'transition-[background-color,border-color,color,transform,box-shadow] duration-150',
   card: 'transition-[box-shadow,border-color,transform] duration-200',
   input: 'transition-[border-color,box-shadow] duration-150',
 };
 
-// Easing functions
 export const easing = {
   default: 'ease-out',
   smooth: 'ease-in-out',
@@ -240,27 +279,21 @@ export const easing = {
 };
 
 // ============================================
-// FOCUS - États de focus accessibles (multi-contexte)
+// FOCUS STATES - Dark Theme
 // ============================================
+
 export const focus = {
-  default: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2',
-  brand: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2',
-  destructive: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2',
-  success: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
-  warning: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2',
-
-  // Pour fond sombre
-  dark: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900',
-
-  // Variantes
-  within: 'focus-within:ring-2 focus-within:ring-brand-500',
-  inset: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500',
-  subtle: 'focus:outline-none focus-visible:ring-1 focus-visible:ring-brand-400',
+  default: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900',
+  brand: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900',
+  destructive: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900',
+  success: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900',
+  subtle: 'focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
 };
 
 // ============================================
-// TACTILE - Tailles minimales pour touch (Apple HIG: 44px)
+// TACTILE - Touch targets (Apple HIG: 44px)
 // ============================================
+
 export const tactile = {
   target: 'min-w-[44px] min-h-[44px]',
   targetSm: 'min-w-[36px] min-h-[36px]',
@@ -268,54 +301,71 @@ export const tactile = {
 };
 
 // ============================================
-// COMPONENT PRESETS - Presets pour composants courants
+// COMPONENT PRESETS - Dark Theme
 // ============================================
+
 export const presets = {
-  // Cards
-  card: 'rounded-2xl bg-white border border-slate-200 shadow-sm',
-  cardHover: 'rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200',
-  cardInteractive: 'rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 active:scale-[0.99] transition-all duration-200 cursor-pointer',
-  glassCard: 'glass-panel',
+  // Cards - Glass morphism
+  card: 'rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm',
+  cardHover: 'rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-200',
+  cardInteractive: 'rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 active:scale-[0.99] transition-all duration-200 cursor-pointer',
+  cardElevated: 'rounded-2xl bg-slate-800/80 border border-white/10 backdrop-blur-md shadow-lg',
+  cardGradient: 'rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10',
+
+  // Section containers
+  section: 'p-6 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10',
+  sectionCompact: 'p-4 rounded-xl bg-white/5 border border-white/10',
 
   // Badges
-  badge: 'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
-  badgeSm: 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
-  badgeLg: 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium',
+  badge: 'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-white/10 text-slate-300 border border-white/10',
+  badgeSm: 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium bg-white/10 text-slate-300',
+  badgeLg: 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium bg-white/10 text-slate-300',
+
+  // Badge colors
+  badgeSuccess: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  badgeWarning: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  badgeError: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+  badgeInfo: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
 
   // Lists
-  listItem: 'flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3',
-  listItemHover: 'flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3 hover:bg-slate-50 hover:border-slate-200 transition-colors duration-150',
-  listItemInteractive: 'flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3 hover:bg-slate-50 hover:border-slate-200 active:bg-slate-100 transition-colors duration-150 cursor-pointer',
+  listItem: 'flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 bg-white/5',
+  listItemHover: 'flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-colors duration-150',
+  listItemInteractive: 'flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 bg-white/5 hover:bg-white/10 hover:border-white/20 active:bg-white/15 transition-colors duration-150 cursor-pointer',
 
   // Inputs
-  inputBase: 'w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-[border-color,box-shadow] duration-150',
-  inputFocus: 'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500',
-  inputError: 'border-rose-400 focus:ring-rose-500 focus:border-rose-500 bg-rose-50/50',
-  inputSuccess: 'border-emerald-400 focus:ring-emerald-500 focus:border-emerald-500',
+  inputBase: 'w-full rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-500 transition-[border-color,box-shadow] duration-150',
+  inputFocus: 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50',
+  inputError: 'border-rose-500/50 focus:ring-rose-500/50 focus:border-rose-500/50 bg-rose-500/5',
+  inputSuccess: 'border-emerald-500/50 focus:ring-emerald-500/50 focus:border-emerald-500/50',
+
+  // Buttons (used with Button component)
+  buttonPrimary: 'bg-gradient-to-r from-blue-500 to-violet-500 text-white hover:from-blue-400 hover:to-violet-400 shadow-lg shadow-blue-500/25',
+  buttonSecondary: 'bg-white/10 text-white hover:bg-white/20 border border-white/20',
+  buttonGhost: 'bg-transparent text-slate-300 hover:bg-white/10 hover:text-white',
+  buttonDanger: 'bg-rose-500 text-white hover:bg-rose-400',
 
   // Overlays
-  overlay: 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm',
-  overlayLight: 'fixed inset-0 bg-white/80 backdrop-blur-sm',
+  overlay: 'fixed inset-0 bg-black/60 backdrop-blur-sm',
+  overlayLight: 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm',
 
   // Status dots
   statusDot: 'h-2 w-2 rounded-full',
   statusDotLg: 'h-3 w-3 rounded-full',
-  statusDotWithPulse: 'h-2 w-2 rounded-full animate-pulse',
+  statusDotPulse: 'h-2 w-2 rounded-full animate-pulse',
 
   // Dividers
-  divider: 'h-px bg-slate-200',
-  dividerVertical: 'w-px h-full bg-slate-200',
+  divider: 'h-px bg-white/10',
+  dividerVertical: 'w-px h-full bg-white/10',
 
   // Skeleton
-  skeleton: 'animate-pulse bg-slate-200 rounded',
-  skeletonShimmer: 'skeleton-shimmer rounded',
+  skeleton: 'animate-pulse bg-slate-700 rounded',
 };
 
 // ============================================
-// ANIMATIONS - Classes d'animation
+// ANIMATIONS
 // ============================================
+
 export const animations = {
-  // Entrées
   fadeIn: 'animate-in fade-in duration-200',
   fadeInFast: 'animate-in fade-in duration-150',
   fadeInSlow: 'animate-in fade-in duration-300',
@@ -326,36 +376,22 @@ export const animations = {
   slideInRight: 'animate-in slide-in-from-right fade-in duration-200',
 
   zoomIn: 'animate-in zoom-in-95 fade-in duration-200',
-
-  // Sorties
   fadeOut: 'animate-out fade-out duration-150',
   zoomOut: 'animate-out zoom-out-95 fade-out duration-150',
 
-  // Continues
   spin: 'animate-spin',
   pulse: 'animate-pulse',
   bounce: 'animate-bounce',
 
-  // Staggered (pour listes)
   stagger: (index, baseDelay = 50) => ({
     animationDelay: `${index * baseDelay}ms`,
   }),
 };
 
 // ============================================
-// BREAKPOINTS - Points de rupture
+// Z-INDEX
 // ============================================
-export const breakpoints = {
-  sm: '640px',
-  md: '768px',
-  lg: '1024px',
-  xl: '1280px',
-  '2xl': '1536px',
-};
 
-// ============================================
-// Z-INDEX - Couches de profondeur
-// ============================================
 export const zIndex = {
   base: 'z-0',
   dropdown: 'z-10',
@@ -370,13 +406,11 @@ export const zIndex = {
 };
 
 // ============================================
-// HELPERS - Fonctions utilitaires
+// HELPERS
 // ============================================
 
 /**
- * Retourne les classes de couleur pour un statut donné
- * @param {'success' | 'warning' | 'error' | 'info' | 'neutral' | 'disabled'} status
- * @param {'bg' | 'bgSolid' | 'text' | 'textLight' | 'border' | 'borderSolid' | 'dot' | 'ring' | 'all'} type
+ * Get status classes for a given status
  */
 export function getStatusClasses(status, type = 'all') {
   const colors = statusColors[status] || statusColors.neutral;
@@ -387,8 +421,7 @@ export function getStatusClasses(status, type = 'all') {
 }
 
 /**
- * Retourne les classes de trend pour une valeur
- * @param {number | string} value
+ * Get trend classes for a value
  */
 export function getTrendClasses(value) {
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
@@ -398,39 +431,30 @@ export function getTrendClasses(value) {
 }
 
 /**
- * Combine plusieurs classes conditionnellement
- * @param {...(string | false | null | undefined)} classes
+ * Combine classes conditionally
  */
 export function cx(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
 /**
- * Génère des classes de délai d'animation pour effet stagger
- * @param {number} index - Index de l'élément
- * @param {number} baseDelay - Délai de base en ms
+ * Get stagger delay for animations
  */
 export function getStaggerDelay(index, baseDelay = 50) {
   return { style: { animationDelay: `${index * baseDelay}ms` } };
 }
 
 /**
- * Retourne les classes de focus pour un contexte donné
- * @param {'default' | 'brand' | 'destructive' | 'success' | 'warning' | 'dark'} context
+ * Get focus classes for context
  */
 export function getFocusClasses(context = 'default') {
   return focus[context] || focus.default;
 }
 
-/**
- * Retourne les classes de surface pour un niveau d'élévation
- * @param {'primary' | 'secondary' | 'tertiary' | 'elevated' | 'overlay' | 'inverse'} level
- */
-export function getSurfaceClasses(level = 'primary') {
-  return surfaceColors[level] || surfaceColors.primary;
-}
-
 export default {
+  colors,
+  statusColors,
+  trendColors,
   spacing,
   padding,
   paddingX,
@@ -438,9 +462,6 @@ export default {
   radius,
   radiusSemantic,
   shadows,
-  statusColors,
-  trendColors,
-  surfaceColors,
   typography,
   transitions,
   easing,
@@ -448,12 +469,10 @@ export default {
   tactile,
   presets,
   animations,
-  breakpoints,
   zIndex,
   getStatusClasses,
   getTrendClasses,
   cx,
   getStaggerDelay,
   getFocusClasses,
-  getSurfaceClasses,
 };

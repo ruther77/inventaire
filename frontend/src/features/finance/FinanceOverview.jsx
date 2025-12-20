@@ -13,6 +13,8 @@ import {
   useFinanceTreasury,
 } from '../../hooks/useFinanceCategories.js';
 import { roundAmount } from '../../utils/banking.js';
+import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
+import QueryErrorState from '../../components/feedback/QueryErrorState.jsx';
 
 const Stat = ({ label, value, hint, icon: Icon, accent = 'text-white', bgColor = 'bg-white/5', borderColor = 'border-white/10' }) => (
   <div className={`rounded-2xl border ${borderColor} ${bgColor} p-4 transition-all hover:border-white/20`}>
@@ -35,12 +37,14 @@ export default function FinanceOverview() {
   const matchesQuery = useFinanceMatches({ status: 'pending' });
   const anomaliesQuery = useFinanceAnomalies({});
 
-  // Nouveaux hooks optimisés pour les graphiques
+  // Nouveaux hooks optimisés pour les graphiques - date filters passed to backend
   const timelineQuery = useFinanceTimeline({
     months: months === 'all' ? null : months,
     granularity: 'monthly',
   });
-  const treasuryQuery = useFinanceTreasury({});
+  const treasuryQuery = useFinanceTreasury({
+    months: months === 'all' ? null : months,
+  });
 
   // Données extraites des requêtes
   const rules = Array.isArray(rulesQuery.data) ? rulesQuery.data : [];
@@ -75,6 +79,18 @@ export default function FinanceOverview() {
     categories.forEach((c) => map.set(c.id, c));
     return map;
   }, [categories]);
+
+  const hasError = treasuryQuery.isError && !treasuryQuery.data;
+
+  if (hasError) {
+    return (
+      <QueryErrorState
+        error={treasuryQuery.error}
+        onRetry={() => treasuryQuery.refetch()}
+        variant="full"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -215,7 +231,7 @@ export default function FinanceOverview() {
           </div>
         </div>
         {treasuryTimeline.length > 0 ? (
-          <div className="h-64">
+          <div className="h-64" key={`treasury-chart-${months}`}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={treasuryTimeline}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />

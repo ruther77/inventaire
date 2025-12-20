@@ -1,4 +1,4 @@
-"""Comprehensive tests for finance API endpoints."""
+"""Tests complets des endpoints API finance."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ def test_transactions_search_pagination_bounds(authenticated_client):
         response = authenticated_client.get("/finance/transactions/search?page=1&size=1000")
         assert response.status_code == 422  # Validation error
 
-        # Test size = 500 (should work)
+        # Test size = 500 (doit fonctionner)
         mock_search.return_value = {
             "items": [],
             "page": 1,
@@ -194,7 +194,7 @@ def test_transactions_search_filters(authenticated_client):
         assert data["items"][0]["account_id"] == 2
         assert data["items"][0]["category_id"] == 5
 
-        # Verify filters were passed to service
+        # Vérifier que les filtres ont été transmis au service
         mock_search.assert_called_once()
         call_kwargs = mock_search.call_args.kwargs
         assert call_kwargs["entity_id"] == 1
@@ -315,7 +315,7 @@ def test_batch_categorize_validation_error(authenticated_client):
     with patch("backend.services.finance_transactions.batch_categorize") as mock_batch:
         mock_batch.side_effect = ValueError("Either transaction_ids or rule must be provided")
 
-        payload = {"category_id": 5}  # Missing both transaction_ids and rule
+        payload = {"category_id": 5}  # Manque à la fois transaction_ids et rule
 
         response = authenticated_client.post("/finance/transactions/batch-categorize", json=payload)
 
@@ -411,10 +411,10 @@ def test_categories_list(authenticated_client):
 
 
 def _make_multipart_body(filename: str, content: bytes, content_type: str = "text/csv") -> tuple[bytes, str]:
-    """Helper to create multipart body for file uploads.
+    """Helper pour créer un corps multipart pour les uploads de fichier.
 
-    Works around httpx 0.28+ TestClient file upload issues.
-    Returns (body_bytes, content_type_header).
+    Permet de contourner les soucis d'upload avec httpx 0.28+ / TestClient.
+    Retourne (body_bytes, content_type_header).
     """
     import uuid
     boundary = f"----pytest{uuid.uuid4().hex}"
@@ -539,9 +539,9 @@ def test_reconciliation_run_default_params(authenticated_client):
             assert response.status_code == 200
             mock_run.assert_called_once()
             call_kwargs = mock_run.call_args.kwargs
-            assert call_kwargs["amount_tolerance"] == 2.0  # Default
-            assert call_kwargs["max_days_difference"] == 10  # Default
-            assert call_kwargs["auto_threshold"] == 0.9  # Default
+            assert call_kwargs["amount_tolerance"] == 2.0  # Par défaut
+            assert call_kwargs["max_days_difference"] == 10  # Par défaut
+            assert call_kwargs["auto_threshold"] == 0.9  # Par défaut
 
 
 def test_reconciliation_matches(authenticated_client):
@@ -877,7 +877,7 @@ def test_reconciliation_matches_empty(authenticated_client):
 
         assert response.status_code == 200
         data = response.json()
-        assert data == []  # Should return empty list on error
+        assert data == []  # Doit renvoyer une liste vide en cas d'erreur
 
 
 def test_anomalies_optional_table_missing(authenticated_client):
@@ -889,4 +889,4 @@ def test_anomalies_optional_table_missing(authenticated_client):
 
         assert response.status_code == 200
         data = response.json()
-        assert data == []  # Should return empty list on error
+        assert data == []  # Doit renvoyer une liste vide en cas d'erreur

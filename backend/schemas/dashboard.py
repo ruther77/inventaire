@@ -1,4 +1,4 @@
-"""Schemas for dashboard metrics."""
+"""Schémas pour les métriques du tableau de bord."""
 
 from __future__ import annotations
 

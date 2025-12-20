@@ -56,9 +56,101 @@ export default function RestaurantOverviewPage() {
 
   const formatPercent = (value) => `${value?.toFixed(1) || 0}%`;
 
+  const csvEscape = (value) => {
+    const text = value === null || value === undefined ? '' : String(value);
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+
   const handleExport = () => {
-    // TODO: Implémenter l'export CSV
-    console.log('Export CSV');
+    if (!overview) return;
+
+    const sections = [];
+
+    // Section 1: KPIs
+    sections.push('=== INDICATEURS CLÉS ===');
+    sections.push('Indicateur,Valeur');
+    if (kpis.total_plats !== undefined) {
+      sections.push(`Nombre total de plats,${kpis.total_plats}`);
+    }
+    if (kpis.food_cost_moyen !== undefined) {
+      sections.push(`Food Cost moyen,${kpis.food_cost_moyen.toFixed(1)}%`);
+    }
+    if (kpis.marge_moyenne !== undefined) {
+      sections.push(`Marge moyenne,${kpis.marge_moyenne.toFixed(1)}%`);
+    }
+    if (kpis.total_revenue !== undefined) {
+      sections.push(`Revenu total,${kpis.total_revenue.toFixed(2)} €`);
+    }
+    sections.push('');
+
+    // Section 2: Top 5 rentables
+    if (top_profitable_plats.length > 0) {
+      sections.push('=== TOP 5 PLATS RENTABLES ===');
+      sections.push('Rang,Nom,Catégorie,Marge %,Marge brute €,Coût matière €,Prix vente €');
+      top_profitable_plats.forEach((plat, idx) => {
+        const row = [
+          idx + 1,
+          csvEscape(plat.nom),
+          csvEscape(plat.categorie || 'Sans catégorie'),
+          plat.marge_pct?.toFixed(1) || '',
+          plat.marge_brute?.toFixed(2) || '',
+          plat.cout_matiere?.toFixed(2) || '',
+          plat.prix_vente?.toFixed(2) || '',
+        ].join(',');
+        sections.push(row);
+      });
+      sections.push('');
+    }
+
+    // Section 3: Top 5 à surveiller
+    if (top_unprofitable_plats.length > 0) {
+      sections.push('=== TOP 5 PLATS À SURVEILLER ===');
+      sections.push('Rang,Nom,Catégorie,Marge %,Coût matière €,Prix vente €,Food Cost %');
+      top_unprofitable_plats.forEach((plat, idx) => {
+        const row = [
+          idx + 1,
+          csvEscape(plat.nom),
+          csvEscape(plat.categorie || 'Sans catégorie'),
+          plat.marge_pct?.toFixed(1) || '',
+          plat.cout_matiere?.toFixed(2) || '',
+          plat.prix_vente?.toFixed(2) || '',
+          plat.food_cost_pct?.toFixed(1) || '',
+        ].join(',');
+        sections.push(row);
+      });
+      sections.push('');
+    }
+
+    // Section 4: Marges par catégorie
+    if (overview.margin_by_category && overview.margin_by_category.length > 0) {
+      sections.push('=== MARGES PAR CATÉGORIE ===');
+      sections.push('Catégorie,Marge moyenne %,Food Cost %');
+      overview.margin_by_category.forEach((cat) => {
+        const row = [
+          csvEscape(cat.category),
+          cat.marge_pct?.toFixed(1) || '',
+          cat.food_cost_pct?.toFixed(1) || '',
+        ].join(',');
+        sections.push(row);
+      });
+      sections.push('');
+    }
+
+    // Section 5: Métadonnées
+    sections.push('=== INFORMATIONS ===');
+    sections.push(`Date d'export,${new Date().toLocaleDateString('fr-FR')}`);
+    sections.push(`Période,${dateRange.dateFrom} - ${dateRange.dateTo}`);
+
+    const csvContent = sections.join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `restaurant_overview_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (

@@ -12,6 +12,12 @@ import { useAuth } from '../hooks/useAuth.js';
 
 const DEFAULT_TENANT = { id: 1, code: 'epicerie', label: 'Inventaire Pro' };
 
+// Un seul tenant pour la connexion - le backend route automatiquement vers les bonnes données
+// selon l'URL (/restaurant/* -> tenant 2, /intelligence/* -> tenant 4, etc.)
+const AVAILABLE_TENANTS = [
+  { id: 1, code: 'epicerie', label: 'Inventaire Pro' },
+];
+
 const DEFAULT_CONTEXT = {
   tenant: DEFAULT_TENANT,
 };
@@ -45,5 +51,5 @@ export function useTenant() {
   return useContext(TenantContext);
 }
 
-// Export for backward compatibility - single tenant now
-export const tenants = [DEFAULT_TENANT];
+// Export la liste des tenants disponibles pour le login
+export const tenants = AVAILABLE_TENANTS;

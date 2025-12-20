@@ -1,6 +1,6 @@
 import { useEffect, useRef, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Command, ArrowRight, Clock, Zap, Navigation } from 'lucide-react';
+import { Search, Command, ArrowRight, Clock, Zap, Navigation, Loader2, Package, DollarSign, AlertTriangle, TrendingUp } from 'lucide-react';
 import clsx from 'clsx';
 import { useCommandBar } from '../../contexts/CommandBarContext.jsx';
 import { useHotkeys } from '../../hooks/index.js';
@@ -21,6 +21,7 @@ export default function CommandBar() {
     setSelectedIndex,
     executeItem,
     handleKeyDown,
+    isLoadingLive,
   } = useCommandBar();
 
   const inputRef = useRef(null);
@@ -62,6 +63,15 @@ export default function CommandBar() {
     context: 'Contexte actuel',
     recent: 'Récents',
     other: 'Autres',
+    // Nouvelles catégories temps réel
+    'live-catalog': 'Catalogue',
+    'live-finance': 'Finances',
+    'live-alerts': 'Alertes actives',
+    'live-operations': 'Opérations',
+    // Catégories contextuelles
+    'context-operations': 'Opérations rapides',
+    'context-finance': 'Actions finances',
+    'context-intelligence': 'Intelligence',
   };
 
   const categoryIcons = {
@@ -71,6 +81,15 @@ export default function CommandBar() {
     context: ArrowRight,
     recent: Clock,
     other: Clock,
+    // Nouvelles catégories temps réel
+    'live-catalog': Package,
+    'live-finance': DollarSign,
+    'live-alerts': AlertTriangle,
+    'live-operations': Package,
+    // Catégories contextuelles
+    'context-operations': Zap,
+    'context-finance': DollarSign,
+    'context-intelligence': TrendingUp,
   };
 
   // Calculer l'index global pour chaque item
@@ -108,13 +127,17 @@ export default function CommandBar() {
             <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/95 shadow-2xl shadow-black/50 backdrop-blur-xl">
               {/* Search Input */}
               <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
-                <Search className="h-5 w-5 text-slate-500" />
+                {isLoadingLive && query.length >= 2 ? (
+                  <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+                ) : (
+                  <Search className="h-5 w-5 text-slate-500" />
+                )}
                 <input
                   ref={inputRef}
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Rechercher une page, action, produit..."
+                  placeholder="Rechercher une page, action, produit, transaction..."
                   className="flex-1 bg-transparent text-base text-white placeholder-slate-500 outline-none"
                   autoComplete="off"
                   autoCorrect="off"

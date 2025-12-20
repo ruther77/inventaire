@@ -1,4 +1,4 @@
-"""Eurociel invoice import endpoints."""
+"""Endpoints d'import de factures Eurociel."""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Link2, AlertTriangle, CheckCircle, Clock, RefreshCw, Filter } from 'lucide-react';
+import { Link2, AlertTriangle, CheckCircle, Clock, RefreshCw, Filter, LayoutGrid, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -10,6 +10,9 @@ import CardExpandable from '../../components/ui/CardExpandable.jsx';
 import AIConfidenceBadge from '../../components/ui/AIConfidenceBadge.jsx';
 import { useBankReconciliation } from '../../hooks/useBankReconciliation.js';
 import { staggerContainer, staggerItem, kpiCard, tabContent, modalScale, overlayFade } from '../../ui/motion.js';
+import ReconciliationSplitView from './components/ReconciliationSplitView.jsx';
+import { DashboardSkeleton } from '../../components/ui/PageSkeletons.jsx';
+import QueryErrorState from '../../components/feedback/QueryErrorState.jsx';
 
 const Stat = ({ label, value, hint, icon: Icon, accent = 'text-white' }) => (
   <motion.div
@@ -48,10 +51,11 @@ const StatusBadge = ({ status }) => {
 
 export default function BankReconciliationPage() {
   const [activeTab, setActiveTab] = useState('transactions');
+  const [viewMode, setViewMode] = useState('split'); // 'split' or 'list'
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [matchModalOpen, setMatchModalOpen] = useState(false);
-  const [filters, setFilters] = useState({ daysBack: 90, minAmount: 0 });
+  const [filters, setFilters] = useState({ daysBack: 365, minAmount: 0 });
 
   const {
     summary,
@@ -63,6 +67,20 @@ export default function BankReconciliationPage() {
     refetchAll,
   } = useBankReconciliation(filters);
 
+  const hasError = summary.isError || transactions.isError || invoices.isError;
+
+  // Gestion des erreurs
+  if (hasError) {
+    return (
+      <QueryErrorState
+        error={summary.error || transactions.error || invoices.error}
+        onRetry={refetchAll}
+        title="Erreur de chargement"
+        description="Impossible de charger les données de rapprochement bancaire."
+      />
+    );
+  }
+
   const unmatchedTransactions = transactions.data || [];
   const unmatchedInvoices = invoices.data || [];
   const suggestions = useMemo(() => {
@@ -70,21 +88,21 @@ export default function BankReconciliationPage() {
     return unmatchedTransactions.slice(0, 3).map((tx, idx) => {
       const inv = unmatchedInvoices[idx] || unmatchedInvoices[0];
       return {
-        id: tx.id || `sug-${idx}`,
-        txId: tx.id,
-        invoiceId: inv?.id,
+        id: tx.transaction_id || tx.id || `sug-${idx}`,
+        txId: tx.transaction_id || tx.id,
+        invoiceId: inv?.invoice_id || inv?.id,
         transaction: {
-          label: tx.label || tx.libelle || 'Transaction',
-          date: tx.date_operation || tx.date || '',
+          label: tx.label || 'Transaction',
+          date: tx.date || '',
           amount: Number(tx.amount) || 0,
-          bank_account: tx.bank_account || tx.bank || '',
+          bank_account: tx.bank_account || '',
         },
         invoice: {
-          supplier: inv.supplier || inv.fournisseur || 'Fournisseur',
-          reference: inv.invoice_number || inv.reference || inv.numero || '',
-          date: inv.invoice_date || inv.date || '',
-          amount: Number(inv.total_ttc || inv.amount || 0),
-          line_count: inv.line_count || inv.nb_lignes || 0,
+          supplier: inv?.supplier_name || 'Fournisseur',
+          reference: inv?.invoice_number || '',
+          date: inv?.date || '',
+          amount: Number(inv?.amount || 0),
+          line_count: inv?.line_count || 0,
         },
         confidence: 0.92,
       };
@@ -115,13 +133,14 @@ export default function BankReconciliationPage() {
 
   const transactionColumns = useMemo(() => [
     {
-      key: 'date_operation',
+      key: 'date',
       header: 'Date',
       sortable: true,
       render: (value) => {
         if (!value) return '—';
-        const parts = value.split('-');
-        return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : value;
+        const dateStr = typeof value === 'string' ? value : value.toString();
+        const parts = dateStr.split('-');
+        return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
       },
     },
     {
@@ -169,17 +188,18 @@ export default function BankReconciliationPage() {
 
   const invoiceColumns = useMemo(() => [
     {
-      key: 'invoice_date',
+      key: 'date',
       header: 'Date',
       sortable: true,
       render: (value) => {
         if (!value) return '—';
-        const parts = value.split('-');
-        return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : value;
+        const dateStr = typeof value === 'string' ? value : value.toString();
+        const parts = dateStr.split('-');
+        return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
       },
     },
     {
-      key: 'supplier',
+      key: 'supplier_name',
       header: 'Fournisseur',
       sortable: true,
       render: (value) => <span className="font-medium text-white">{value || '—'}</span>,
@@ -190,13 +210,13 @@ export default function BankReconciliationPage() {
       render: (value) => <span className="text-sm text-slate-300">{value || '—'}</span>,
     },
     {
-      key: 'total_ttc',
+      key: 'amount',
       header: 'Montant TTC',
       align: 'right',
       sortable: true,
       render: (value) => {
         const amount = Number(value) || 0;
-        return <span className="font-semibold text-rose-600">-{amount.toFixed(2)} €</span>;
+        return <span className="font-semibold text-rose-400">-{amount.toFixed(2)} €</span>;
       },
     },
     {
@@ -231,6 +251,23 @@ export default function BankReconciliationPage() {
           <h1 className="text-2xl font-semibold text-orange-400">Rapprochement Bancaire</h1>
         </div>
         <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex bg-white/5 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('split')}
+              className={`p-2 rounded transition ${viewMode === 'split' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}
+              title="Vue split"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded transition ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}
+              title="Vue liste"
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
           <Button variant="ghost" size="sm" onClick={refetchAll} loading={isLoading}>
             <RefreshCw className="h-4 w-4" />
             Actualiser
@@ -310,107 +347,120 @@ export default function BankReconciliationPage() {
         </div>
       </Card>
 
-      {/* Suggestions IA */}
-      <CardExpandable
-        title="Suggestions IA"
-        subtitle="Rapprochement assisté"
-        summary={`${suggestions.length || 0} propositions`}
-        variant="info"
-        defaultExpanded
-        className="border-white/10 bg-white/5"
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <AIConfidenceBadge confidence={0.9} label="Auto-match" variant="pill" size="sm" />
-          <p className="text-xs text-slate-500">Basé sur montant/date/fournisseur</p>
-        </div>
-        <ReconciliationSuggestionList
-          title="Suggestions IA"
+      {/* Split View Mode */}
+      {viewMode === 'split' ? (
+        <ReconciliationSplitView
+          transactions={unmatchedTransactions}
+          invoices={unmatchedInvoices}
           suggestions={suggestions}
-          onValidate={(id) => {
-            const target = suggestions.find((s) => s.id === id);
-            if (target) {
-              createMatch.mutate({
-                transaction_id: target.txId || target.transaction?.id || target.id,
-                invoice_id: target.invoiceId || target.invoice?.id || target.id,
-                match_type: 'ai',
-              });
-            }
-          }}
-          onReject={() => {}}
-          className="bg-white/5 border border-white/10 rounded-2xl p-4"
+          onMatchCreated={refetchAll}
+          isLoading={isLoading}
         />
-      </CardExpandable>
-
-      {/* Tabs */}
-      <div className="flex gap-2 bg-white/5 p-1 rounded-xl w-fit">
-        <button
-          onClick={() => setActiveTab('transactions')}
-          className="relative px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          {activeTab === 'transactions' && (
-            <motion.span
-              layoutId="reco-tab"
-              className="absolute inset-0 bg-orange-500 rounded-lg"
-              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+      ) : (
+        <>
+          {/* Suggestions IA */}
+          <CardExpandable
+            title="Suggestions IA"
+            subtitle="Rapprochement assisté"
+            summary={`${suggestions.length || 0} propositions`}
+            variant="info"
+            defaultExpanded
+            className="border-white/10 bg-white/5"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <AIConfidenceBadge confidence={0.9} label="Auto-match" variant="pill" size="sm" />
+              <p className="text-xs text-slate-500">Basé sur montant/date/fournisseur</p>
+            </div>
+            <ReconciliationSuggestionList
+              title="Suggestions IA"
+              suggestions={suggestions}
+              onValidate={(id) => {
+                const target = suggestions.find((s) => s.id === id);
+                if (target) {
+                  createMatch.mutate({
+                    transaction_id: target.txId || target.transaction?.id || target.id,
+                    invoice_id: target.invoiceId || target.invoice?.id || target.id,
+                    match_type: 'ai',
+                  });
+                }
+              }}
+              onReject={() => {}}
+              className="bg-white/5 border border-white/10 rounded-2xl p-4"
             />
-          )}
-          <span className={`relative z-10 ${activeTab === 'transactions' ? 'text-white' : 'text-slate-400'}`}>
-            Transactions ({unmatchedTransactions.length})
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('invoices')}
-          className="relative px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          {activeTab === 'invoices' && (
-            <motion.span
-              layoutId="reco-tab"
-              className="absolute inset-0 bg-orange-500 rounded-lg"
-              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-            />
-          )}
-          <span className={`relative z-10 ${activeTab === 'invoices' ? 'text-white' : 'text-slate-400'}`}>
-            Factures ({unmatchedInvoices.length})
-          </span>
-        </button>
-      </div>
+          </CardExpandable>
 
-      {/* Tables */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          variants={tabContent}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-        >
-          <Card padding="none">
-            {activeTab === 'transactions' ? (
-              <DataTable
-                data={unmatchedTransactions}
-                columns={transactionColumns}
-                loading={isLoading}
-                sortable
-                pagination
-                pageSize={25}
-                emptyMessage="Toutes les transactions sont rapprochées"
-                getRowId={(row) => row.id}
-              />
-            ) : (
-              <DataTable
-                data={unmatchedInvoices}
-                columns={invoiceColumns}
-                loading={isLoading}
-                sortable
-                pagination
-                pageSize={25}
-                emptyMessage="Toutes les factures sont rapprochées"
-                getRowId={(row) => row.id}
-              />
-            )}
-          </Card>
-        </motion.div>
-      </AnimatePresence>
+          {/* Tabs */}
+          <div className="flex gap-2 bg-white/5 p-1 rounded-xl w-fit">
+            <button
+              onClick={() => setActiveTab('transactions')}
+              className="relative px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              {activeTab === 'transactions' && (
+                <motion.span
+                  layoutId="reco-tab"
+                  className="absolute inset-0 bg-orange-500 rounded-lg"
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+              )}
+              <span className={`relative z-10 ${activeTab === 'transactions' ? 'text-white' : 'text-slate-400'}`}>
+                Transactions ({unmatchedTransactions.length})
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('invoices')}
+              className="relative px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              {activeTab === 'invoices' && (
+                <motion.span
+                  layoutId="reco-tab"
+                  className="absolute inset-0 bg-orange-500 rounded-lg"
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+              )}
+              <span className={`relative z-10 ${activeTab === 'invoices' ? 'text-white' : 'text-slate-400'}`}>
+                Factures ({unmatchedInvoices.length})
+              </span>
+            </button>
+          </div>
+
+          {/* Tables */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              variants={tabContent}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <Card padding="none">
+                {activeTab === 'transactions' ? (
+                  <DataTable
+                    data={unmatchedTransactions}
+                    columns={transactionColumns}
+                    loading={isLoading}
+                    sortable
+                    pagination
+                    pageSize={25}
+                    emptyMessage="Toutes les transactions sont rapprochées"
+                    getRowId={(row) => row.id}
+                  />
+                ) : (
+                  <DataTable
+                    data={unmatchedInvoices}
+                    columns={invoiceColumns}
+                    loading={isLoading}
+                    sortable
+                    pagination
+                    pageSize={25}
+                    emptyMessage="Toutes les factures sont rapprochées"
+                    getRowId={(row) => row.id}
+                  />
+                )}
+              </Card>
+            </motion.div>
+          </AnimatePresence>
+        </>
+      )}
 
       {/* Modal rapprochement manuel */}
       <Modal

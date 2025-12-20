@@ -89,10 +89,14 @@ services:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
       NEWCMS_ALLOW_ANON: "1"            # mode démo pour newCMS (pas d'auth requise)
       NEWCMS_DEFAULT_TENANT_ID: "2"     # tenant par défaut pour newCMS (restaurant)
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - inventaire-net
@@ -116,7 +120,21 @@ services:
       - "5175:80"
     networks:
       - inventaire-net
-  
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: inventaire-ngrok
+    restart: unless-stopped
+    command: http inventaire-frontend:80
+    environment:
+      - NGROK_AUTHTOKEN=36CRM3bhfuahmaHrrIOOzfyv72E_6nvkimDv98YXiptZR88WD
+    ports:
+      - "4040:4040"  # Dashboard ngrok local
+    depends_on:
+      - frontend
+    networks:
+      - inventaire-net
+
   n8n:
     image: n8nio/n8n
     container_name: inventaire-n8n
@@ -155,11 +173,114 @@ services:
     networks:
       - inventaire-net
 
+  blocks:
+    build:
+      context: ./blocks
+      dockerfile: Dockerfile
+      target: dev
+    container_name: inventaire-blocks
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - HOSTNAME=0.0.0.0
+    networks:
+      - inventaire-net
+
+  # === DISTRIBUTED SYSTEM INFRASTRUCTURE ===
+
+  # Redis - Cache layer + Idempotency keys storage
+  redis:
+    image: redis:7-alpine
+    container_name: inventaire-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - inventaire-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # RabbitMQ - Message broker for Celery workers
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: inventaire-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5672:5672"   # AMQP protocol
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - inventaire-net
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Celery Worker - Background task processing
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: inventaire-celery-worker
+    restart: unless-stopped
+    command: celery -A backend.worker worker --loglevel=info --concurrency=2
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - inventaire-net
+    volumes:
+      - .:/app
+
+  # Celery Beat - Periodic task scheduler
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: inventaire-celery-beat
+    restart: unless-stopped
+    command: celery -A backend.worker beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
+    depends_on:
+      - celery-worker
+    networks:
+      - inventaire-net
+    volumes:
+      - .:/app
 
 volumes:
   db_data:
   backup_data:
   db_test_data:
+  redis_data:
+  rabbitmq_data:
 networks:
   inventaire-net:
     driver: bridge

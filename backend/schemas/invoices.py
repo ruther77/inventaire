@@ -49,6 +49,7 @@ class InvoiceHistoryEntry(BaseModel):
     supplier: Optional[str] = None
     facture_date: Optional[str] = None
     line_count: int
+    total_ttc: Optional[float] = None
     file_path: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -150,6 +151,39 @@ class ZeroClickJobListResponse(BaseModel):
     total: int
 
 
+class ImportSession(BaseModel):
+    session_id: str
+    date_debut: datetime
+    date_fin: Optional[datetime] = None
+    nb_imports: int
+    nb_completed: int = 0
+    nb_failed: int = 0
+    total_lignes: int = 0
+    total_mouvements: int = 0
+    total_produits_crees: int = 0
+    fournisseurs: Optional[str] = None
+
+
+class ImportSessionListResponse(BaseModel):
+    items: List[ImportSession]
+    total: int
+
+
+class ImportSessionDetails(BaseModel):
+    session_id: str
+    date_debut: datetime
+    date_fin: Optional[datetime] = None
+    nb_imports: int
+    nb_completed: int = 0
+    nb_failed: int = 0
+    nb_pending: int = 0
+    total_lignes: int = 0
+    total_mouvements: int = 0
+    total_produits_crees: int = 0
+    fournisseurs: List[str] = Field(default_factory=list)
+    imports: List[ZeroClickJobStatus] = Field(default_factory=list)
+
+
 __all__ = [
     "InvoiceExtractRequest",
     "InvoiceExtractResponse",
@@ -166,4 +200,7 @@ __all__ = [
     "InvoiceStockConfirmRequest",
     "ZeroClickJobStatus",
     "ZeroClickJobListResponse",
+    "ImportSession",
+    "ImportSessionListResponse",
+    "ImportSessionDetails",
 ]

@@ -1,4 +1,4 @@
-"""Service helpers for Restaurant Menus & Costs (Scénario 3.6)."""
+"""Helpers de service pour Menus & Coûts Restaurant (Scénario 3.6)."""
 
 from __future__ import annotations
 

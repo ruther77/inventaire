@@ -301,7 +301,7 @@ class CreateOrderResponse(BaseModel):
 
 
 # =============================================================================
-# Request Models (si besoin de parametres)
+# Modèles de requête (si besoin de paramètres)
 # =============================================================================
 
 class CockpitFilters(BaseModel):
@@ -312,7 +312,7 @@ class CockpitFilters(BaseModel):
 
 
 # =============================================================================
-# Finance Module Schemas
+# Schémas du module Finance
 # =============================================================================
 
 class ReconciliationStats(BaseModel):
@@ -413,7 +413,7 @@ class ApplyReconciliationResponse(BaseModel):
 
 
 # =============================================================================
-# Intelligence Module Schemas
+# Schémas du module Intelligence
 # =============================================================================
 
 class PriorityLevel(str):
@@ -538,7 +538,7 @@ class ApplyRecommendationResponse(BaseModel):
 
 
 # =============================================================================
-# Restaurant Module Schemas
+# Schémas du module Restaurant
 # =============================================================================
 
 class RestaurantPlatCost(BaseModel):
@@ -602,7 +602,7 @@ class RestaurantOverviewResponse(BaseModel):
 
 
 # =============================================================================
-# Mobile Module Schemas
+# Schémas du module Mobile
 # =============================================================================
 
 class MobileInventoryItem(BaseModel):

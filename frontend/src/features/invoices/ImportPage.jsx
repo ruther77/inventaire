@@ -9,11 +9,12 @@
  * - InvoiceHistoryPanel: Historique et conflits
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Button from '../../components/ui/Button.jsx';
 import FiltersDrawer from '../../components/ui/FiltersDrawer.jsx';
 import Card from '../../components/ui/Card.jsx';
+import PDFPreview from '../../components/ui/PDFPreview.jsx';
 import {
   InvoiceUploadCard,
   InvoiceDocumentSelector,
@@ -25,6 +26,11 @@ import { InvoiceProcessingCard } from './components/index.js';
 import CardExpandable from '../../components/ui/CardExpandable.jsx';
 import AIConfidenceBadge from '../../components/ui/AIConfidenceBadge.jsx';
 import { useInvoiceZeroClick } from '../../hooks/useInvoiceImport.js';
+import { usePDFFileFromUpload } from '../../hooks/usePDFFile.js';
+import { InvoiceImportSkeleton, TableSkeleton } from '../../components/ui/PageSkeletons.jsx';
+
+// Lazy load ImportSessionsView (historique rarement utilisé immédiatement)
+const ImportSessionsView = lazy(() => import('./components/ImportSessionsView.jsx'));
 
 // ============================================================================
 // CONSTANTES
@@ -58,6 +64,11 @@ const SECTION_DEFINITIONS = [
             id: 'history.list',
             label: 'Factures traitees',
             description: 'Consultez les PDF stockes et rejouez un import facilement.',
+          },
+          {
+            id: 'history.sessions',
+            label: 'Historique par session',
+            description: 'Voir les imports groupes par session de travail.',
           },
         ],
       },
@@ -161,6 +172,9 @@ export default function ImportPage() {
   // State: Resultats d'import (pour transmettre a l'historique)
   const [catalogSummary, setCatalogSummary] = useState(null);
   const zeroClickMutation = useInvoiceZeroClick();
+
+  // State: PDF Preview
+  const pdfFile = usePDFFileFromUpload();
 
   // Navigation par section
   const defaultPanel = SECTION_DEFINITIONS[0]?.groups?.[0]?.items?.[0]?.id ?? 'workspace.intake';
@@ -328,40 +342,99 @@ export default function ImportPage() {
         supplier={supplier}
         onExtractionSuccess={handleExtractionSuccess}
         onProcessingSnapshot={setProcessingSnapshot}
+        onFileUpload={(file) => pdfFile.setPDFFile(file)}
       />
 
-      {/* Carte de traitement en temps réel */}
-      <InvoiceProcessingCard
-        isProcessing={processingSnapshot.isProcessing}
-        fileName={processingSnapshot.fileName}
-        steps={processingSnapshot.steps}
-        attentionItems={processingSnapshot.attentionItems}
-        summary={processingSnapshot.summary}
-        onValidate={() => setProcessingSnapshot((prev) => ({ ...prev, isProcessing: false }))}
-        onCancel={() => setProcessingSnapshot((prev) => ({ ...prev, isProcessing: false }))}
-      />
+      {/* Split View: PDF Preview (left) + Editor (right) */}
+      {pdfFile.hasFile && lines.length > 0 && (
+        <div className="grid lg:grid-cols-12 gap-6">
+          {/* PDF Preview - 40% width on desktop, full width on mobile */}
+          <div className="lg:col-span-5">
+            <PDFPreview
+              file={pdfFile.file}
+              fileName={pdfFile.fileMetadata?.name || 'Facture'}
+              collapsible={true}
+              defaultCollapsed={false}
+              className="sticky top-6 h-[calc(100vh-200px)]"
+            />
+          </div>
 
-      {/* Editeur de lignes */}
-      <InvoiceLinesEditor
-        lines={lines}
-        onLinesChange={handleLinesChange}
-        onDownloadCsv={() => downloadLinesCsv(lines)}
-      />
+          {/* Editor - 60% width on desktop, full width on mobile */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Carte de traitement en temps réel */}
+            <InvoiceProcessingCard
+              isProcessing={processingSnapshot.isProcessing}
+              fileName={processingSnapshot.fileName}
+              steps={processingSnapshot.steps}
+              attentionItems={processingSnapshot.attentionItems}
+              summary={processingSnapshot.summary}
+              onValidate={() => setProcessingSnapshot((prev) => ({ ...prev, isProcessing: false }))}
+              onCancel={() => setProcessingSnapshot((prev) => ({ ...prev, isProcessing: false }))}
+            />
 
-      {/* Actions d'import */}
-      <InvoiceImportActions
-        lines={lines}
-        supplier={supplier}
-        onSupplierChange={setSupplier}
-        invoiceDate={invoiceDate}
-        onInvoiceDateChange={handleInvoiceDateChange}
-        onImportSuccess={() => setCatalogSummary(null)}
-      />
+            {/* Editeur de lignes */}
+            <InvoiceLinesEditor
+              lines={lines}
+              onLinesChange={handleLinesChange}
+              onDownloadCsv={() => downloadLinesCsv(lines)}
+            />
+
+            {/* Actions d'import */}
+            <InvoiceImportActions
+              lines={lines}
+              supplier={supplier}
+              onSupplierChange={setSupplier}
+              invoiceDate={invoiceDate}
+              onInvoiceDateChange={handleInvoiceDateChange}
+              onImportSuccess={() => setCatalogSummary(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Fallback: Afficher les cartes normalement si pas de PDF ou pas de lignes */}
+      {(!pdfFile.hasFile || lines.length === 0) && (
+        <>
+          {/* Carte de traitement en temps réel */}
+          <InvoiceProcessingCard
+            isProcessing={processingSnapshot.isProcessing}
+            fileName={processingSnapshot.fileName}
+            steps={processingSnapshot.steps}
+            attentionItems={processingSnapshot.attentionItems}
+            summary={processingSnapshot.summary}
+            onValidate={() => setProcessingSnapshot((prev) => ({ ...prev, isProcessing: false }))}
+            onCancel={() => setProcessingSnapshot((prev) => ({ ...prev, isProcessing: false }))}
+          />
+
+          {/* Editeur de lignes */}
+          <InvoiceLinesEditor
+            lines={lines}
+            onLinesChange={handleLinesChange}
+            onDownloadCsv={() => downloadLinesCsv(lines)}
+          />
+
+          {/* Actions d'import */}
+          <InvoiceImportActions
+            lines={lines}
+            supplier={supplier}
+            onSupplierChange={setSupplier}
+            invoiceDate={invoiceDate}
+            onInvoiceDateChange={handleInvoiceDateChange}
+            onImportSuccess={() => setCatalogSummary(null)}
+          />
+        </>
+      )}
     </>
   );
 
   const renderHistoryPanel = () => (
     <InvoiceHistoryPanel supplier={supplier} catalogSummary={catalogSummary} />
+  );
+
+  const renderSessionsPanel = () => (
+    <Suspense fallback={<TableSkeleton rows={8} columns={5} />}>
+      <ImportSessionsView />
+    </Suspense>
   );
 
   const renderPanel = () => {
@@ -370,6 +443,8 @@ export default function ImportPage() {
         return renderWorkspacePanel();
       case 'history.list':
         return renderHistoryPanel();
+      case 'history.sessions':
+        return renderSessionsPanel();
       default:
         return (
           <Card>

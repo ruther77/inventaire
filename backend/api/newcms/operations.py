@@ -1,4 +1,4 @@
-"""NewCMS Operations API - Unified operations dashboard endpoints."""
+"""API NewCMS Operations - endpoints unifiés du tableau de bord opérations."""
 
 from __future__ import annotations
 
@@ -359,7 +359,7 @@ async def get_operations_overview(
             if 0 < item.get("stock_actuel", 0) <= item.get("seuil_alerte", 0)
         ][:5]
     except Exception:
-        # Fallback silencieux
+        # Repli silencieux
         pass
 
     # 2. Dernières factures traitées (5 plus récentes)

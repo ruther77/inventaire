@@ -1,4 +1,4 @@
-"""Dashboard aggregation services."""
+"""Services d'agrégation pour le tableau de bord."""
 
 from __future__ import annotations
 

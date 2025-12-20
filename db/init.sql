@@ -35,181 +35,21 @@ VALUES
 ON CONFLICT (code) DO UPDATE
 SET tenant_id = EXCLUDED.tenant_id, nom = EXCLUDED.nom;
 
-CREATE TABLE IF NOT EXISTS ingredients (
-    id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL REFERENCES tenants(id) DEFAULT 2,
-    nom TEXT NOT NULL UNIQUE,
-    unite_base TEXT NOT NULL DEFAULT 'kg',
-    etat TEXT NOT NULL DEFAULT 'autre',
-    tva_pct NUMERIC(5,2) DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE ingredients ALTER COLUMN tenant_id SET DEFAULT 2;
-
-CREATE TABLE IF NOT EXISTS plats (
-    id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL REFERENCES tenants(id) DEFAULT 2,
-    restaurant_id INT NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
-    nom TEXT NOT NULL,
-    type TEXT NOT NULL DEFAULT 'dish',
-    portions_par_batch INT NOT NULL DEFAULT 1,
-    poids_portion_g INT NOT NULL DEFAULT 0,
-    prix_vente_ttc NUMERIC(12,2) DEFAULT 0,
-    tva_pct NUMERIC(5,2) DEFAULT 0,
-    actif BOOLEAN NOT NULL DEFAULT TRUE,
-    UNIQUE (restaurant_id, nom)
-);
-
-ALTER TABLE plats ALTER COLUMN tenant_id SET DEFAULT 2;
-
-CREATE TABLE IF NOT EXISTS plat_ingredients (
-    id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL REFERENCES tenants(id) DEFAULT 2,
-    plat_id INT NOT NULL REFERENCES plats(id) ON DELETE CASCADE,
-    ingredient_id INT NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
-    quantite_batch NUMERIC(14,6) NOT NULL DEFAULT 0,
-    UNIQUE (plat_id, ingredient_id)
-);
-
-ALTER TABLE plat_ingredients ALTER COLUMN tenant_id SET DEFAULT 2;
-
-CREATE TABLE IF NOT EXISTS plat_equivalences (
-    id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL REFERENCES tenants(id) DEFAULT 2,
-    plat_id INT NOT NULL REFERENCES plats(id) ON DELETE CASCADE,
-    ingredient_id INT NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
-    qte_ingredient NUMERIC(14,6) NOT NULL DEFAULT 0,
-    UNIQUE (plat_id, ingredient_id)
-);
-
-ALTER TABLE plat_equivalences ALTER COLUMN tenant_id SET DEFAULT 2;
-
-CREATE TABLE IF NOT EXISTS bundle_items (
-    id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL REFERENCES tenants(id) DEFAULT 2,
-    bundle_id INT NOT NULL REFERENCES plats(id) ON DELETE CASCADE,
-    item_plat_id INT NOT NULL REFERENCES plats(id) ON DELETE RESTRICT,
-    quantite NUMERIC(12,4) NOT NULL DEFAULT 1.0,
-    UNIQUE (bundle_id, item_plat_id)
-);
-
-ALTER TABLE bundle_items ALTER COLUMN tenant_id SET DEFAULT 2;
-
-CREATE TABLE IF NOT EXISTS categories (
-    id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL REFERENCES tenants(id) DEFAULT 2,
-    nom TEXT NOT NULL UNIQUE
-);
-
-ALTER TABLE categories ALTER COLUMN tenant_id SET DEFAULT 2;
-
-CREATE TABLE IF NOT EXISTS plat_categories (
-    plat_id INT NOT NULL REFERENCES plats(id) ON DELETE CASCADE,
-    categorie_id INT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
-    PRIMARY KEY (plat_id, categorie_id)
-);
-
-CREATE TABLE IF NOT EXISTS ingredient_conditionnements (
-    id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL REFERENCES tenants(id) DEFAULT 2,
-    ingredient_id INT NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
-    libelle TEXT NOT NULL,
-    qte_base NUMERIC(12,4) NOT NULL DEFAULT 0,
-    prix_pack NUMERIC(12,4),
-    actif BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-ALTER TABLE ingredient_conditionnements ALTER COLUMN tenant_id SET DEFAULT 2;
-
-CREATE OR REPLACE VIEW v_prix_unitaire_normalise AS
-SELECT i.id AS ingredient_id,
-       0::numeric AS prix_par_unite
-FROM ingredients i;
-
-CREATE TABLE IF NOT EXISTS stock_emplacements (
-    id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL REFERENCES tenants(id) DEFAULT 2,
-    nom TEXT NOT NULL UNIQUE
-);
-
-ALTER TABLE stock_emplacements ALTER COLUMN tenant_id SET DEFAULT 2;
-
-CREATE TABLE IF NOT EXISTS stock_mouvements (
-    id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL REFERENCES tenants(id) DEFAULT 2,
-    ingredient_id INT NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
-    emplacement_id INT NOT NULL REFERENCES stock_emplacements(id) ON DELETE CASCADE,
-    qte NUMERIC(14,4) NOT NULL,
-    ref_type TEXT,
-    ref_doc TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT now()
-);
-
-ALTER TABLE stock_mouvements ALTER COLUMN tenant_id SET DEFAULT 2;
-
-CREATE TABLE IF NOT EXISTS productions (
-    id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL REFERENCES tenants(id) DEFAULT 2,
-    plat_id INT NOT NULL REFERENCES plats(id) ON DELETE CASCADE,
-    date_prod TIMESTAMP NOT NULL DEFAULT now(),
-    qte_batch_cible INT NOT NULL DEFAULT 1,
-    qte_batch_reel INT,
-    perte_pct NUMERIC(5,2),
-    commentaire TEXT
-);
-
-ALTER TABLE productions ALTER COLUMN tenant_id SET DEFAULT 2;
-
-CREATE TABLE IF NOT EXISTS production_lots (
-    id SERIAL PRIMARY KEY,
-    production_id INT NOT NULL REFERENCES productions(id) ON DELETE CASCADE,
-    lot_code TEXT,
-    portions_creees INT NOT NULL DEFAULT 0
-);
-
-CREATE OR REPLACE FUNCTION _ensure_tenant_id()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.tenant_id IS NULL THEN
-        NEW.tenant_id := 2;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS ensure_ingredient_tenant ON ingredients;
-CREATE TRIGGER ensure_ingredient_tenant BEFORE INSERT ON ingredients
-    FOR EACH ROW EXECUTE FUNCTION _ensure_tenant_id();
-DROP TRIGGER IF EXISTS ensure_plat_tenant ON plats;
-CREATE TRIGGER ensure_plat_tenant BEFORE INSERT ON plats
-    FOR EACH ROW EXECUTE FUNCTION _ensure_tenant_id();
-DROP TRIGGER IF EXISTS ensure_plat_ingredients_tenant ON plat_ingredients;
-CREATE TRIGGER ensure_plat_ingredients_tenant BEFORE INSERT ON plat_ingredients
-    FOR EACH ROW EXECUTE FUNCTION _ensure_tenant_id();
-DROP TRIGGER IF EXISTS ensure_plat_equivalences_tenant ON plat_equivalences;
-CREATE TRIGGER ensure_plat_equivalences_tenant BEFORE INSERT ON plat_equivalences
-    FOR EACH ROW EXECUTE FUNCTION _ensure_tenant_id();
-DROP TRIGGER IF EXISTS ensure_bundle_items_tenant ON bundle_items;
-CREATE TRIGGER ensure_bundle_items_tenant BEFORE INSERT ON bundle_items
-    FOR EACH ROW EXECUTE FUNCTION _ensure_tenant_id();
-DROP TRIGGER IF EXISTS ensure_categories_tenant ON categories;
-CREATE TRIGGER ensure_categories_tenant BEFORE INSERT ON categories
-    FOR EACH ROW EXECUTE FUNCTION _ensure_tenant_id();
-DROP TRIGGER IF EXISTS ensure_ingredient_conditionnements_tenant ON ingredient_conditionnements;
-CREATE TRIGGER ensure_ingredient_conditionnements_tenant BEFORE INSERT ON ingredient_conditionnements
-    FOR EACH ROW EXECUTE FUNCTION _ensure_tenant_id();
-DROP TRIGGER IF EXISTS ensure_stock_emplacements_tenant ON stock_emplacements;
-CREATE TRIGGER ensure_stock_emplacements_tenant BEFORE INSERT ON stock_emplacements
-    FOR EACH ROW EXECUTE FUNCTION _ensure_tenant_id();
-DROP TRIGGER IF EXISTS ensure_stock_mouvements_tenant ON stock_mouvements;
-CREATE TRIGGER ensure_stock_mouvements_tenant BEFORE INSERT ON stock_mouvements
-    FOR EACH ROW EXECUTE FUNCTION _ensure_tenant_id();
-DROP TRIGGER IF EXISTS ensure_productions_tenant ON productions;
-CREATE TRIGGER ensure_productions_tenant BEFORE INSERT ON productions
-    FOR EACH ROW EXECUTE FUNCTION _ensure_tenant_id();
-
 CREATE UNIQUE INDEX IF NOT EXISTS uix_restaurant_nom ON restaurants (tenant_id, nom);
+
+-- Nettoyage: suppression des tables restaurant V1 et des tables jamais utilisées
+DROP TABLE IF EXISTS plat_ingredients CASCADE;
+DROP TABLE IF EXISTS plat_equivalences CASCADE;
+DROP TABLE IF EXISTS plats CASCADE;
+DROP TABLE IF EXISTS ingredients CASCADE;
+DROP TABLE IF EXISTS bundle_items CASCADE;
+DROP TABLE IF EXISTS categories CASCADE;
+DROP TABLE IF EXISTS plat_categories CASCADE;
+DROP TABLE IF EXISTS ingredient_conditionnements CASCADE;
+DROP TABLE IF EXISTS stock_emplacements CASCADE;
+DROP TABLE IF EXISTS stock_mouvements CASCADE;
+DROP TABLE IF EXISTS productions CASCADE;
+DROP TABLE IF EXISTS production_lots CASCADE;
 
 --------------------------------------------------------------------------------
 -- 2. TABLES (avec Contraintes d'Intégrité)
@@ -408,6 +248,9 @@ ORDER BY valeur_achat DESC;
 -- 6. TABLES CAPITAL & VUES PRIX POUR LE PORTEFEUILLE
 --------------------------------------------------------------------------------
 
+-- Drop explicite pour éviter les conflits d'ordre de colonnes lors du REPLACE
+DROP VIEW IF EXISTS latest_price_history;
+
 CREATE TABLE IF NOT EXISTS capital_snapshot (
     id SERIAL PRIMARY KEY,
     tenant_id INT NOT NULL,
@@ -541,12 +384,18 @@ CREATE TABLE IF NOT EXISTS restaurant_ingredients (
     unite_base TEXT NOT NULL DEFAULT 'kg',
     cout_unitaire NUMERIC(12,4) DEFAULT 0,
     stock_actuel NUMERIC(14,4) DEFAULT 0,
+    stock_min NUMERIC(14,4) DEFAULT 0,
+    categorie TEXT,
+    fournisseur TEXT,
+    produit_epicerie_id INT REFERENCES produits(id) ON DELETE SET NULL,
+    ratio_epicerie NUMERIC(12,4) DEFAULT 1.0,
     UNIQUE (tenant_id, nom)
 );
 
 CREATE TABLE IF NOT EXISTS restaurant_plats (
     id SERIAL PRIMARY KEY,
     tenant_id INT NOT NULL DEFAULT 1,
+    restaurant_id INT NOT NULL DEFAULT 1 REFERENCES restaurants(id) ON DELETE CASCADE,
     nom TEXT NOT NULL,
     categorie TEXT,
     prix_vente_ttc NUMERIC(12,2) DEFAULT 0,
@@ -566,7 +415,7 @@ CREATE TABLE IF NOT EXISTS restaurant_plat_ingredients (
 
 CREATE TABLE IF NOT EXISTS restaurant_ingredient_price_history (
     id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL DEFAULT 2,
+    tenant_id INT NOT NULL DEFAULT 1,
     ingredient_id INT NOT NULL REFERENCES restaurant_ingredients(id) ON DELETE CASCADE,
     cout_unitaire NUMERIC(12,4) NOT NULL,
     changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -576,13 +425,100 @@ CREATE INDEX IF NOT EXISTS idx_restaurant_ingredient_price_history_ingredient ON
 
 CREATE TABLE IF NOT EXISTS restaurant_plat_price_history (
     id SERIAL PRIMARY KEY,
-    tenant_id INT NOT NULL DEFAULT 2,
+    tenant_id INT NOT NULL DEFAULT 1,
     plat_id INT NOT NULL REFERENCES restaurant_plats(id) ON DELETE CASCADE,
     prix_vente_ttc NUMERIC(12,4) NOT NULL,
     changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_restaurant_plat_price_history_plat ON restaurant_plat_price_history (tenant_id, plat_id, changed_at DESC);
+
+-- Coûts plats matérialisés
+CREATE TABLE IF NOT EXISTS restaurant_plat_costs (
+    tenant_id INT NOT NULL,
+    plat_id INT NOT NULL REFERENCES restaurant_plats(id) ON DELETE CASCADE,
+    cout_matiere NUMERIC(14,4) NOT NULL DEFAULT 0,
+    prix_vente_ttc NUMERIC(14,4) NOT NULL DEFAULT 0,
+    marge_brute NUMERIC(14,4) NOT NULL DEFAULT 0,
+    marge_pct NUMERIC(8,3) NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, plat_id)
+);
+
+-- Alertes restaurant (marges, etc.)
+CREATE TABLE IF NOT EXISTS restaurant_alerts (
+    id SERIAL PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    plat_id INT REFERENCES restaurant_plats(id) ON DELETE CASCADE,
+    alert_type TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    message TEXT NOT NULL,
+    current_value NUMERIC(14,4),
+    threshold NUMERIC(14,4),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_restaurant_alerts_tenant_type ON restaurant_alerts (tenant_id, alert_type);
+
+-- Table de mapping entre produits restaurant et produits épicerie
+CREATE TABLE IF NOT EXISTS restaurant_epicerie_sku_map (
+    id SERIAL PRIMARY KEY,
+    tenant_restaurant INT NOT NULL DEFAULT 2,
+    tenant_epicerie INT NOT NULL DEFAULT 1,
+    produit_restaurant_id INT NOT NULL REFERENCES restaurant_plats(id) ON DELETE CASCADE,
+    produit_epicerie_id INT NOT NULL REFERENCES produits(id) ON DELETE CASCADE,
+    ratio NUMERIC(12,4) DEFAULT 1.0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (tenant_restaurant, produit_restaurant_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_restaurant_epicerie_sku_map_epicerie ON restaurant_epicerie_sku_map (tenant_epicerie, produit_epicerie_id);
+
+-- ============================================================================
+-- STOCK RESTAURANT (indépendant de l'épicerie)
+-- ============================================================================
+
+-- Mouvements de stock pour les ingrédients restaurant
+CREATE TABLE IF NOT EXISTS restaurant_stock_movements (
+    id SERIAL PRIMARY KEY,
+    tenant_id INT NOT NULL DEFAULT 1,
+    ingredient_id INT NOT NULL REFERENCES restaurant_ingredients(id) ON DELETE CASCADE,
+    type_mouvement TEXT NOT NULL CHECK (type_mouvement IN ('entree', 'sortie', 'ajustement', 'transfert_epicerie')),
+    quantite NUMERIC(14,4) NOT NULL,
+    unite TEXT,
+    cout_unitaire NUMERIC(12,4),
+    cout_total NUMERIC(12,4),
+    -- Traçabilité source
+    source TEXT, -- 'facture', 'epicerie', 'inventaire', 'consommation', 'perte'
+    facture_id INT REFERENCES processed_invoices(id) ON DELETE SET NULL,
+    facture_ref TEXT, -- Référence facture pour affichage
+    fournisseur TEXT,
+    produit_epicerie_id INT REFERENCES produits(id) ON DELETE SET NULL,
+    -- Métadonnées
+    commentaire TEXT,
+    date_mouvement TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_by TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_restaurant_stock_movements_ingredient ON restaurant_stock_movements (tenant_id, ingredient_id, date_mouvement DESC);
+CREATE INDEX IF NOT EXISTS idx_restaurant_stock_movements_date ON restaurant_stock_movements (tenant_id, date_mouvement DESC);
+CREATE INDEX IF NOT EXISTS idx_restaurant_stock_movements_facture ON restaurant_stock_movements (facture_id) WHERE facture_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_restaurant_stock_movements_source ON restaurant_stock_movements (tenant_id, source, date_mouvement DESC);
+
+-- Vue pour le stock actuel par ingrédient (calculé depuis les mouvements)
+CREATE OR REPLACE VIEW v_restaurant_stock_actuel AS
+SELECT
+    m.tenant_id,
+    m.ingredient_id,
+    ri.nom AS ingredient_nom,
+    ri.unite_base,
+    SUM(CASE WHEN m.type_mouvement IN ('entree', 'transfert_epicerie', 'ajustement') THEN m.quantite ELSE -m.quantite END) AS stock_calcule,
+    MAX(m.date_mouvement) AS dernier_mouvement,
+    COUNT(*) AS nb_mouvements
+FROM restaurant_stock_movements m
+JOIN restaurant_ingredients ri ON ri.id = m.ingredient_id
+GROUP BY m.tenant_id, m.ingredient_id, ri.nom, ri.unite_base;
 
 CREATE TABLE IF NOT EXISTS restaurant_bank_statements (
     id SERIAL PRIMARY KEY,

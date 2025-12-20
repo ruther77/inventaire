@@ -99,6 +99,13 @@ import { PriceSimulatorPanel } from './components';
 ### PlatDetailModal
 Modal complet avec 3 onglets (fiche, historique, simulateur).
 
+Supporte l'édition des ingrédients via les mutations :
+- POST `/restaurant/plats/{platId}/ingredients`
+- PATCH `/restaurant/plats/{platId}/ingredients/{ingredientId}`
+- DELETE `/restaurant/plats/{platId}/ingredients/{ingredientId}`
+
+Les ingrédients consomment `unit_price` et `total_cost` (fallback calculé si absents) pour éviter les NaN.
+
 ```jsx
 import { PlatDetailModal } from './components';
 

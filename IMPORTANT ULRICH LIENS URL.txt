@@ -1,0 +1,60 @@
+- Frontend : http://localhost:5175
+  - API Swagger : http://localhost:8000/docs
+  - RabbitMQ Management : http://localhost:15672 (guest/guest)
+  - Adminer : http://localhost:8080
+
+
+🧩 Conception (Design & architecture)
+Conception fonctionnelle
+
+Spécifications fonctionnelles générales (SFG)
+
+Spécifications fonctionnelles détaillées (SFD)
+
+Diagrammes UML (cas d’usage, séquence, activités)
+
+Wireframes / maquettes fonctionnelles
+
+Conception technique
+
+Dossier d’architecture technique (DAT)
+
+Spécifications techniques (ST)
+
+Schémas d’architecture (applicative, réseau, sécurité)
+
+Modèle de données / MCD / MLD
+
+
+
+
+
+
+5. Déploiement & mise en production
+
+Dossier d’exploitation
+
+Guide d’installation
+
+Procédures de mise en production (MEP)
+
+Plan de sauvegarde et de reprise (PRA / PCA)
+
+Documentation d’administration
+
+
+6. Documentation utilisateur & support
+
+Manuel utilisateur
+
+Guide de prise en main
+
+FAQ
+
+Aide en ligne / tutoriels
+
+Documentation de support
+
+
+
+

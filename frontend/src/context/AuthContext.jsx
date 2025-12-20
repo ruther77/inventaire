@@ -1,16 +1,11 @@
 /* @refresh reload */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import api, {
-  clearAccessToken,
-  registerUnauthorizedHandler,
-  setAccessToken,
-} from '../api/client.js';
+import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import api, { registerUnauthorizedHandler } from '../api/client.js';
 
-const STORAGE_KEY = 'auth/session';
+const STORAGE_KEY = 'auth/user';
 
 export const AuthContext = createContext({
   user: null,
-  token: null,
   isAuthenticated: false,
   login: async () => {},
   logout: () => {},
@@ -19,7 +14,7 @@ export const AuthContext = createContext({
   clearError: () => {},
 });
 
-function readStoredSession() {
+function readStoredUser() {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return null;
   }
@@ -27,7 +22,8 @@ function readStoredSession() {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    if (parsed?.token && parsed?.user) {
+    // On ne stocke plus que les infos user, pas le token
+    if (parsed?.id && parsed?.username) {
       return parsed;
     }
   } catch (error) {
@@ -37,31 +33,35 @@ function readStoredSession() {
 }
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(() => readStoredSession());
+  const [user, setUser] = useState(() => readStoredUser());
   const [initializing, setInitializing] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const handler = () => setSession(null);
+    const handler = () => {
+      setUser(null);
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    };
     registerUnauthorizedHandler(handler);
     return () => registerUnauthorizedHandler(null);
   }, []);
 
   useEffect(() => {
-    if (session?.token) {
-      setAccessToken(session.token);
+    // Persister uniquement les infos user (pas de token côté JS)
+    if (user) {
       if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
       }
     } else {
-      clearAccessToken();
       if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
         localStorage.removeItem(STORAGE_KEY);
       }
     }
     setInitializing(false);
-  }, [session]);
+  }, [user]);
 
   const login = useCallback(async ({ username, password, tenant }) => {
     setLoading(true);
@@ -72,20 +72,19 @@ export function AuthProvider({ children }) {
       body.set('username', username);
       body.set('password', password);
       body.set('tenant', tenant);
-      const response = await api.post('/auth/token', body, {
+      // Utilise /auth/login qui set les cookies HTTP-Only
+      const response = await api.post('/auth/login', body, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       });
-      // API returns wrapped response: { success, data: { access_token, user }, error, meta }
+      // API returns: { message, expires_in, user } - pas de token dans la réponse
       const payload = response.data?.data ?? response.data;
-      const nextSession = { token: payload.access_token, user: payload.user };
-      setAccessToken(nextSession.token);
+      const userInfo = payload.user;
       if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(userInfo));
       }
-      setSession(nextSession);
+      setUser(userInfo);
       return payload;
     } catch (authError) {
-      // Handle wrapped error response: { success: false, error: { message } }
       const errorData = authError?.response?.data;
       const detail = errorData?.error?.message ?? errorData?.detail ?? 'Authentification impossible';
       setError(detail);
@@ -95,9 +94,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    setSession(null);
-    clearAccessToken();
+  const logout = useCallback(async () => {
+    try {
+      // Appel backend pour supprimer les cookies HTTP-Only
+      await api.post('/auth/logout');
+    } catch (err) {
+      console.warn('Erreur lors du logout:', err);
+    }
+    setUser(null);
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -105,9 +109,8 @@ export function AuthProvider({ children }) {
 
   const value = useMemo(
     () => ({
-      user: session?.user ?? null,
-      token: session?.token ?? null,
-      isAuthenticated: Boolean(session?.token),
+      user,
+      isAuthenticated: Boolean(user),
       initializing,
       login,
       logout,
@@ -115,7 +118,7 @@ export function AuthProvider({ children }) {
       error,
       clearError: () => setError(null),
     }),
-    [error, loading, login, logout, session, initializing],
+    [error, loading, login, logout, user, initializing],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

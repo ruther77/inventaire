@@ -16,7 +16,7 @@ from datetime import datetime, date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from pydantic import BaseModel, Field
 
-from backend.dependencies.tenant import Tenant, get_current_tenant
+from backend.dependencies.tenant import Tenant, get_current_tenant, get_current_tenant_or_default
 from core.data_repository import query_df, exec_sql
 from core.finance.bank_reconciliation import (
     BankReconciliationEngine,
@@ -109,9 +109,8 @@ class CreateAliasRequest(BaseModel):
 def _get_transactions_for_reconciliation(tenant_id: int, days: int = 60) -> List[dict]:
     """Récupère les transactions à rapprocher depuis finance_transactions.
 
-    Note: finance_transactions utilise entity_id (pas tenant_id).
+    Note: Récupère toutes les transactions (entity_id 2 et 3) pour le rapprochement global.
     """
-    entity_id = 2 if tenant_id == 4 else tenant_id
     sql = """
         SELECT
             ft.id,
@@ -120,41 +119,39 @@ def _get_transactions_for_reconciliation(tenant_id: int, days: int = 60) -> List
             ft.label,
             NULL as category,
             CASE WHEN fr.id IS NOT NULL THEN true ELSE false END as reconciled,
-            NULL as reconciled_invoice_id
+            NULL as reconciled_invoice_id,
+            ft.entity_id
         FROM finance_transactions ft
         LEFT JOIN finance_reconciliations fr ON fr.transaction_id = ft.id
-        WHERE ft.entity_id = :entity_id
-          AND ft.date_operation >= CURRENT_DATE - :days * INTERVAL '1 day'
+        WHERE ft.date_operation >= CURRENT_DATE - :days * INTERVAL '1 day'
           AND ft.direction = 'OUT'  -- Dépenses uniquement
         ORDER BY ft.date_operation DESC
     """
-    df = query_df(sql, params={"entity_id": entity_id, "days": days})
+    df = query_df(sql, params={"days": days})
     return df.to_dict('records') if not df.empty else []
 
 
 def _get_invoices_for_reconciliation(tenant_id: int, days: int = 90) -> List[dict]:
-    """Récupère les factures à rapprocher depuis finance_invoices_supplier.
+    """Récupère les factures à rapprocher depuis processed_invoices.
 
-    Note: finance_invoices_supplier utilise entity_id (pas tenant_id).
+    Note: processed_invoices a tenant_id=1 pour toutes les factures (Épicerie).
+    On récupère toutes les factures peu importe le tenant pour le rapprochement.
     """
-    entity_id = 2 if tenant_id == 4 else tenant_id
     sql = """
         SELECT
-            i.id,
-            i.invoice_number,
-            i.date_invoice as date,
-            i.montant_ttc as amount,
-            i.vendor_id as supplier_id,
-            v.name as supplier_name,
-            CASE WHEN i.status = 'PAID' THEN true ELSE false END as paid,
+            pi.id,
+            pi.invoice_id as invoice_number,
+            pi.facture_date::date as date,
+            pi.total_ttc as amount,
+            NULL as supplier_id,
+            pi.supplier as supplier_name,
+            false as paid,
             NULL as payment_date
-        FROM finance_invoices_supplier i
-        LEFT JOIN finance_vendors v ON v.id = i.vendor_id
-        WHERE i.entity_id = :entity_id
-          AND i.date_invoice >= CURRENT_DATE - :days * INTERVAL '1 day'
-        ORDER BY i.date_invoice DESC
+        FROM processed_invoices pi
+        WHERE pi.facture_date::date >= CURRENT_DATE - :days * INTERVAL '1 day'
+        ORDER BY pi.facture_date DESC
     """
-    df = query_df(sql, params={"entity_id": entity_id, "days": days})
+    df = query_df(sql, params={"days": days})
     return df.to_dict('records') if not df.empty else []
 
 
@@ -194,7 +191,7 @@ def _fuzzy_amount_match(amount1: float, amount2: float, tolerance: float = 0.03)
 def run_reconciliation(
     days_back: int = Query(default=60, ge=1, le=180),
     auto_confirm_threshold: float = Query(default=0.95, ge=0.5, le=1.0),
-    tenant: Tenant = Depends(get_current_tenant)
+    tenant: Tenant = Depends(get_current_tenant_or_default)
 ):
     """
     Lance le rapprochement bancaire automatique.
@@ -359,16 +356,16 @@ def run_reconciliation(
 
 @router.get("/unmatched/transactions", response_model=List[UnmatchedTransactionResponse])
 def get_unmatched_transactions(
-    days_back: int = Query(default=60, ge=1, le=180),
+    days_back: int = Query(default=365, ge=1, le=730),
     min_amount: float = Query(default=0, ge=0),
-    tenant: Tenant = Depends(get_current_tenant)
+    tenant: Tenant = Depends(get_current_tenant_or_default)
 ):
     """
-    Retourne les transactions non rapprochées avec suggestions de matches.
+    Retourne les transactions non rapprochées AVEC FACTURES.
 
-    Note: Utilise finance_transactions avec entity_id.
+    Une transaction est considérée non rapprochée si elle n'a pas de invoice_id
+    dans finance_reconciliations.
     """
-    entity_id = 2 if tenant.id == 4 else tenant.id
     sql = """
         SELECT
             ft.id as transaction_id,
@@ -378,15 +375,14 @@ def get_unmatched_transactions(
             NULL as category,
             CURRENT_DATE - ft.date_operation::date as days_unmatched
         FROM finance_transactions ft
-        LEFT JOIN finance_reconciliations fr ON fr.transaction_id = ft.id
-        WHERE ft.entity_id = :entity_id
-          AND ft.date_operation >= CURRENT_DATE - :days * INTERVAL '1 day'
+        LEFT JOIN finance_reconciliations fr ON fr.transaction_id = ft.id AND fr.invoice_id IS NOT NULL
+        WHERE ft.date_operation >= CURRENT_DATE - :days * INTERVAL '1 day'
           AND ft.direction = 'OUT'
-          AND fr.id IS NULL  -- Non rapproché
-          AND CAST(ft.amount AS NUMERIC) >= :min_amount
+          AND fr.id IS NULL  -- Pas de rapprochement avec facture
+          AND ABS(CAST(ft.amount AS NUMERIC)) >= :min_amount
         ORDER BY ft.date_operation DESC
     """
-    df = query_df(sql, params={"entity_id": entity_id, "days": days_back, "min_amount": min_amount})
+    df = query_df(sql, params={"days": days_back, "min_amount": min_amount})
 
     if df.empty:
         return []
@@ -439,31 +435,27 @@ def get_unmatched_transactions(
 
 @router.get("/unmatched/invoices", response_model=List[UnmatchedInvoiceResponse])
 def get_unmatched_invoices(
-    days_back: int = Query(default=90, ge=1, le=365),
-    tenant: Tenant = Depends(get_current_tenant)
+    days_back: int = Query(default=365, ge=1, le=730),
+    tenant: Tenant = Depends(get_current_tenant_or_default)
 ):
     """
     Retourne les factures non payées/non rapprochées.
 
-    Note: Utilise finance_invoices_supplier avec entity_id.
+    Note: Utilise processed_invoices avec tenant_id.
     """
-    entity_id = 2 if tenant.id == 4 else tenant.id
     sql = """
         SELECT
-            i.id as invoice_id,
-            i.invoice_number,
-            i.date_invoice as date,
-            i.montant_ttc as amount,
-            v.name as supplier_name,
-            CURRENT_DATE - i.date_invoice::date as days_unpaid
-        FROM finance_invoices_supplier i
-        LEFT JOIN finance_vendors v ON v.id = i.vendor_id
-        WHERE i.entity_id = :entity_id
-          AND i.date_invoice >= CURRENT_DATE - :days * INTERVAL '1 day'
-          AND i.status NOT IN ('PAID', 'CANCELLED')
-        ORDER BY i.date_invoice
+            pi.id as invoice_id,
+            pi.invoice_id as invoice_number,
+            pi.facture_date::date as date,
+            pi.total_ttc as amount,
+            pi.supplier as supplier_name,
+            CURRENT_DATE - pi.facture_date::date as days_unpaid
+        FROM processed_invoices pi
+        WHERE pi.facture_date::date >= CURRENT_DATE - :days * INTERVAL '1 day'
+        ORDER BY pi.facture_date
     """
-    df = query_df(sql, params={"entity_id": entity_id, "days": days_back})
+    df = query_df(sql, params={"days": days_back})
 
     if df.empty:
         return []
@@ -508,84 +500,52 @@ def get_unmatched_invoices(
 @router.post("/match/manual")
 def create_manual_match(
     request: ManualMatchRequest,
-    tenant: Tenant = Depends(get_current_tenant)
+    tenant: Tenant = Depends(get_current_tenant_or_default)
 ):
     """
     Crée un rapprochement manuel entre une transaction et une ou plusieurs factures.
-    Note: Utilise finance_transactions avec entity_id (pas tenant_id).
+    Met à jour la colonne invoice_id dans finance_reconciliations existante.
     """
-    entity_id = 2 if tenant.id == 4 else tenant.id
-
-    # Vérifier la transaction dans finance_transactions
+    # Vérifier la transaction
     txn_sql = """
-        SELECT id, CAST(amount AS NUMERIC) as montant, label as libelle
-        FROM finance_transactions
-        WHERE id = :txn_id AND entity_id = :entity_id
+        SELECT ft.id, CAST(ft.amount AS NUMERIC) as montant, ft.label as libelle, fr.id as reco_id
+        FROM finance_transactions ft
+        LEFT JOIN finance_reconciliations fr ON fr.transaction_id = ft.id
+        WHERE ft.id = :txn_id
     """
-    txn_df = query_df(txn_sql, params={"txn_id": request.transaction_id, "entity_id": entity_id})
+    txn_df = query_df(txn_sql, params={"txn_id": request.transaction_id})
 
     if txn_df.empty:
         raise HTTPException(status_code=404, detail="Transaction non trouvée")
 
-    # Vérifier les factures dans finance_invoices_supplier
+    # Vérifier les factures dans processed_invoices
     inv_sql = """
-        SELECT id, montant_ttc as total_ttc, vendor_id as supplier_id
-        FROM finance_invoices_supplier
-        WHERE id = ANY(:ids) AND entity_id = :entity_id
+        SELECT id, total_ttc, supplier
+        FROM processed_invoices
+        WHERE id = ANY(:ids)
     """
-    inv_df = query_df(inv_sql, params={"ids": request.invoice_ids, "entity_id": entity_id})
+    inv_df = query_df(inv_sql, params={"ids": request.invoice_ids})
 
     if len(inv_df) != len(request.invoice_ids):
         raise HTTPException(status_code=404, detail="Une ou plusieurs factures non trouvées")
 
-    # Créer l'entrée de rapprochement dans finance_reconciliations
-    for invoice_id in request.invoice_ids:
-        reconcile_sql = """
-            INSERT INTO finance_reconciliations (transaction_id, invoice_id, matched_at, match_type)
-            VALUES (:txn_id, :invoice_id, NOW(), 'manual')
-            ON CONFLICT (transaction_id, invoice_id) DO NOTHING
-        """
-        try:
-            exec_sql(reconcile_sql, params={
+    # Mettre à jour le rapprochement existant avec invoice_id
+    reco_id = txn_df.iloc[0]['reco_id']
+    if reco_id:
+        # Mettre à jour le rapprochement existant
+        for invoice_id in request.invoice_ids:
+            update_sql = """
+                UPDATE finance_reconciliations
+                SET invoice_id = :invoice_id, status = 'MANUAL'
+                WHERE transaction_id = :txn_id
+            """
+            exec_sql(update_sql, params={
                 "txn_id": request.transaction_id,
                 "invoice_id": invoice_id
             })
-        except Exception:
-            pass  # Ignore si déjà rapproché
-
-    # Marquer les factures comme payées
-    update_inv_sql = """
-        UPDATE finance_invoices_supplier
-        SET status = 'PAID'
-        WHERE id = ANY(:ids) AND entity_id = :entity_id
-    """
-    exec_sql(update_inv_sql, params={
-        "ids": request.invoice_ids,
-        "entity_id": entity_id
-    })
-
-    # Apprendre l'alias si possible
-    txn_label = txn_df.iloc[0]['libelle']
-    supplier_id = int(inv_df.iloc[0]['supplier_id']) if inv_df.iloc[0]['supplier_id'] else None
-
-    if supplier_id and txn_label:
-        # Vérifier si alias existe déjà
-        alias_sql = """
-            INSERT INTO supplier_bank_aliases (tenant_id, bank_label, supplier_id, confidence, match_count)
-            VALUES (:tenant_id, :label, :supplier_id, 0.8, 1)
-            ON CONFLICT (tenant_id, bank_label) DO UPDATE
-            SET match_count = supplier_bank_aliases.match_count + 1,
-                confidence = LEAST(0.99, supplier_bank_aliases.confidence + 0.02),
-                last_used = NOW()
-        """
-        try:
-            exec_sql(alias_sql, params={
-                "tenant_id": tenant.id,
-                "label": txn_label.upper()[:100],
-                "supplier_id": supplier_id
-            })
-        except Exception:
-            pass  # Ignore si table n'existe pas encore
+    else:
+        # Pas de rapprochement existant - ne devrait pas arriver mais on gère le cas
+        raise HTTPException(status_code=400, detail="Transaction sans ligne bancaire associée")
 
     return {
         "status": "matched",
@@ -597,7 +557,7 @@ def create_manual_match(
 
 @router.get("/aliases", response_model=List[SupplierAliasResponse])
 def get_supplier_aliases(
-    tenant: Tenant = Depends(get_current_tenant)
+    tenant: Tenant = Depends(get_current_tenant_or_default)
 ):
     """
     Retourne les alias fournisseurs appris pour le rapprochement automatique.
@@ -644,7 +604,7 @@ def get_supplier_aliases(
 @router.post("/aliases")
 def create_supplier_alias(
     request: CreateAliasRequest,
-    tenant: Tenant = Depends(get_current_tenant)
+    tenant: Tenant = Depends(get_current_tenant_or_default)
 ):
     """
     Crée un nouvel alias fournisseur pour le rapprochement automatique.
@@ -676,7 +636,7 @@ def create_supplier_alias(
 @router.delete("/aliases/{alias_id}")
 def delete_supplier_alias(
     alias_id: int,
-    tenant: Tenant = Depends(get_current_tenant)
+    tenant: Tenant = Depends(get_current_tenant_or_default)
 ):
     """
     Supprime un alias fournisseur.
@@ -693,31 +653,26 @@ def delete_supplier_alias(
 @router.get("/summary", response_model=ReconciliationSummaryResponse)
 def get_reconciliation_summary(
     days_back: int = Query(default=30, ge=1, le=180),
-    tenant: Tenant = Depends(get_current_tenant)
+    tenant: Tenant = Depends(get_current_tenant_or_default)
 ):
     """
-    Résumé du rapprochement bancaire.
+    Résumé du rapprochement bancaire avec FACTURES.
 
-    Note: Utilise finance_transactions avec entity_id (pas tenant_id).
-    Le rapprochement est tracké via finance_reconciliations.
+    Une transaction est rapprochée si elle a un invoice_id dans finance_reconciliations.
     """
-    # Mapper tenant vers entity
-    entity_id = 2 if tenant.id == 4 else tenant.id
-
-    # Stats transactions (finance_transactions utilise entity_id)
+    # Stats transactions - rapprochement avec factures
     txn_sql = """
         SELECT
             COUNT(*) as total,
-            COUNT(*) FILTER (WHERE fr.id IS NOT NULL) as matched,
+            COUNT(*) FILTER (WHERE fr.invoice_id IS NOT NULL) as matched,
             COALESCE(SUM(ABS(CAST(ft.amount AS NUMERIC))), 0) as total_amount,
-            COALESCE(SUM(ABS(CAST(ft.amount AS NUMERIC))) FILTER (WHERE fr.id IS NOT NULL), 0) as matched_amount
+            COALESCE(SUM(ABS(CAST(ft.amount AS NUMERIC))) FILTER (WHERE fr.invoice_id IS NOT NULL), 0) as matched_amount
         FROM finance_transactions ft
         LEFT JOIN finance_reconciliations fr ON fr.transaction_id = ft.id
-        WHERE ft.entity_id = :entity_id
-          AND ft.date_operation >= CURRENT_DATE - :days * INTERVAL '1 day'
+        WHERE ft.date_operation >= CURRENT_DATE - :days * INTERVAL '1 day'
           AND ft.direction = 'OUT'
     """
-    txn_df = query_df(txn_sql, params={"entity_id": entity_id, "days": days_back})
+    txn_df = query_df(txn_sql, params={"days": days_back})
 
     total = int(txn_df.iloc[0]['total'] or 0) if not txn_df.empty else 0
     matched = int(txn_df.iloc[0]['matched'] or 0) if not txn_df.empty else 0
@@ -733,15 +688,14 @@ def get_reconciliation_summary(
     if total - matched > 20:
         alerts.append(f"{total - matched} transactions non rapprochées")
 
-    # Factures impayées anciennes (finance_invoices_supplier utilise entity_id)
+    # Factures impayées anciennes (toutes entités)
     old_invoices_sql = """
         SELECT COUNT(*) as count
         FROM finance_invoices_supplier
-        WHERE entity_id = :entity_id
-          AND date_invoice < CURRENT_DATE - INTERVAL '30 days'
+        WHERE date_invoice < CURRENT_DATE - INTERVAL '30 days'
           AND status NOT IN ('PAID', 'CANCELLED')
     """
-    old_df = query_df(old_invoices_sql, params={"entity_id": entity_id})
+    old_df = query_df(old_invoices_sql, params={})
     old_count = int(old_df.iloc[0]['count'] or 0) if not old_df.empty else 0
 
     if old_count > 0:

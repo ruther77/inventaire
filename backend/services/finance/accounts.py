@@ -173,13 +173,13 @@ def delete_account(account_id: int) -> bool:
         ).fetchone()
 
         if has_data:
-            # Soft delete: désactiver le compte
+            # Suppression logique : désactiver le compte
             conn.execute(
                 text("UPDATE finance_accounts SET is_active = false, updated_at = now() WHERE id = :account_id"),
                 {"account_id": account_id},
             )
         else:
-            # Hard delete: supprimer le compte
+            # Suppression définitive : supprimer le compte
             conn.execute(
                 text("DELETE FROM finance_accounts WHERE id = :account_id"),
                 {"account_id": account_id},

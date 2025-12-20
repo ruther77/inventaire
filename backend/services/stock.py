@@ -1,4 +1,4 @@
-"""Stock analytics and adjustments."""
+"""Services d'analytics et d'ajustements de stock."""
 
 from __future__ import annotations
 
@@ -135,7 +135,7 @@ def adjust_stock_level(
             payload,
         )
 
-    # Trigger updates stock_actuel; fetch new value
+    # Le trigger met à jour stock_actuel ; on récupère la nouvelle valeur
     with engine.connect() as conn:
         new_row = conn.execute(
             text("SELECT COALESCE(stock_actuel, 0) FROM produits WHERE id = :pid AND tenant_id = :tenant_id"),

@@ -1,4 +1,4 @@
-"""Reusable dependency to resolve the current tenant from request headers."""
+"""Dépendance réutilisable pour déterminer le tenant courant via les en-têtes."""
 
 from __future__ import annotations
 
@@ -74,11 +74,11 @@ def resolve_tenant(identifier: Optional[str | int]) -> Tenant | None:
 
 
 async def get_current_tenant(request: Request) -> Tenant:
-    """Get current tenant from authenticated user (supports cookies and bearer).
+    """Récupère le tenant courant depuis l'utilisateur authentifié (cookies ou bearer).
 
-    This dependency extracts the user from either:
-    - httpOnly cookie (preferred for browsers)
-    - Authorization: Bearer header (for API clients)
+    Cette dépendance extrait l'utilisateur depuis :
+    - le cookie httpOnly (préféré pour les navigateurs)
+    - l'en-tête Authorization: Bearer (pour les clients API)
     """
     user = get_current_user_from_request(request)
     tenant = resolve_tenant(user.tenant_id)
@@ -116,3 +116,82 @@ async def get_current_tenant_or_default(request: Request) -> Tenant:
     )
     tenant = resolve_tenant(tenant_identifier)
     return tenant or DEFAULT_TENANT
+
+
+# ============================================================================
+# TENANTS FIXES PAR MODULE
+# ============================================================================
+
+# Tenants prédéfinis (correspondent aux données en base)
+RESTAURANT_TENANT = Tenant(id=2, code="restaurant", name="Restaurant HQ")
+TRESORERIE_TENANT = Tenant(id=3, code="tresorerie", name="Trésorerie HQ")
+INTELLIGENCE_TENANT = Tenant(id=4, code="intelligence", name="Intelligence")
+
+
+async def get_restaurant_tenant(request: Request) -> Tenant:
+    """
+    Dépendance pour le module restaurant.
+    Retourne toujours le tenant restaurant (id=2).
+    N'exige pas d'authentification pour permettre l'accès aux données restaurant.
+    """
+    # Toujours retourner le tenant restaurant, sans vérifier l'auth
+    return RESTAURANT_TENANT
+
+
+async def get_restaurant_tenant_strict(request: Request) -> Tenant:
+    """
+    Dépendance pour le module restaurant avec authentification obligatoire.
+    Vérifie l'authentification mais utilise toujours le tenant restaurant (id=2).
+    """
+    user = get_current_user_from_request(request)
+    return RESTAURANT_TENANT
+
+
+async def get_intelligence_tenant(request: Request) -> Tenant:
+    """
+    Dépendance pour le module intelligence/scoring.
+    Vérifie l'authentification mais utilise toujours le tenant intelligence (id=4).
+    """
+    user = get_current_user_from_request(request)
+    return INTELLIGENCE_TENANT
+
+
+async def get_epicerie_tenant(request: Request) -> Tenant:
+    """
+    Dépendance pour le module épicerie (operations, catalogue, etc.).
+    Vérifie l'authentification mais utilise toujours le tenant epicerie (id=1).
+    """
+    user = get_current_user_from_request(request)
+    return DEFAULT_TENANT
+
+
+async def get_tenant_by_route(request: Request) -> Tenant:
+    """
+    Dépendance intelligente qui détermine le tenant selon la route.
+    /restaurant/* -> tenant 2
+    /supplier-scoring/* -> tenant 1 (epicerie - pour les fournisseurs)
+    /intelligence/* -> tenant 4
+    Autres -> tenant du token JWT
+    """
+    path = request.url.path.lower()
+
+    # Vérifier l'authentification d'abord
+    user = get_current_user_from_request(request)
+
+    # Router vers le bon tenant selon le path
+    if path.startswith("/restaurant"):
+        return RESTAURANT_TENANT
+    elif path.startswith("/supplier-scoring"):
+        # Les fournisseurs sont dans epicerie
+        return DEFAULT_TENANT
+    elif path.startswith("/intelligence") or path.startswith("/forecasting") or path.startswith("/anomaly"):
+        return INTELLIGENCE_TENANT
+
+    # Par défaut, utiliser le tenant du token
+    tenant = resolve_tenant(user.tenant_id)
+    if tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant introuvable",
+        )
+    return tenant

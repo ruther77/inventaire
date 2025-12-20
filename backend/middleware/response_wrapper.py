@@ -111,6 +111,15 @@ def build_error_response(
     }
 
 
+def _copy_headers_preserving_duplicates(source_response: Response, target_response: Response) -> None:
+    """Copy headers from source to target, preserving duplicates like multiple Set-Cookie."""
+    for key, value in source_response.headers.raw:
+        key_str = key.decode("latin-1") if isinstance(key, bytes) else key
+        value_str = value.decode("latin-1") if isinstance(value, bytes) else value
+        if key_str.lower() not in ("content-length", "content-type"):
+            target_response.headers.append(key_str, value_str)
+
+
 class ResponseWrapperMiddleware(BaseHTTPMiddleware):
     """
     Middleware de standardisation des réponses.
@@ -161,12 +170,13 @@ class ResponseWrapperMiddleware(BaseHTTPMiddleware):
 
         # Déterminer si c'est déjà wrappé
         if self._is_already_wrapped(original_data):
-            return Response(
+            new_response = Response(
                 content=body,
                 status_code=response.status_code,
-                headers=dict(response.headers),
                 media_type="application/json",
             )
+            _copy_headers_preserving_duplicates(response, new_response)
+            return new_response
 
         # Wrapper la réponse
         if response.status_code >= 400:
@@ -174,18 +184,21 @@ class ResponseWrapperMiddleware(BaseHTTPMiddleware):
         elif not self.wrap_errors_only:
             wrapped = self._wrap_success(original_data, response.status_code)
         else:
-            return Response(
+            new_response = Response(
                 content=body,
                 status_code=response.status_code,
-                headers=dict(response.headers),
                 media_type="application/json",
             )
+            _copy_headers_preserving_duplicates(response, new_response)
+            return new_response
 
-        return JSONResponse(
+        # Construire une nouvelle réponse en préservant tous les en-têtes, y compris les Set-Cookie multiples
+        json_response = JSONResponse(
             content=wrapped,
             status_code=response.status_code,
-            headers={k: v for k, v in response.headers.items() if k.lower() != "content-length"},
         )
+        _copy_headers_preserving_duplicates(response, json_response)
+        return json_response
 
     def _is_already_wrapped(self, data: Any) -> bool:
         """Vérifie si la réponse est déjà au format standardisé."""

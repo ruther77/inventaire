@@ -81,7 +81,7 @@ export function WeeklyFlowsChart({
         />
       }
     >
-      <div className="h-64">
+      <div className="h-64" key={`weekly-chart-${window}`}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
@@ -178,7 +178,7 @@ export function CategoryStockChart({ data, loading = false, limit = 6 }) {
 
   return (
     <ChartContainer title="Stocks par catégorie" subtitle="Mix catalogue">
-      <div className="h-64">
+      <div className="h-64" key={`category-chart-${limit}`}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}

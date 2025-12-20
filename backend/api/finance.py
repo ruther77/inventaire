@@ -1,12 +1,13 @@
-"""Finance endpoints (reconciliation, anomalies, etc.)."""
+"""Endpoints finance (rapprochements, anomalies, etc.)."""
 
 from __future__ import annotations
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi import UploadFile, File
+from pydantic import BaseModel
 
-from backend.dependencies.tenant import Tenant, get_current_tenant
+from backend.dependencies.tenant import Tenant, get_current_tenant, get_current_tenant_or_default
 from backend.services.finance import core as finance_service
 from backend.services.finance import accounts as finance_accounts
 from backend.services.finance import transactions as finance_transactions
@@ -23,8 +24,6 @@ from backend.services.finance import categories as finance_categories
 from backend.services.finance import cost_centers as finance_cost_centers
 from backend.services.finance import transaction_lines as finance_tx_lines
 from backend.services.importers import bank_statement_csv
-from core.parsers.releve_pdf import parse_bank_pdf  # fallback parser PDF
-from core.parsers.releve_pdf import parse_bank_pdf
 from backend.schemas.finance import (
     FinanceMatch,
     FinanceMatchStatusRequest,
@@ -65,7 +64,7 @@ logger = logging.getLogger(__name__)
 @router.post("/accounts")
 def create_account(
     payload: FinanceAccountCreate,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_accounts.create_account(payload)
@@ -77,7 +76,7 @@ def create_account(
 def list_accounts(
     entity_id: int | None = Query(default=None),
     is_active: bool | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
     return finance_accounts.list_accounts(entity_id=entity_id, is_active=is_active)
 
@@ -85,15 +84,16 @@ def list_accounts(
 @router.get("/accounts/overview")
 def accounts_overview(
     entity_id: int | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
+    # Si aucun entity_id n'est fourni, renvoyer tous les comptes (pas de filtre)
     return finance_stats.accounts_overview(entity_id=entity_id)
 
 
 @router.get("/accounts/{account_id}")
 def get_account(
     account_id: int,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     account = finance_accounts.get_account(account_id)
     if not account:
@@ -105,7 +105,7 @@ def get_account(
 def update_account(
     account_id: int,
     payload: dict,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_accounts.update_account(account_id, payload)
@@ -116,7 +116,7 @@ def update_account(
 @router.delete("/accounts/{account_id}")
 def delete_account(
     account_id: int,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         finance_accounts.delete_account(account_id)
@@ -131,7 +131,7 @@ def delete_account(
 @router.post("/transactions")
 def create_transaction(
     payload: FinanceTransactionCreate,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_transactions.create_transaction(payload)
@@ -146,7 +146,7 @@ def list_transactions(
     status_filter: str | None = Query(default=None, alias="status"),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
     return finance_transactions.list_transactions(
         entity_id=entity_id,
@@ -158,7 +158,7 @@ def list_transactions(
 
 
 @router.get("/transactions/search", response_model=FinanceTransactionSearchResponse)
-def search_transactions(
+async def search_transactions(
     entity_id: int | None = Query(default=None),
     account_id: int | None = Query(default=None),
     category_id: int | None = Query(default=None),
@@ -170,7 +170,7 @@ def search_transactions(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=500),
     sort: str = Query(default="-date_operation", description="date_operation|amount|category|account avec - pour desc"),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> FinanceTransactionSearchResponse:
     return finance_transactions.search_transactions(
         entity_id=entity_id,
@@ -191,7 +191,7 @@ def search_transactions(
 def update_transaction(
     transaction_id: int,
     payload: FinanceTransactionUpdate,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_transactions.update_transaction(transaction_id, payload)
@@ -202,7 +202,7 @@ def update_transaction(
 @router.post("/transactions/{transaction_id}/lock")
 def lock_transaction(
     transaction_id: int,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_transactions.lock_transaction(transaction_id)
@@ -216,7 +216,7 @@ def lock_transaction(
 @router.post("/vendors")
 def create_vendor(
     payload: FinanceVendorCreate,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_invoices.create_vendor(payload)
@@ -228,7 +228,7 @@ def create_vendor(
 def list_vendors(
     entity_id: int | None = Query(default=None),
     is_active: bool | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
     return finance_invoices.list_vendors(entity_id=entity_id, is_active=is_active)
 
@@ -236,7 +236,7 @@ def list_vendors(
 @router.post("/invoices")
 def create_invoice(
     payload: FinanceInvoiceCreate,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_invoices.create_invoice(payload)
@@ -254,7 +254,7 @@ def search_invoices(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=500),
     sort: str = Query(default="-date_invoice", description="date_invoice|date_due|montant_ttc|vendor|status avec - pour desc"),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> FinanceInvoiceSearchResponse:
     result = finance_invoices.search_invoices(
         entity_id=entity_id,
@@ -272,7 +272,7 @@ def search_invoices(
 @router.post("/payments")
 def create_payment(
     payload: FinancePaymentCreate,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_invoices.create_payment(payload)
@@ -287,7 +287,7 @@ def create_payment(
 def suggest_autre_top(
     entity_id: int | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[FinanceAutreSuggestion]:
     return finance_transactions.suggest_autre_top(entity_id=entity_id, limit=limit)
 
@@ -296,7 +296,7 @@ def suggest_autre_top(
 def list_categories(
     entity_id: int | None = Query(default=None),
     is_active: bool | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
     return finance_categories.list_categories(entity_id=entity_id, is_active=is_active)
 
@@ -304,7 +304,7 @@ def list_categories(
 @router.post("/categories")
 def create_category(
     payload: FinanceCategoryCreate,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_categories.create_category(
@@ -324,7 +324,7 @@ def create_category(
 def list_cost_centers(
     entity_id: int | None = Query(default=None),
     is_active: bool | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
     return finance_cost_centers.list_cost_centers(entity_id=entity_id, is_active=is_active)
 
@@ -332,7 +332,7 @@ def list_cost_centers(
 @router.post("/cost-centers")
 def create_cost_center(
     payload: FinanceCostCenterCreate,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_cost_centers.create_cost_center(
@@ -349,7 +349,7 @@ def autocomplete_categories(
     q: str = Query(default="", description="Search query for category suggestions"),
     entity_id: int | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
     if not q:
         return []
@@ -359,7 +359,7 @@ def autocomplete_categories(
 @router.post("/transactions/batch-categorize")
 def batch_categorize_transactions(
     payload: FinanceBatchCategorizeRequest,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_transactions.batch_categorize(payload)
@@ -374,13 +374,13 @@ def batch_categorize_transactions(
 def list_rules(
     entity_id: int | None = Query(default=None),
     is_active: bool | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[FinanceRule]:
     return finance_rules.list_rules(entity_id=entity_id, is_active=is_active)
 
 
 @router.post("/rules", response_model=FinanceRule)
-def create_rule(payload: FinanceRuleCreate, tenant: Tenant = Depends(get_current_tenant)) -> FinanceRule:
+def create_rule(payload: FinanceRuleCreate, tenant: Tenant = Depends(get_current_tenant_or_default)) -> FinanceRule:
     return finance_rules.create_rule(payload)
 
 
@@ -388,7 +388,7 @@ def create_rule(payload: FinanceRuleCreate, tenant: Tenant = Depends(get_current
 def update_rule(
     rule_id: int,
     payload: dict,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> FinanceRule:
     try:
         return finance_rules.update_rule(rule_id, payload)
@@ -397,7 +397,7 @@ def update_rule(
 
 
 @router.delete("/rules/{rule_id}")
-def delete_rule(rule_id: int, tenant: Tenant = Depends(get_current_tenant)) -> dict:
+def delete_rule(rule_id: int, tenant: Tenant = Depends(get_current_tenant_or_default)) -> dict:
     try:
         return finance_rules.delete_rule(rule_id)
     except ValueError as exc:
@@ -405,12 +405,12 @@ def delete_rule(rule_id: int, tenant: Tenant = Depends(get_current_tenant)) -> d
 
 
 @router.get("/imports")
-def list_imports(tenant: Tenant = Depends(get_current_tenant)) -> list[dict]:
+def list_imports(tenant: Tenant = Depends(get_current_tenant_or_default)) -> list[dict]:
     return finance_imports.list_imports()
 
 
 @router.post("/deduplicate")
-def deduplicate_finance(tenant: Tenant = Depends(get_current_tenant)) -> dict:
+def deduplicate_finance(tenant: Tenant = Depends(get_current_tenant_or_default)) -> dict:
     """Supprime les doublons (date+montant) sur transactions et lignes de relevés."""
     tx = finance_dedupe.dedupe_transactions()
     stmt = finance_dedupe.dedupe_statement_lines()
@@ -420,7 +420,7 @@ def deduplicate_finance(tenant: Tenant = Depends(get_current_tenant)) -> dict:
 @router.post("/transactions/mark-incomplete")
 def mark_transactions_incomplete(
     transaction_ids: list[int],
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     """Crée des transaction_lines par défaut et marque les transactions comme 'incomplètes' (data_quality_flags)."""
     return finance_tx_lines.mark_incomplete(transaction_ids)
@@ -432,7 +432,7 @@ def mark_transactions_incomplete(
 @router.get("/categories/stats")
 def categories_stats(
     entity_id: int | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
     return finance_stats.categories_stats(entity_id=entity_id)
 
@@ -440,14 +440,14 @@ def categories_stats(
 @router.get("/dashboard/summary")
 def finance_dashboard_summary(
     entity_id: int | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     return finance_dashboard.dashboard_summary(entity_id=entity_id)
 
 
 @router.post("/stats/refresh")
 def refresh_stats_cache(
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     """Rafraîchit les vues matérialisées des stats finance."""
     return finance_stats.refresh_materialized_views()
@@ -458,9 +458,10 @@ def get_timeline_stats(
     entity_id: int | None = Query(default=None),
     months: int | None = Query(default=12, description="Nombre de mois (null=tout)"),
     granularity: str = Query(default="monthly", description="daily|weekly|monthly"),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
     """Retourne la chronologie agrégée des flux pour les graphiques."""
+    # Si aucun entity_id n'est fourni, renvoyer les données toutes entités confondues
     return finance_stats.timeline_stats(
         entity_id=entity_id,
         months=months,
@@ -473,9 +474,10 @@ def get_category_breakdown(
     entity_id: int | None = Query(default=None),
     months: int | None = Query(default=12, description="Nombre de mois (null=tout)"),
     direction: str | None = Query(default=None, description="IN|OUT|null pour les deux"),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
     """Retourne la répartition par catégorie pour les pie/bar charts."""
+    # Si aucun entity_id n'est fourni, renvoyer les données toutes entités confondues
     return finance_stats.category_breakdown(
         entity_id=entity_id,
         months=months,
@@ -486,9 +488,10 @@ def get_category_breakdown(
 @router.get("/stats/treasury")
 def get_treasury_summary(
     entity_id: int | None = Query(default=None),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     """Retourne un résumé de trésorerie (totaux, solde, période)."""
+    # Si aucun entity_id n'est fourni, renvoyer les totaux toutes entités confondues
     return finance_stats.treasury_summary(entity_id=entity_id)
 
 
@@ -498,7 +501,7 @@ def get_treasury_summary(
 @router.post("/reconciliations")
 def create_reconciliation(
     payload: FinanceReconciliationCreate,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         return finance_reconciliation.create_reconciliation(
@@ -514,7 +517,7 @@ def create_reconciliation(
 @router.delete("/reconciliations/{reconciliation_id}")
 def delete_reconciliation(
     reconciliation_id: int,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         finance_reconciliation.delete_reconciliation(reconciliation_id)
@@ -532,7 +535,7 @@ def search_bank_statements(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=500),
     sort: str = Query(default="-imported_at", description="imported_at|period_start|period_end|account avec - pour desc"),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> FinanceBankStatementSearchResponse:
     result = finance_bank_statements.search_bank_statements(
         account_id=account_id,
@@ -550,7 +553,7 @@ def search_bank_statements(
 async def import_bank_statements(
     account_id: int = Query(..., description="ID du compte finance_accounts"),
     file: UploadFile = File(...),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     try:
         content = await file.read()
@@ -580,7 +583,7 @@ async def import_bank_statements(
 async def import_bank_statements_pdf(
     account_id: int = Query(..., description="ID du compte finance_accounts"),
     file: UploadFile = File(...),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
     """Import best-effort d'un relevé PDF (parse minimal) dans finance_bank_statements/lines."""
     try:
@@ -616,7 +619,7 @@ async def import_bank_statements_pdf(
 @router.post("/reconciliation/run", response_model=FinanceRunResponse)
 def run_reconciliation(
     payload: FinanceRunRequest,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> FinanceRunResponse:
     summary = finance_service.run_reconciliation(
         tenant.id,
@@ -662,11 +665,11 @@ def _build_match(record: dict) -> FinanceMatch:
 @router.get("/reconciliation/matches", response_model=list[FinanceMatch])
 def list_matches(
     status: str | None = Query(default="pending", description="Filtrer par statut."),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[FinanceMatch]:
     try:
         results = finance_service.list_matches(tenant.id, status=status)
-    except Exception as exc:  # defensive fallback when optional tables are absent
+    except Exception as exc:  # repli défensif quand les tables optionnelles sont absentes
         logger.warning("finance matches unavailable: %s", exc)
         return []
     return [_build_match(record) for record in results]
@@ -676,7 +679,7 @@ def list_matches(
 def update_match_status(
     match_id: int,
     payload: FinanceMatchStatusRequest,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> FinanceMatch:
     try:
         record = finance_service.update_match_status(
@@ -693,7 +696,7 @@ def update_match_status(
 @router.post("/recurring/refresh", response_model=RecurringRefreshResponse)
 def refresh_recurring(
     payload: RecurringRefreshRequest,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> RecurringRefreshResponse:
     summary = finance_service.refresh_recurring(tenant.id, min_occurrences=payload.min_occurrences)
     return RecurringRefreshResponse(**summary)
@@ -701,7 +704,7 @@ def refresh_recurring(
 
 @router.get("/recurring", response_model=list[FinanceRecurringExpense])
 def list_recurring(
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[FinanceRecurringExpense]:
     entries = finance_service.list_recurring(tenant.id)
     return [FinanceRecurringExpense(**entry) for entry in entries]
@@ -710,7 +713,7 @@ def list_recurring(
 @router.post("/anomalies/refresh", response_model=AnomalyRefreshResponse)
 def refresh_anomalies(
     payload: AnomalyRefreshRequest,
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> AnomalyRefreshResponse:
     summary = finance_service.refresh_anomalies(
         tenant.id,
@@ -723,11 +726,11 @@ def refresh_anomalies(
 @router.get("/anomalies", response_model=list[FinanceAnomaly])
 def list_anomalies(
     severity: str | None = Query(default=None, description="Filtrer par sévérité."),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[FinanceAnomaly]:
     try:
         entries = finance_service.list_anomalies(tenant.id, severity=severity)
-    except Exception as exc:  # optional table may be absent on some tenants
+    except Exception as exc:  # table optionnelle possiblement absente chez certains tenants
         logger.warning("finance anomalies unavailable: %s", exc)
         entries = []
     return [
@@ -753,7 +756,7 @@ def list_anomalies(
 def get_reconciliation_run_anomalies(
     run_id: int,
     severity: str | None = Query(default=None, description="Filtrer par sévérité."),
-    tenant: Tenant = Depends(get_current_tenant),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[FinanceAnomaly]:
     """
     Retourne les anomalies détectées pour un run de rapprochement spécifique.
@@ -785,3 +788,171 @@ def get_reconciliation_run_anomalies(
         )
         for entry in entries
     ]
+
+
+# --- Feedback de catégorisation (pour apprentissage ML) ---
+
+
+class CategoryFeedbackPayload(BaseModel):
+    """Payload pour enregistrer un feedback de catégorisation."""
+
+    actual_category_id: int
+    predicted_category_id: int | None = None
+    confidence_score: float | None = None
+    correction_source: str = "user_inline_edit"
+
+
+@router.post("/transactions/{transaction_id}/feedback")
+def record_category_feedback(
+    transaction_id: int,
+    payload: CategoryFeedbackPayload,
+    tenant: Tenant = Depends(get_current_tenant_or_default),
+) -> dict:
+    """
+    Enregistre une correction de catégorie faite par l'utilisateur.
+
+    Cette fonction stocke le feedback pour l'apprentissage futur du moteur ML.
+    Elle permet de collecter les données de correction pour améliorer la précision
+    de la catégorisation automatique.
+
+    Args:
+        transaction_id: ID de la transaction corrigée
+        actual_category_id: ID de la catégorie correcte choisie par l'utilisateur
+        predicted_category_id: ID de la catégorie prédite par le système (optionnel)
+        confidence_score: Score de confiance de la prédiction originale (0.0-1.0)
+        correction_source: Source de la correction ('manual', 'rule', 'bulk_action')
+        tenant: Tenant courant (injecté automatiquement)
+
+    Returns:
+        Dict avec l'ID du feedback créé et un message de confirmation
+
+    Example:
+        POST /finance/transactions/12345/feedback
+        {
+            "actual_category_id": 8,
+            "predicted_category_id": 5,
+            "confidence_score": 0.75,
+            "correction_source": "manual"
+        }
+    """
+    try:
+        from core.bank_import.categorizer import record_categorization_feedback
+
+        feedback_id = record_categorization_feedback(
+            transaction_id=transaction_id,
+            predicted_category_id=payload.predicted_category_id,
+            actual_category_id=payload.actual_category_id,
+            confidence_score=payload.confidence_score,
+            user_id=tenant.id,
+            correction_source=payload.correction_source,
+        )
+
+        return {
+            "id": feedback_id,
+            "transaction_id": transaction_id,
+            "message": "Feedback enregistré avec succès",
+        }
+    except Exception as exc:
+        logger.error(f"Error recording feedback for transaction {transaction_id}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de l'enregistrement du feedback: {str(exc)}",
+        ) from exc
+
+
+@router.get("/categorization/feedback/stats")
+def get_categorization_feedback_stats(
+    tenant: Tenant = Depends(get_current_tenant_or_default),
+) -> dict:
+    """
+    Retourne les statistiques globales sur le feedback de catégorisation.
+
+    Fournit des métriques utiles pour évaluer la performance du système de
+    catégorisation automatique et identifier les axes d'amélioration.
+
+    Returns:
+        Dict avec les statistiques de feedback:
+        - total_corrections: Nombre total de corrections
+        - unique_transactions: Nombre de transactions uniques corrigées
+        - categories_corrected_to: Nombre de catégories cibles différentes
+        - categories_corrected_from: Nombre de catégories sources différentes
+        - avg_wrong_confidence: Confiance moyenne des prédictions incorrectes
+        - manual_corrections: Nombre de corrections manuelles
+        - rule_corrections: Nombre de corrections via règles
+        - bulk_corrections: Nombre de corrections en masse
+
+    Example:
+        GET /finance/categorization/feedback/stats
+        Response:
+        {
+            "total_corrections": 150,
+            "unique_transactions": 145,
+            "categories_corrected_to": 12,
+            "categories_corrected_from": 8,
+            "avg_wrong_confidence": 0.65,
+            "manual_corrections": 120,
+            "rule_corrections": 20,
+            "bulk_corrections": 10
+        }
+    """
+    try:
+        from core.bank_import.categorizer import get_feedback_stats
+
+        return get_feedback_stats()
+    except Exception as exc:
+        logger.error(f"Error retrieving feedback stats: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération des statistiques: {str(exc)}",
+        ) from exc
+
+
+@router.get("/categorization/feedback/common-corrections")
+def get_common_category_corrections(
+    limit: int = Query(default=20, ge=1, le=100),
+    tenant: Tenant = Depends(get_current_tenant_or_default),
+) -> list[dict]:
+    """
+    Retourne les corrections de catégories les plus fréquentes.
+
+    Utile pour identifier les patterns de correction récurrents et créer
+    de nouvelles règles de catégorisation pour améliorer la précision.
+
+    Args:
+        limit: Nombre maximum de patterns à retourner (1-100)
+        tenant: Tenant courant (injecté automatiquement)
+
+    Returns:
+        Liste de dicts avec les patterns de correction:
+        - predicted_code: Code de la catégorie prédite
+        - predicted_name: Nom de la catégorie prédite
+        - actual_code: Code de la catégorie correcte
+        - actual_name: Nom de la catégorie correcte
+        - correction_count: Nombre de fois que cette correction a été faite
+        - avg_confidence: Confiance moyenne des prédictions incorrectes
+
+    Example:
+        GET /finance/categorization/feedback/common-corrections?limit=10
+        Response:
+        [
+            {
+                "predicted_code": "alimentation",
+                "predicted_name": "Alimentation",
+                "actual_code": "fournitures",
+                "actual_name": "Fournitures",
+                "correction_count": 25,
+                "avg_confidence": 0.68
+            },
+            ...
+        ]
+    """
+    try:
+        from core.bank_import.categorizer import get_common_corrections
+
+        return get_common_corrections(limit=limit)
+    except Exception as exc:
+        logger.error(f"Error retrieving common corrections: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération des corrections fréquentes: {str(exc)}",
+        ) from exc

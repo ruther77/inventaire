@@ -1,5 +1,5 @@
 /* @refresh reload */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { ResponsiveContainer, LineChart, Line, AreaChart, Area, Tooltip, XAxis, YAxis, CartesianGrid, Legend, BarChart, Bar } from 'recharts';
@@ -97,6 +97,10 @@ export default function PricesPage() {
     dateEnd: '',
     limit: 200,
   });
+  const productNameById = useMemo(
+    () => new Map(products.map((product) => [product.id, product.nom])),
+    [products],
+  );
 
   const effectiveFilters = useMemo(
     () => ({
@@ -114,6 +118,18 @@ export default function PricesPage() {
 
   const historyQuery = usePriceHistory(effectiveFilters);
   const items = historyQuery.data ?? [];
+  const nameByCode = useMemo(() => {
+    const map = new Map();
+    items.forEach((entry) => {
+      const code = entry?.code ? String(entry.code).trim() : '';
+      const rawName = typeof entry?.nom === 'string' ? entry.nom.trim() : entry?.nom;
+      if (!code || !rawName || rawName === '-' || rawName === '—') return;
+      if (!map.has(code)) {
+        map.set(code, rawName);
+      }
+    });
+    return map;
+  }, [items]);
   const sortedHistory = useMemo(
     () =>
       [...items].sort((a, b) => {
@@ -123,6 +139,31 @@ export default function PricesPage() {
       }),
     [items],
   );
+
+  const resolveProductName = useCallback((entry) => {
+    // Vérifie d'abord le nom brut
+    const rawName = typeof entry?.nom === 'string' ? entry.nom.trim() : entry?.nom;
+    const isPlaceholder = !rawName || rawName === '-' || rawName === '—' || rawName === 'null' || rawName === 'undefined';
+    if (!isPlaceholder) return rawName;
+
+    // Fallback via produit_id
+    const productId = entry?.produit_id ?? entry?.product_id;
+    if (productId !== null && productId !== undefined) {
+      const fallback = productNameById.get(Number(productId));
+      if (fallback && fallback !== '-' && fallback !== '—') return fallback;
+    }
+
+    // Fallback via code (cherche dans nameByCode ou affiche le code)
+    const code = entry?.code != null ? String(entry.code).trim() : '';
+    if (code && code !== 'null' && code !== 'undefined') {
+      const fallback = nameByCode.get(code);
+      if (fallback && fallback !== '-' && fallback !== '—') return fallback;
+      // Affiche le code entre crochets si aucun nom n'est trouvé
+      return `[${code}]`;
+    }
+
+    return '—';
+  }, [productNameById, nameByCode]);
 
   const metrics = useMemo(() => {
     if (!sortedHistory.length) {
@@ -200,7 +241,7 @@ export default function PricesPage() {
         const pct = prevPrice ? (delta / prevPrice) * 100 : null;
         return {
           label,
-          name: latest.nom || previous.nom || '—',
+          name: resolveProductName(latest) || resolveProductName(previous),
           code: latest.code || previous.code || '—',
           latest: lastPrice,
           previous: prevPrice,
@@ -210,7 +251,7 @@ export default function PricesPage() {
         };
       })
       .filter(Boolean);
-  }, [sortedHistory]);
+  }, [sortedHistory, resolveProductName]);
 
   const topIncreases = useMemo(
     () => [...productVariations].filter((entry) => entry.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 5),
@@ -235,24 +276,31 @@ export default function PricesPage() {
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">prix & inflation</p>
-            <h2 className="text-2xl font-semibold text-slate-900">Historique fournisseur</h2>
-            <p className="text-sm text-slate-500">
+            <h2 className="text-2xl font-semibold text-white">Historique fournisseur</h2>
+            <p className="text-sm text-slate-400">
               Comparez les évolutions de prix d&apos;achat par produit, fournisseur et période.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button variant="ghost" size="sm" onClick={() => downloadCsv(items)} disabled={!items.length}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                downloadCsv(items.map((item) => ({ ...item, nom: resolveProductName(item) })))
+              }
+              disabled={!items.length}
+            >
               Export CSV
             </Button>
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          <label className="text-sm text-slate-600">
+          <label className="text-sm text-slate-300">
             Produit
             <select
               value={filters.productId}
               onChange={(event) => setFilters((prev) => ({ ...prev, productId: event.target.value }))}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-brand-400 focus:outline-none"
+              className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-brand-500/50 focus:outline-none"
             >
               <option value="all">Catalogue complet</option>
               {products.map((product) => (
@@ -262,54 +310,54 @@ export default function PricesPage() {
               ))}
             </select>
           </label>
-          <label className="text-sm text-slate-600">
+          <label className="text-sm text-slate-300">
             Fournisseur
             <input
               type="text"
               value={filters.supplier}
               onChange={(event) => setFilters((prev) => ({ ...prev, supplier: event.target.value }))}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-brand-400 focus:outline-none"
+              className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-slate-500 focus:border-brand-500/50 focus:outline-none"
               placeholder="Metro, Grossiste..."
             />
           </label>
-          <label className="text-sm text-slate-600">
+          <label className="text-sm text-slate-300">
             Code/EAN
             <input
               type="text"
               value={filters.code}
               onChange={(event) => setFilters((prev) => ({ ...prev, code: event.target.value }))}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-brand-400 focus:outline-none"
+              className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-slate-500 focus:border-brand-500/50 focus:outline-none"
               placeholder="1234567890123"
             />
           </label>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          <label className="text-sm text-slate-600">
+          <label className="text-sm text-slate-300">
             Recherche libre
             <input
               type="text"
               value={filters.search}
               onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-brand-400 focus:outline-none"
+              className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-slate-500 focus:border-brand-500/50 focus:outline-none"
               placeholder="Nom produit, context..."
             />
           </label>
-          <label className="text-sm text-slate-600">
+          <label className="text-sm text-slate-300">
             Début
             <input
               type="date"
               value={filters.dateStart}
               onChange={(event) => setFilters((prev) => ({ ...prev, dateStart: event.target.value }))}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-brand-400 focus:outline-none"
+              className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-brand-500/50 focus:outline-none"
             />
           </label>
-          <label className="text-sm text-slate-600">
+          <label className="text-sm text-slate-300">
             Fin
             <input
               type="date"
               value={filters.dateEnd}
               onChange={(event) => setFilters((prev) => ({ ...prev, dateEnd: event.target.value }))}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-brand-400 focus:outline-none"
+              className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-brand-500/50 focus:outline-none"
             />
           </label>
         </div>
@@ -320,7 +368,7 @@ export default function PricesPage() {
           label="Dernier prix"
           value={formatCurrency(metrics.last)}
           hint={`vs début ${formatDelta(priceDelta)}`}
-          accent="text-slate-900"
+          accent="text-white"
         />
         <Metric
           label="Variation"
@@ -336,61 +384,61 @@ export default function PricesPage() {
         />
       </Card>
 
-      <Card className="flex flex-col gap-3 border-amber-200 bg-amber-50">
+      <Card className="flex flex-col gap-3 border-amber-500/30 bg-amber-500/10">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-amber-600">alertes prix/stock</p>
-            <h3 className="text-lg font-semibold text-amber-900">
+            <p className="text-xs uppercase tracking-[0.35em] text-amber-400">alertes prix/stock</p>
+            <h3 className="text-lg font-semibold text-amber-300">
               {alertItems.length} alerte{alertItems.length > 1 ? 's' : ''}
             </h3>
           </div>
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700 shadow-sm">
+          <span className="rounded-full bg-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-300 border border-amber-500/30">
             Marges <span className="font-bold">{alertItems.filter((a) => a.margin_alert).length}</span> · Ruptures{' '}
             <span className="font-bold">{alertItems.filter((a) => a.stock_alert || a.stockout_repeated).length}</span>
           </span>
         </div>
         {alertItems.length ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-amber-100 text-sm">
+            <table className="min-w-full divide-y divide-amber-500/20 text-sm">
               <thead>
-                <tr className="text-left text-xs uppercase tracking-widest text-amber-700">
+                <tr className="text-left text-xs uppercase tracking-widest text-amber-400">
                   <th className="px-3 py-2">Produit</th>
                   <th className="px-3 py-2">Prix achat</th>
                   <th className="px-3 py-2">Marge</th>
                   <th className="px-3 py-2">Rupture</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-amber-100">
+              <tbody className="divide-y divide-amber-500/20">
                 {alertItems.slice(0, 6).map((item) => (
                   <tr key={`${item.id ?? item.code}-${item.facture_date}`}>
                     <td className="px-3 py-2">
-                      <p className="font-semibold text-amber-900">{item.nom ?? '—'}</p>
-                      <p className="text-xs text-amber-700">{item.code ?? '—'}</p>
+                      <p className="font-semibold text-white">{resolveProductName(item)}</p>
+                      <p className="text-xs text-amber-400">{item.code ?? '—'}</p>
                     </td>
-                    <td className="px-3 py-2 text-amber-900">{formatCurrency(item.prix_achat)}</td>
+                    <td className="px-3 py-2 text-white">{formatCurrency(item.prix_achat)}</td>
                     <td className="px-3 py-2">
                       {item.marge_pct !== null && item.marge_pct !== undefined ? (
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             item.margin_alert
-                              ? 'bg-rose-100 text-rose-700'
-                              : 'bg-emerald-100 text-emerald-700'
+                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                              : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           }`}
                         >
                           {formatPercentage(item.marge_pct)}
                         </span>
                       ) : (
-                        <span className="text-xs text-amber-700">N/C</span>
+                        <span className="text-xs text-amber-400">N/C</span>
                       )}
                     </td>
                     <td className="px-3 py-2 space-x-2">
                       {item.stock_alert && (
-                        <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+                        <span className="rounded-full bg-rose-500/20 px-3 py-1 text-xs font-semibold text-rose-400 border border-rose-500/30">
                           Stock critique
                         </span>
                       )}
                       {item.stockout_repeated && (
-                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                        <span className="rounded-full bg-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-400 border border-amber-500/30">
                           Ruptures ({item.stockout_events || 0})
                         </span>
                       )}
@@ -401,7 +449,7 @@ export default function PricesPage() {
             </table>
           </div>
         ) : (
-          <p className="text-sm text-amber-800">
+          <p className="text-sm text-amber-400">
             Aucune alerte active sur les marges ou les ruptures répétées pour ces filtres.
           </p>
         )}
@@ -412,62 +460,62 @@ export default function PricesPage() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Courbe de prix</p>
-              <h3 className="text-lg font-semibold text-slate-900">Evolution moyenne journalière</h3>
+              <h3 className="text-lg font-semibold text-white">Evolution moyenne journalière</h3>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-400">
               {timelineData.length} points • glissante 5 jours
             </p>
           </div>
           {timelineData.length ? (
-            <div className="h-72">
+            <div className="h-72" key={`timeline-chart-${filters.productId}-${filters.dateStart}-${filters.dateEnd}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={timelineData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `${numberFormatter.format(value)} €`} />
-                  <Legend />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} stroke="#475569" />
+                  <YAxis tick={{ fill: '#94a3b8' }} stroke="#475569" />
+                  <Tooltip formatter={(value) => `${numberFormatter.format(value)} €`} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} labelStyle={{ color: '#fff' }} itemStyle={{ color: '#94a3b8' }} />
+                  <Legend wrapperStyle={{ color: '#94a3b8' }} />
                   <Area type="monotone" dataKey="moving" stroke="#6366f1" fill="#6366f1" fillOpacity={0.1} name="Moyenne mobile" />
                   <Line type="monotone" dataKey="average" stroke="#0ea5e9" strokeWidth={2} dot={false} name="Moyenne quotidienne" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Pas encore d&apos;historique pour ces filtres.</p>
+            <p className="text-sm text-slate-400">Pas encore d&apos;historique pour ces filtres.</p>
           )}
         </Card>
 
         <Card className="flex flex-col gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Fournisseurs</p>
-            <h3 className="text-lg font-semibold text-slate-900">Top contributeurs</h3>
+            <h3 className="text-lg font-semibold text-white">Top contributeurs</h3>
           </div>
           {supplierBreakdown.length ? (
-            <div className="h-72">
+            <div className="h-72" key={`supplier-chart-${filters.productId}-${filters.supplier}-${filters.dateStart}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={supplierBreakdown} layout="vertical" margin={{ left: 0, right: 10, top: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="supplier" type="category" width={120} />
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis type="number" tick={{ fill: '#94a3b8' }} stroke="#475569" />
+                  <YAxis dataKey="supplier" type="category" width={120} tick={{ fill: '#94a3b8' }} stroke="#475569" />
+                  <Tooltip formatter={(value) => formatCurrency(value)} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} labelStyle={{ color: '#fff' }} itemStyle={{ color: '#94a3b8' }} />
                   <Bar dataKey="value" fill="#f97316" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Aucun fournisseur identifié.</p>
+            <p className="text-sm text-slate-400">Aucun fournisseur identifié.</p>
           )}
         </Card>
       </div>
 
       <Card className="grid gap-6 lg:grid-cols-2">
-        <VariationList title="Top hausses" items={topIncreases} emptyLabel="Aucune hausse détectée." accent="text-rose-600" />
-        <VariationList title="Top baisses" items={topDrops} emptyLabel="Aucune détente constatée." accent="text-emerald-600" />
+        <VariationList title="Top hausses" items={topIncreases} emptyLabel="Aucune hausse détectée." accent="text-rose-400" />
+        <VariationList title="Top baisses" items={topDrops} emptyLabel="Aucune détente constatée." accent="text-emerald-400" />
       </Card>
 
       {!historyQuery.isLoading && items.length === 0 && (
-        <Card className="flex flex-col gap-2 border border-amber-200 bg-amber-50 text-sm text-amber-900">
-          <p className="font-semibold">Aucune statistique enregistrée</p>
+        <Card className="flex flex-col gap-2 border border-amber-500/30 bg-amber-500/10 text-sm text-amber-300">
+          <p className="font-semibold text-amber-200">Aucune statistique enregistrée</p>
           <p>
             L&apos;historique se remplit lors de l&apos;import de factures (onglet Factures → Commandes)
             ou via l&apos;API `record_price_history`. Réimporte tes factures PDF/CSV pour reconstruire les
@@ -479,14 +527,14 @@ export default function PricesPage() {
 
       <Card className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-slate-900">Historique des prix</h3>
-          <p className="text-sm text-slate-500">{items.length} entrée(s)</p>
+          <h3 className="text-lg font-semibold text-white">Historique des prix</h3>
+          <p className="text-sm text-slate-400">{items.length} entrée(s)</p>
         </div>
         {items.length ? (
           <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100 text-sm">
+              <table className="min-w-full divide-y divide-white/10 text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
+                  <tr className="text-left text-xs uppercase tracking-widest text-slate-400">
                     <th className="px-3 py-2">Date</th>
                     <th className="px-3 py-2">Produit</th>
                     <th className="px-3 py-2">Code</th>
@@ -499,27 +547,27 @@ export default function PricesPage() {
                     <th className="px-3 py-2">Contexte</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-white/10">
                   {items.map((item) => (
                     <tr key={item.id ?? `${item.code}-${item.facture_date}`}>
-                    <td className="px-3 py-2 text-slate-500">
+                    <td className="px-3 py-2 text-slate-400">
                       {item.facture_date ? dateFormatter.format(new Date(item.facture_date)) : '—'}
                     </td>
-                    <td className="px-3 py-2 text-slate-900">{item.nom ?? '—'}</td>
-                    <td className="px-3 py-2 text-slate-600">{item.code ?? '—'}</td>
-                    <td className="px-3 py-2 text-slate-600">{item.fournisseur ?? '—'}</td>
-                    <td className="px-3 py-2">{numberFormatter.format(item.prix_achat ?? 0)} €</td>
+                    <td className="px-3 py-2 text-white">{resolveProductName(item)}</td>
+                    <td className="px-3 py-2 text-slate-300">{item.code ?? '—'}</td>
+                    <td className="px-3 py-2 text-slate-300">{item.fournisseur ?? '—'}</td>
+                    <td className="px-3 py-2 text-white">{numberFormatter.format(item.prix_achat ?? 0)} €</td>
                     <td className="px-3 py-2">
                       {item.delta_prix !== null && item.delta_prix !== undefined ? (
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            item.delta_prix > 0 ? 'bg-rose-50 text-rose-700' : item.delta_prix < 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                            item.delta_prix > 0 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : item.delta_prix < 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-500/20 text-slate-400 border border-slate-500/30'
                           }`}
                         >
                           {formatDelta(item.delta_prix)} ({formatPercentage(item.delta_pct)})
                         </span>
                       ) : (
-                        '—'
+                        <span className="text-slate-500">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2">
@@ -527,8 +575,8 @@ export default function PricesPage() {
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                             item.margin_alert
-                              ? 'bg-rose-100 text-rose-700'
-                              : 'bg-emerald-100 text-emerald-700'
+                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                              : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           }`}
                         >
                           {formatPercentage(item.marge_pct)}
@@ -539,28 +587,28 @@ export default function PricesPage() {
                       {(item.stock_alert || item.stockout_repeated) && (
                         <div className="mt-1 space-x-1">
                           {item.stock_alert && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                            <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[11px] font-semibold text-amber-400 border border-amber-500/30">
                               Stock critique
                             </span>
                           )}
                           {item.stockout_repeated && (
-                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                            <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[11px] font-semibold text-rose-400 border border-rose-500/30">
                               Ruptures {item.stockout_events ?? 0}
                             </span>
                           )}
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2">{item.quantite ?? '—'}</td>
-                    <td className="px-3 py-2">{item.montant ? `${numberFormatter.format(item.montant)} €` : '—'}</td>
-                    <td className="px-3 py-2 text-slate-500">{item.source_context ?? '—'}</td>
+                    <td className="px-3 py-2 text-white">{item.quantite ?? '—'}</td>
+                    <td className="px-3 py-2 text-white">{item.montant ? `${numberFormatter.format(item.montant)} €` : '—'}</td>
+                    <td className="px-3 py-2 text-slate-400">{item.source_context ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-400">
             {historyQuery.isLoading ? 'Chargement…' : 'Aucune donnée pour ces filtres.'}
           </p>
         )}
@@ -569,12 +617,12 @@ export default function PricesPage() {
   );
 }
 
-function Metric({ label, value, hint, accent = 'text-slate-900' }) {
+function Metric({ label, value, hint, accent = 'text-white' }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</p>
       <p className={`text-2xl font-semibold ${accent}`}>{value}</p>
-      {hint && <p className="text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="text-xs text-slate-400">{hint}</p>}
     </div>
   );
 }
@@ -584,25 +632,25 @@ function VariationList({ title, items, emptyLabel, accent }) {
     <div className="flex flex-col gap-3">
       <div>
         <p className="text-xs uppercase tracking-[0.4em] text-slate-400">{title}</p>
-        <p className="text-sm text-slate-500">Comparatif entre les deux dernières variations</p>
+        <p className="text-sm text-slate-400">Comparatif entre les deux dernières variations</p>
       </div>
       {items.length === 0 ? (
-        <p className="text-sm text-slate-500">{emptyLabel}</p>
+        <p className="text-sm text-slate-400">{emptyLabel}</p>
       ) : (
-        <ul className="divide-y divide-slate-100 text-sm">
+        <ul className="divide-y divide-white/10 text-sm">
           {items.map((entry) => (
             <li key={entry.label} className="flex flex-col gap-1 py-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-slate-900">{entry.name || entry.label}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="font-semibold text-white">{entry.name || entry.label}</p>
+                  <p className="text-xs text-slate-400">
                     {entry.code && entry.code !== '—' ? `${entry.code} · ` : ''}
                     {entry.supplier}
                   </p>
                 </div>
                 <span className={`text-sm font-semibold ${accent}`}>{formatDelta(entry.delta)}</span>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-400">
                 {formatCurrency(entry.previous)} → {formatCurrency(entry.latest)} ({formatPercentage(entry.pct)})
               </p>
             </li>

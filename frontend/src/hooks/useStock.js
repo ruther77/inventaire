@@ -22,6 +22,7 @@ export function useStockTimeseries(filters) {
     queryKey: ['stock-timeseries', filters],
     queryFn: () => fetchTimeseries(filters),
     keepPreviousData: true,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 
@@ -30,6 +31,7 @@ export function useRecentMovements(filters) {
     queryKey: ['stock-recent', filters],
     queryFn: () => fetchRecent(filters),
     keepPreviousData: true,
+    staleTime: 60 * 1000, // 1 minute
   });
 }
 

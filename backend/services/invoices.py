@@ -1,4 +1,4 @@
-"""Invoice extraction and import services."""
+"""Services d'extraction et d'import de factures."""
 
 from __future__ import annotations
 
@@ -136,7 +136,7 @@ def extract_invoice_lines(
     supplier_hint: str | None = None,
     tenant_id: int = 1,
 ) -> pd.DataFrame:
-    """Extract structured lines from raw invoice text."""
+    """Extrait des lignes structurées depuis le texte brut d'une facture."""
 
     if not text.strip():
         return pd.DataFrame()
@@ -312,7 +312,7 @@ def enrich_lines_with_catalog(
     margin_percent: float = 40.0,
     tenant_id: int = 1,
 ) -> pd.DataFrame:
-    """Attach catalogue metadata (matches) to parsed invoice lines."""
+    """Associe les métadonnées catalogue (matchs) aux lignes de facture parsées."""
 
     df = lines.copy()
     if "codes" not in df.columns or df.empty:
@@ -433,7 +433,7 @@ def enrich_lines_with_catalog(
 
 
 def _has_missing_product_ids(df: pd.DataFrame) -> bool:
-    """Return True when at least one invoice line lacks a valid produit_id."""
+    """Retourne True si au moins une ligne de facture n'a pas de produit_id valide."""
 
     if "produit_id" not in df.columns:
         return True
@@ -443,7 +443,7 @@ def _has_missing_product_ids(df: pd.DataFrame) -> bool:
 
 
 def _prepare_lines_for_import(invoice_df: pd.DataFrame, *, tenant_id: int = 1) -> pd.DataFrame:
-    """Ensure movements can be created even if the frontend lacks produit_id/quantities."""
+    """Garantit la création des mouvements même si le frontend n'a pas produit_id/quantités."""
 
     if not isinstance(invoice_df, pd.DataFrame) or invoice_df.empty:
         return invoice_df
@@ -452,8 +452,8 @@ def _prepare_lines_for_import(invoice_df: pd.DataFrame, *, tenant_id: int = 1) -
 
     has_codes = "codes" in working_df.columns
     if has_codes and _has_missing_product_ids(working_df):
-        # Re-run the catalogue reconciliation with the latest DB state so newly
-        # created products (or updated barcodes) are picked up automatically.
+        # Relance la réconciliation du catalogue avec l'état BD le plus récent
+        # pour récupérer automatiquement les produits créés ou codes-barres mis à jour.
         return enrich_lines_with_catalog(working_df, margin_percent=40.0, tenant_id=tenant_id)
 
     if "quantite_recue" not in working_df.columns and "qte_init" in working_df.columns:
@@ -475,7 +475,7 @@ def apply_invoice_import(
     invoice_date: datetime | date | None = None,
     tenant_id: int = 1,
 ) -> dict[str, object]:
-    """Persist movements based on the invoice lines."""
+    """Persiste les mouvements à partir des lignes de facture."""
 
     # Sécurise les données avant création des mouvements (quantités, produit_id)
     prepared_df = _prepare_lines_for_import(invoice_df, tenant_id=tenant_id)
@@ -508,7 +508,7 @@ def import_catalog_from_invoice(
     invoice_date: datetime | None = None,
     tenant_id: int = 1,
 ) -> dict[str, object]:
-    """Create/update catalogue entries from invoice lines and log price history."""
+    """Crée/met à jour le catalogue depuis les lignes de facture et journalise l'historique de prix."""
 
     if not isinstance(invoice_df, pd.DataFrame):
         raise ValueError("Le format des lignes est invalide.")
@@ -648,8 +648,110 @@ def record_processed_invoices(invoice_df: pd.DataFrame, *, supplier: str | None,
         )
     try:
         exec_sql(sql, params=params_batch)
+        # Synchroniser avec finance_invoices_supplier
+        _sync_to_finance_invoices_supplier(invoice_df, groups, supplier_label, tenant_id)
     except Exception as exc:  # pragma: no cover - base indisponible
         LOGGER.warning("Impossible d'enregistrer les factures (batch): %s", exc)
+
+
+def _sync_to_finance_invoices_supplier(
+    invoice_df: pd.DataFrame,
+    groups: list[dict],
+    supplier_label: str,
+    tenant_id: int
+) -> None:
+    """Synchronise les factures vers finance_invoices_supplier pour le rapprochement."""
+    # Mapping tenant_id -> entity_id (convention du projet)
+    entity_id = 2 if tenant_id == 4 else tenant_id
+
+    # Obtenir ou créer le vendor_id
+    vendor_id = _get_or_create_vendor(supplier_label, entity_id)
+    if not vendor_id:
+        LOGGER.warning(f"Impossible de créer le vendor pour {supplier_label}")
+        return
+
+    # Calculer les totaux par facture
+    invoice_totals = {}
+    if "invoice_id" in invoice_df.columns:
+        for inv_id, grp in invoice_df.groupby("invoice_id"):
+            total_ht = grp["total_ht"].sum() if "total_ht" in grp.columns else 0
+            total_ttc = grp["total_ttc"].sum() if "total_ttc" in grp.columns else 0
+            # Repli sur prix_achat * qte en l'absence de total
+            if total_ttc == 0 and "prix_achat" in grp.columns and "qte_init" in grp.columns:
+                total_ttc = (grp["prix_achat"].fillna(0) * grp["qte_init"].fillna(0)).sum()
+            invoice_totals[str(inv_id)] = {
+                "montant_ht": float(total_ht or 0),
+                "montant_ttc": float(total_ttc or 0),
+            }
+
+    sql = text(
+        """
+        INSERT INTO finance_invoices_supplier
+            (entity_id, vendor_id, invoice_number, date_invoice, montant_ht, montant_ttc, status, currency, ref_externe)
+        VALUES
+            (:entity_id, :vendor_id, :invoice_number, :date_invoice, :montant_ht, :montant_ttc, 'pending', 'EUR', :ref_externe)
+        ON CONFLICT (entity_id, invoice_number) WHERE invoice_number IS NOT NULL
+        DO UPDATE SET
+            montant_ht = COALESCE(EXCLUDED.montant_ht, finance_invoices_supplier.montant_ht),
+            montant_ttc = COALESCE(EXCLUDED.montant_ttc, finance_invoices_supplier.montant_ttc),
+            date_invoice = COALESCE(EXCLUDED.date_invoice, finance_invoices_supplier.date_invoice),
+            updated_at = now()
+        """
+    )
+
+    params_batch = []
+    for group in groups:
+        invoice_id = str(group["invoice_id"])
+        totals = invoice_totals.get(invoice_id, {"montant_ht": 0, "montant_ttc": 0})
+        facture_date = group.get("facture_date")
+
+        params_batch.append({
+            "entity_id": entity_id,
+            "vendor_id": vendor_id,
+            "invoice_number": invoice_id,
+            "date_invoice": facture_date,
+            "montant_ht": totals["montant_ht"],
+            "montant_ttc": totals["montant_ttc"],
+            "ref_externe": f"processed_invoices:{tenant_id}:{invoice_id}",
+        })
+
+    try:
+        exec_sql(sql, params=params_batch)
+        LOGGER.info(f"Synchronisé {len(params_batch)} factures vers finance_invoices_supplier")
+    except Exception as exc:
+        LOGGER.warning(f"Erreur sync finance_invoices_supplier: {exc}")
+
+
+def _get_or_create_vendor(supplier_name: str, entity_id: int) -> int | None:
+    """Obtient ou crée un vendor dans finance_vendors."""
+    if not supplier_name or supplier_name == "Inconnu":
+        return None
+
+    # Chercher le vendor existant
+    sql_find = text(
+        "SELECT id FROM finance_vendors WHERE entity_id = :entity_id AND name ILIKE :name LIMIT 1"
+    )
+    df = query_df(sql_find, {"entity_id": entity_id, "name": supplier_name})
+
+    if not df.empty:
+        return int(df.iloc[0]["id"])
+
+    # Créer le vendor
+    sql_create = text(
+        """
+        INSERT INTO finance_vendors (entity_id, name, is_active)
+        VALUES (:entity_id, :name, true)
+        RETURNING id
+        """
+    )
+    try:
+        result = query_df(sql_create, {"entity_id": entity_id, "name": supplier_name})
+        if not result.empty:
+            return int(result.iloc[0]["id"])
+    except Exception as exc:
+        LOGGER.warning(f"Erreur création vendor {supplier_name}: {exc}")
+
+    return None
 
 
 def find_processed_invoice_ids(invoice_ids: set[str], *, tenant_id: int) -> set[str]:
@@ -687,10 +789,10 @@ def list_processed_invoices(
     where_clause = " AND ".join(filters)
     sql = text(
         f"""
-        SELECT invoice_id, supplier, facture_date, line_count, file_path, created_at, updated_at
+        SELECT invoice_id, supplier, facture_date, line_count, total_ttc, file_path, created_at, updated_at
         FROM processed_invoices
         WHERE {where_clause}
-        ORDER BY created_at DESC
+        ORDER BY facture_date DESC NULLS LAST, created_at DESC
         LIMIT :limit
         """
     )

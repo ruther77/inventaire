@@ -1,4 +1,4 @@
-"""Shared catalog data loaders usable by FastAPI and Streamlit."""
+"""Chargeurs de données catalogue partagés, utilisables par FastAPI et Streamlit."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ _RECENT_SUPPLIERS_SQL = """
 
 
 def _normalize_ean(value: str | int | float | None) -> str:
-    """Return a canonical GTIN if valid, otherwise an empty string."""
+    """Retourne un GTIN canonique s'il est valide, sinon une chaîne vide."""
 
     if value is None:
         return ""
@@ -86,7 +86,7 @@ def _normalize_ean(value: str | int | float | None) -> str:
 
 
 def fetch_customer_catalog(*, tenant_id: int = 1) -> pd.DataFrame:
-    """Return the active catalog enriched with rolling sales and main barcode."""
+    """Retourne le catalogue actif enrichi des ventes glissantes et du code-barres principal."""
 
     df = query_df(_CUSTOMER_CATALOG_SQL, params={"tenant_id": int(tenant_id)})
     if df.empty:
@@ -133,7 +133,7 @@ def fetch_customer_catalog(*, tenant_id: int = 1) -> pd.DataFrame:
 
 
 def fetch_recent_suppliers(*, tenant_id: int = 1) -> pd.DataFrame:
-    """Return the most recent incoming-movement source per product."""
+    """Retourne la dernière source de mouvement entrant par produit."""
 
     df = query_df(_RECENT_SUPPLIERS_SQL, params={"tenant_id": int(tenant_id)})
     if df.empty:

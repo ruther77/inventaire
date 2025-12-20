@@ -1,4 +1,4 @@
-"""Audit and stock discrepancy services."""
+"""Services d'audit et de gestion des écarts de stock."""
 
 from __future__ import annotations
 

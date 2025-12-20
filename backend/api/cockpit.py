@@ -260,18 +260,18 @@ def _get_treasury_summary(tenant_id: int) -> TreasurySummary:
     except Exception:
         pass
 
-    # Transactions non rapprochees
+    # Transactions non rapprochees - basé sur finance_bank_statement_lines et matches
     try:
         unmatched_sql = """
             SELECT
                 COUNT(*) as total,
-                COUNT(*) FILTER (WHERE rapproche = true) as matched
-            FROM finance_transactions
-            WHERE tenant_id = :tenant_id
-              AND date_transaction >= CURRENT_DATE - INTERVAL '60 days'
-              AND montant < 0
+                COUNT(m.id) as matched
+            FROM finance_bank_statement_lines bsl
+            LEFT JOIN finance_bank_invoice_matches m ON m.bank_statement_id = bsl.id AND m.status = 'confirmed'
+            WHERE bsl.date_operation >= CURRENT_DATE - INTERVAL '60 days'
+              AND bsl.montant < 0
         """
-        unmatched_df = query_df(unmatched_sql, params={"tenant_id": tenant_id})
+        unmatched_df = query_df(unmatched_sql, params={})
         total_tx = int(unmatched_df.iloc[0]['total'] or 0) if not unmatched_df.empty else 0
         matched_tx = int(unmatched_df.iloc[0]['matched'] or 0) if not unmatched_df.empty else 0
     except Exception:

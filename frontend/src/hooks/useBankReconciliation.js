@@ -9,7 +9,6 @@ import {
   deleteSupplierAlias,
   fetchReconciliationSummary,
 } from '../api/client.js';
-import { useAuth } from './useAuth.js';
 
 /**
  * Hook pour récupérer le résumé du rapprochement bancaire.
@@ -126,38 +125,34 @@ export function useDeleteSupplierAlias() {
  */
 export function useBankReconciliation(filters = {}) {
   const { daysBack = 90, minAmount = 0 } = filters;
-  const { isAuthenticated } = useAuth();
 
   const summary = useQuery({
     queryKey: ['reconciliation', 'summary', daysBack],
     queryFn: () => fetchReconciliationSummary(daysBack),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    enabled: isAuthenticated,
   });
 
   const transactions = useQuery({
     queryKey: ['reconciliation', 'unmatched', 'transactions', daysBack, minAmount],
     queryFn: () => fetchUnmatchedTransactions({ daysBack, minAmount }),
     staleTime: 2 * 60 * 1000,
-    select: (data) => data?.items || (Array.isArray(data) ? data : []),
-    enabled: isAuthenticated,
+    // API returns {success, data: [...], error, meta} - extract data array
+    select: (response) => response?.data || response?.items || (Array.isArray(response) ? response : []),
   });
 
   const invoices = useQuery({
     queryKey: ['reconciliation', 'unmatched', 'invoices', daysBack],
     queryFn: () => fetchUnmatchedInvoices(daysBack),
     staleTime: 2 * 60 * 1000,
-    select: (data) => data?.items || (Array.isArray(data) ? data : []),
-    enabled: isAuthenticated,
+    // API returns {success, data: [...], error, meta} - extract data array
+    select: (response) => response?.data || response?.items || (Array.isArray(response) ? response : []),
   });
 
-  // Only fetch aliases when authenticated (not always needed on page load)
   const aliases = useQuery({
     queryKey: ['reconciliation', 'aliases'],
     queryFn: fetchSupplierAliases,
     staleTime: 10 * 60 * 1000,
-    enabled: isAuthenticated,
   });
 
   const runReconciliation = useRunReconciliation();

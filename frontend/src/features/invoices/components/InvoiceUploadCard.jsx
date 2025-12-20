@@ -43,6 +43,7 @@ export default function InvoiceUploadCard({
   supplier,
   onExtractionSuccess,
   onProcessingSnapshot,
+  onFileUpload,
 }) {
   const [rawText, setRawText] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -58,6 +59,11 @@ export default function InvoiceUploadCard({
   };
 
   const processFile = (file) => {
+    // Notifier le parent qu'un fichier a été uploadé (pour le preview PDF)
+    if (onFileUpload) {
+      onFileUpload(file);
+    }
+
     if (onProcessingSnapshot) {
       onProcessingSnapshot({
         isProcessing: true,

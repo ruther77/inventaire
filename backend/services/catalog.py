@@ -11,11 +11,11 @@ from core.products_loader import insert_or_update_barcode
 
 
 class CatalogServiceError(Exception):
-    """Base exception for catalogue operations."""
+    """Exception de base pour les opérations catalogue."""
 
 
 class ProductNotFound(CatalogServiceError):
-    """Raised when a product cannot be located."""
+    """Levée lorsqu'un produit ne peut pas être trouvé."""
 
 
 PRODUCT_COLUMNS = (
@@ -276,7 +276,7 @@ def list_vendors(*, tenant_id: int) -> list[dict[str, Any]]:
         if rows:
             return [{"id": idx + 1, "name": row[0]} for idx, row in enumerate(rows)]
 
-        # Fallback: restaurant_fournisseurs si applicable
+        # Repli vers restaurant_fournisseurs si applicable
         try:
             rows = conn.execute(
                 text(

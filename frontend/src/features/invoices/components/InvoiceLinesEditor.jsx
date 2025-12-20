@@ -12,6 +12,7 @@ import { useMemo } from 'react';
 import Card from '../../../components/ui/Card.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import { useLinkInvoiceLine, useCreateProductFromLine } from '../../../hooks/useInvoiceImport.js';
+import ProductMatchSuggestions from './ProductMatchSuggestions.jsx';
 
 const numberFormatter = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 });
 
@@ -207,10 +208,50 @@ export default function InvoiceLinesEditor({
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       <div className="flex flex-wrap gap-2 justify-end">
+                        {/* Afficher les suggestions de matching si pas de produit_id */}
+                        {!line.produit_id && line.nom && (
+                          <ProductMatchSuggestions
+                            productName={line.nom}
+                            onSelectMatch={(suggestion) => {
+                              // Lier automatiquement au produit suggéré
+                              linkMutation.mutate(
+                                { line, productId: suggestion.produit_id },
+                                {
+                                  onSuccess: (enriched) => {
+                                    const next = [...lines];
+                                    next[index] = enriched;
+                                    onLinesChange(next);
+                                  },
+                                }
+                              );
+                            }}
+                            onCreateNew={() => {
+                              // Créer un nouveau produit
+                              createProductMutation.mutate(
+                                {
+                                  line,
+                                  supplier: line.catalogue_nom || line.catalogue_categorie,
+                                  initializeStock: true,
+                                  invoiceDate: line.facture_date,
+                                },
+                                {
+                                  onSuccess: () => {
+                                    const next = [...lines];
+                                    next[index] = {
+                                      ...line,
+                                      produit_id: line.produit_id || line.numero_article || null,
+                                    };
+                                    onLinesChange(next);
+                                  },
+                                }
+                              );
+                            }}
+                          />
+                        )}
                         <Button
                           variant="outline"
                           size="xs"
-                          disabled={linkMutation.isPending}
+                          disabled={linkMutation.isPending || !line.produit_id}
                           onClick={() => {
                             if (!line.produit_id) return;
                             linkMutation.mutate(

@@ -10,6 +10,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -20,6 +21,8 @@ import {
   resolveAnomaly,
 } from '../../api/client.js';
 import { staggerContainer, staggerItem, expandRow, kpiCard } from '../../ui/motion.js';
+import AnomalyDetailDrawer from './components/AnomalyDetailDrawer.jsx';
+import AnomalyActionsInline from './components/AnomalyActionsInline.jsx';
 
 const SEVERITY_CONFIG = {
   critical: { bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-300', label: 'Critique' },
@@ -68,7 +71,7 @@ function StatCard({ label, value, severity }) {
   );
 }
 
-function AnomalyRow({ anomaly, onResolve, onIgnore, isResolving }) {
+function AnomalyRow({ anomaly, onResolve, onIgnore, onViewDetails, onNavigate, isResolving }) {
   const config = SEVERITY_CONFIG[anomaly.severity] || SEVERITY_CONFIG.low;
   const [expanded, setExpanded] = useState(false);
 
@@ -102,6 +105,16 @@ function AnomalyRow({ anomaly, onResolve, onIgnore, isResolving }) {
           <span className="text-sm font-semibold text-slate-700">
             Impact: {anomaly.impact?.toLocaleString('fr-FR')} €
           </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDetails(anomaly);
+            }}
+          >
+            Details
+          </Button>
           <motion.span
             className="text-slate-400"
             animate={{ rotate: expanded ? 180 : 0 }}
@@ -141,40 +154,20 @@ function AnomalyRow({ anomaly, onResolve, onIgnore, isResolving }) {
                 </motion.div>
               )}
 
-              {/* Actions */}
+              {/* Actions correctives inline */}
               <motion.div
-                className="flex gap-3"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.15 }}
               >
-                <Button
-                  variant="brand"
-                  size="sm"
-                  onClick={() => onResolve(anomaly.id)}
-                  disabled={isResolving}
-                >
-                  {isResolving ? 'Resolution...' : 'Marquer resolu'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onIgnore(anomaly.id)}
-                  disabled={isResolving}
-                >
-                  Ignorer
-                </Button>
-                {anomaly.entity_type && anomaly.entity_id && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      window.location.href = `/${anomaly.entity_type}/${anomaly.entity_id}`
-                    }
-                  >
-                    Voir {anomaly.entity_type}
-                  </Button>
-                )}
+                <AnomalyActionsInline
+                  anomaly={anomaly}
+                  onResolve={onResolve}
+                  onIgnore={onIgnore}
+                  onViewDetails={onViewDetails}
+                  onNavigateToEntity={onNavigate}
+                  showFeedback={true}
+                />
               </motion.div>
             </div>
           </motion.div>
@@ -186,8 +179,11 @@ function AnomalyRow({ anomaly, onResolve, onIgnore, isResolving }) {
 
 export default function AnomaliesPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [severityFilter, setSeverityFilter] = useState(null);
   const [typeFilter, setTypeFilter] = useState(null);
+  const [selectedAnomaly, setSelectedAnomaly] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Queries
   const anomaliesQuery = useQuery({
@@ -221,6 +217,32 @@ export default function AnomaliesPage() {
 
   const handleIgnore = (anomalyId) => {
     resolveMutation.mutate({ anomalyId, action: 'ignored' });
+  };
+
+  const handleViewDetails = (anomaly) => {
+    setSelectedAnomaly(anomaly);
+    setDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setDrawerOpen(false);
+    setSelectedAnomaly(null);
+  };
+
+  const handleNavigate = (entityType, entityId) => {
+    if (!entityType || !entityId) return;
+    const routes = {
+      product: `/inventory/product/${entityId}`,
+      supplier: `/intelligence/scoring/suppliers/${entityId}`,
+      transaction: `/finances/transactions?id=${entityId}`,
+      invoice: `/operations/factures?id=${entityId}`,
+      prices: `/operations/prix?product=${entityId}`,
+      history: `/operations/prix?product=${entityId}`,
+      stock: `/operations/stock?product=${entityId}`,
+    };
+    const path = routes[entityType] || `/${entityType}/${entityId}`;
+    navigate(path);
+    handleCloseDrawer();
   };
 
   return (
@@ -314,6 +336,8 @@ export default function AnomaliesPage() {
                 anomaly={anomaly}
                 onResolve={handleResolve}
                 onIgnore={handleIgnore}
+                onViewDetails={handleViewDetails}
+                onNavigate={handleNavigate}
                 isResolving={resolveMutation.isPending}
               />
             ))}
@@ -352,6 +376,22 @@ export default function AnomaliesPage() {
           </div>
         </div>
       </Card>
+
+      {/* Anomaly Detail Drawer */}
+      <AnomalyDetailDrawer
+        isOpen={drawerOpen}
+        onClose={handleCloseDrawer}
+        anomaly={selectedAnomaly}
+        onResolve={(id, action) => {
+          handleResolve(id);
+          handleCloseDrawer();
+        }}
+        onIgnore={(id) => {
+          handleIgnore(id);
+          handleCloseDrawer();
+        }}
+        onNavigate={handleNavigate}
+      />
     </div>
   );
 }

@@ -1,35 +1,18 @@
 import { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import SidebarNav from './SidebarNav.jsx';
 import TopBar from './TopBar.jsx';
 import CommandBar from '../components/layout/CommandBar.jsx';
 import BottomNav from '../components/layout/BottomNav.jsx';
 import { CommandBarProvider } from '../contexts/CommandBarContext.jsx';
+import OfflineBanner from '../components/feedback/OfflineBanner.jsx';
 
 // ============================================================================
-// PAGE TRANSITION VARIANTS - Simplified for performance
+// PAGE TRANSITION - Désactivé pour éviter conflits avec Suspense/lazy
 // ============================================================================
-
-const pageVariants = {
-  hidden: {
-    opacity: 0,
-  },
-  visible: {
-    opacity: 1,
-    transition: {
-      duration: 0.15,
-      ease: 'easeOut',
-    },
-  },
-  exit: {
-    opacity: 0,
-    transition: {
-      duration: 0.1,
-    },
-  },
-};
+// Note: AnimatePresence mode="wait" + Suspense lazy loading = navigation bloquée
+// La transition simple CSS est plus fiable
 
 // ============================================================================
 // APP SHELL 2025 - Unified Layout
@@ -37,11 +20,13 @@ const pageVariants = {
 
 export default function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const location = useLocation();
 
   return (
     <CommandBarProvider>
       <div className="flex min-h-screen">
+        {/* Bannière Offline/Online */}
+        <OfflineBanner />
+
         {/* Sidebar */}
         <SidebarNav
           isOpen={sidebarOpen}
@@ -53,20 +38,11 @@ export default function AppShell() {
           {/* TopBar */}
           <TopBar onMenuToggle={() => setSidebarOpen(true)} />
 
-          {/* Page content */}
+          {/* Page content - Sans AnimatePresence pour éviter blocage avec Suspense */}
           <main className="flex-1 px-4 pb-12 pt-6 sm:px-6 lg:px-8">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={location.pathname}
-                variants={pageVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="mx-auto w-full max-w-7xl"
-              >
-                <Outlet />
-              </motion.div>
-            </AnimatePresence>
+            <div className="mx-auto w-full max-w-7xl">
+              <Outlet />
+            </div>
           </main>
 
           {/* Footer */}

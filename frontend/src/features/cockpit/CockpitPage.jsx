@@ -40,6 +40,7 @@ import {
   acknowledgeCockpitAlert,
   fetchForecastingSummary,
   fetchAnomalySummary,
+  fetchInvoiceHistory,
 } from '../../api/client.js';
 import AlertCard, { AlertList } from '../../components/ai/AlertCard.jsx';
 import SuggestionCard from '../../components/ai/SuggestionCard.jsx';
@@ -560,9 +561,9 @@ function QuickSuggestion({ onNavigate }) {
 }
 
 /**
- * Actions rapides
+ * Actions rapides avec CTAs pour factures récentes
  */
-function QuickActions({ onNavigate }) {
+function QuickActions({ onNavigate, recentInvoices = [] }) {
   const actions = [
     { icon: Receipt, label: 'Scanner facture', path: '/operations/factures', variant: 'primary' },
     { icon: Package, label: 'Vérifier stock', path: '/operations/stock', variant: 'default' },
@@ -571,25 +572,74 @@ function QuickActions({ onNavigate }) {
   ];
 
   return (
-    <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10">
-      <div className="flex items-center gap-2 mb-4">
-        <Zap className="w-5 h-5 text-amber-400" />
-        <h3 className="font-semibold text-white">Actions rapides</h3>
+    <div className="space-y-3">
+      {/* Actions principales */}
+      <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10">
+        <div className="flex items-center gap-2 mb-4">
+          <Zap className="w-5 h-5 text-amber-400" />
+          <h3 className="font-semibold text-white">Actions rapides</h3>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {actions.map((action, index) => (
+            <QuickAction
+              key={index}
+              icon={action.icon}
+              label={action.label}
+              variant={action.variant}
+              size="md"
+              onClick={() => onNavigate(action.path)}
+              className="w-full justify-start"
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        {actions.map((action, index) => (
-          <QuickAction
-            key={index}
-            icon={action.icon}
-            label={action.label}
-            variant={action.variant}
-            size="md"
-            onClick={() => onNavigate(action.path)}
-            className="w-full justify-start"
-          />
-        ))}
-      </div>
+      {/* CTAs Factures récentes */}
+      {recentInvoices?.length > 0 && (
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-900/20 to-violet-900/20 border border-blue-500/30">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-blue-400" />
+              <h4 className="text-sm font-semibold text-white">Factures importées</h4>
+            </div>
+            <span className="text-xs text-blue-400">{recentInvoices.length} récentes</span>
+          </div>
+
+          <div className="space-y-2">
+            {recentInvoices.slice(0, 3).map((invoice, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className="flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => onNavigate(`/operations/factures?invoice=${invoice.invoice_id}`)}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">
+                    {invoice.invoice_id}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {invoice.supplier || 'Fournisseur inconnu'} • {invoice.line_count || 0} lignes
+                  </p>
+                </div>
+                <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 ml-2" />
+              </motion.div>
+            ))}
+          </div>
+
+          {recentInvoices.length > 3 && (
+            <button
+              onClick={() => onNavigate('/operations/factures')}
+              className="mt-2 w-full text-xs text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1"
+            >
+              Voir toutes les factures ({recentInvoices.length})
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -680,6 +730,14 @@ export default function CockpitPage() {
     queryKey: ['anomaly-summary'],
     queryFn: () => fetchAnomalySummary({ days_back: 7 }),
     staleTime: 5 * 60000, // 5 minutes
+    enabled: !isLoading,
+  });
+
+  // Query quaternaire: factures récentes importées (pour CTAs)
+  const { data: recentInvoices } = useQuery({
+    queryKey: ['invoice-history-recent'],
+    queryFn: () => fetchInvoiceHistory({ limit: 10 }),
+    staleTime: 2 * 60000, // 2 minutes
     enabled: !isLoading,
   });
 
@@ -777,8 +835,11 @@ export default function CockpitPage() {
                 stockData={data?.stock}
               />
 
-              {/* Actions rapides */}
-              <QuickActions onNavigate={handleNavigate} />
+              {/* Actions rapides avec CTAs factures */}
+              <QuickActions
+                onNavigate={handleNavigate}
+                recentInvoices={recentInvoices}
+              />
             </div>
 
             {/* Suggestion IA */}

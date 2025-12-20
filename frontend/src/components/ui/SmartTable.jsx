@@ -2,6 +2,8 @@
  * SmartTable - Table intelligente avec tri, filtres, export
  * Phase 4 - UX_NEXT_GEN_2025.md
  *
+ * Dark Theme Design System (2025 Next-Gen)
+ *
  * Features:
  * - Tri multi-colonnes
  * - Filtres inline
@@ -23,7 +25,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
   Check,
   Loader2,
   Settings2,
@@ -262,10 +263,10 @@ const SmartTable = forwardRef(function SmartTable(
   // Visible columns
   const displayColumns = columns.filter((col) => visibleColumns.includes(col.key));
 
-  // Variant styles
+  // Variant styles - Dark Theme
   const variantStyles = {
-    default: 'border border-slate-200 rounded-lg overflow-hidden',
-    bordered: 'border border-slate-300 rounded-lg overflow-hidden [&_td]:border [&_th]:border',
+    default: 'border border-white/10 rounded-xl overflow-hidden',
+    bordered: 'border border-white/20 rounded-xl overflow-hidden [&_td]:border-white/10 [&_th]:border-white/10',
     minimal: 'overflow-hidden',
   };
 
@@ -280,14 +281,14 @@ const SmartTable = forwardRef(function SmartTable(
               className={clsx(
                 'flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors',
                 showFilters || Object.keys(filters).length > 0
-                  ? 'bg-brand-50 border-brand-200 text-brand-700'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  ? 'bg-blue-500/20 border-blue-500/30 text-blue-400'
+                  : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
               )}
             >
               <Filter className="w-4 h-4" />
               Filtres
               {Object.keys(filters).length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-brand-500 text-white rounded-full">
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-500 text-white rounded-full">
                   {Object.keys(filters).length}
                 </span>
               )}
@@ -295,7 +296,7 @@ const SmartTable = forwardRef(function SmartTable(
           )}
 
           {selectable && selectedRows.size > 0 && (
-            <span className="text-sm text-slate-600">
+            <span className="text-sm text-slate-400">
               {selectedRows.size} sélectionné{selectedRows.size > 1 ? 's' : ''}
             </span>
           )}
@@ -306,17 +307,17 @@ const SmartTable = forwardRef(function SmartTable(
           <div className="relative">
             <button
               onClick={() => setShowColumnSettings(!showColumnSettings)}
-              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              className="p-2 rounded-lg border border-white/10 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
               title="Colonnes"
             >
               <Settings2 className="w-4 h-4" />
             </button>
             {showColumnSettings && (
-              <div className="absolute right-0 top-full mt-1 z-10 bg-white border border-slate-200 rounded-lg shadow-lg p-2 min-w-[200px]">
+              <div className="absolute right-0 top-full mt-1 z-20 bg-slate-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[200px]">
                 {columns.map((col) => (
                   <label
                     key={col.key}
-                    className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer"
+                    className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 rounded-lg cursor-pointer"
                   >
                     <input
                       type="checkbox"
@@ -328,9 +329,9 @@ const SmartTable = forwardRef(function SmartTable(
                           setVisibleColumns(visibleColumns.filter((k) => k !== col.key));
                         }
                       }}
-                      className="rounded text-brand-500"
+                      className="rounded bg-white/10 border-white/20 text-blue-500 focus:ring-blue-500/50"
                     />
-                    <span className="text-sm">{col.header || col.key}</span>
+                    <span className="text-sm text-slate-300">{col.header || col.key}</span>
                   </label>
                 ))}
               </div>
@@ -342,7 +343,7 @@ const SmartTable = forwardRef(function SmartTable(
             <div className="relative group">
               <button
                 onClick={() => handleExport('csv')}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-white/10 text-slate-300 hover:bg-white/10 transition-colors"
               >
                 <Download className="w-4 h-4" />
                 Exporter
@@ -359,7 +360,7 @@ const SmartTable = forwardRef(function SmartTable(
 
       {/* Filters row */}
       {showFilters && (
-        <div className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="flex flex-wrap gap-2 mb-3 p-3 bg-white/5 rounded-xl border border-white/10">
           {displayColumns
             .filter((col) => col.filterable !== false)
             .map((col) => (
@@ -369,7 +370,7 @@ const SmartTable = forwardRef(function SmartTable(
                   <select
                     value={filters[col.key] || ''}
                     onChange={(e) => handleFilterChange(col.key, e.target.value)}
-                    className="text-sm px-2 py-1 rounded border border-slate-300 bg-white"
+                    className="text-sm px-2 py-1 rounded-lg border border-white/20 bg-white/5 text-white"
                   >
                     <option value="">Tous</option>
                     {col.filterOptions?.map((opt) => (
@@ -380,13 +381,13 @@ const SmartTable = forwardRef(function SmartTable(
                   </select>
                 ) : (
                   <div className="relative">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
                     <input
                       type="text"
                       value={filters[col.key] || ''}
                       onChange={(e) => handleFilterChange(col.key, e.target.value)}
                       placeholder="Filtrer..."
-                      className="text-sm pl-6 pr-2 py-1 w-32 rounded border border-slate-300"
+                      className="text-sm pl-6 pr-2 py-1 w-32 rounded-lg border border-white/20 bg-white/5 text-white placeholder-slate-500"
                     />
                   </div>
                 )}
@@ -398,7 +399,7 @@ const SmartTable = forwardRef(function SmartTable(
                 setFilters({});
                 onFilter?.({});
               }}
-              className="text-xs text-red-600 hover:text-red-700 flex items-center gap-1"
+              className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1"
             >
               <X className="w-3 h-3" />
               Effacer tout
@@ -415,7 +416,7 @@ const SmartTable = forwardRef(function SmartTable(
         <table className="w-full">
           <thead
             className={clsx(
-              'bg-slate-50 text-left text-sm font-medium text-slate-600',
+              'bg-white/5 text-left text-sm font-medium text-slate-400',
               stickyHeader && 'sticky top-0 z-10'
             )}
           >
@@ -429,7 +430,7 @@ const SmartTable = forwardRef(function SmartTable(
                       selectedRows.size === paginatedData.length
                     }
                     onChange={handleSelectAll}
-                    className="rounded text-brand-500"
+                    className="rounded bg-white/10 border-white/20 text-blue-500"
                   />
                 </th>
               )}
@@ -442,19 +443,19 @@ const SmartTable = forwardRef(function SmartTable(
                     col.width && `w-[${col.width}]`,
                     col.align === 'right' && 'text-right',
                     col.align === 'center' && 'text-center',
-                    sortable && col.sortable !== false && 'cursor-pointer hover:bg-slate-100'
+                    sortable && col.sortable !== false && 'cursor-pointer hover:bg-white/5 transition-colors'
                   )}
                   onClick={() => col.sortable !== false && handleSort(col.key)}
                 >
                   <div className="flex items-center gap-1">
                     <span>{col.header || col.key}</span>
                     {sortable && col.sortable !== false && (
-                      <span className="text-slate-400">
+                      <span className="text-slate-500">
                         {sortConfig.key === col.key ? (
                           sortConfig.direction === 'asc' ? (
-                            <ArrowUp className="w-4 h-4" />
+                            <ArrowUp className="w-4 h-4 text-blue-400" />
                           ) : (
-                            <ArrowDown className="w-4 h-4" />
+                            <ArrowDown className="w-4 h-4 text-blue-400" />
                           )
                         ) : (
                           <ArrowUpDown className="w-4 h-4 opacity-30" />
@@ -467,14 +468,14 @@ const SmartTable = forwardRef(function SmartTable(
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-white/5">
             {loading ? (
               <tr>
                 <td
                   colSpan={displayColumns.length + (selectable ? 1 : 0)}
                   className="px-3 py-12 text-center"
                 >
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-400" />
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-500" />
                   <p className="text-sm text-slate-500 mt-2">Chargement...</p>
                 </td>
               </tr>
@@ -497,9 +498,9 @@ const SmartTable = forwardRef(function SmartTable(
                     key={rowKey}
                     className={clsx(
                       'transition-colors',
-                      striped && rowIndex % 2 === 1 && 'bg-slate-50/50',
-                      isSelected && 'bg-brand-50',
-                      onRowClick && 'cursor-pointer hover:bg-slate-100'
+                      striped && rowIndex % 2 === 1 && 'bg-white/[0.02]',
+                      isSelected && 'bg-blue-500/10',
+                      onRowClick && 'cursor-pointer hover:bg-white/5'
                     )}
                     onClick={() => onRowClick?.(row)}
                   >
@@ -513,7 +514,7 @@ const SmartTable = forwardRef(function SmartTable(
                             handleSelectRow(rowKey);
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className="rounded text-brand-500"
+                          className="rounded bg-white/10 border-white/20 text-blue-500"
                         />
                       </td>
                     )}
@@ -523,7 +524,7 @@ const SmartTable = forwardRef(function SmartTable(
                         className={clsx(
                           'px-3',
                           compact ? 'py-2' : 'py-3',
-                          'text-sm',
+                          'text-sm text-slate-300',
                           col.align === 'right' && 'text-right',
                           col.align === 'center' && 'text-center'
                         )}
@@ -567,7 +568,7 @@ const SmartTable = forwardRef(function SmartTable(
                 setLocalPageSize(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="px-2 py-1 rounded border border-slate-300"
+              className="px-2 py-1 rounded-lg border border-white/20 bg-white/5 text-white"
             >
               {pageSizeOptions.map((size) => (
                 <option key={size} value={size}>
@@ -588,7 +589,7 @@ const SmartTable = forwardRef(function SmartTable(
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -611,10 +612,10 @@ const SmartTable = forwardRef(function SmartTable(
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
                     className={clsx(
-                      'w-8 h-8 rounded text-sm',
+                      'w-8 h-8 rounded-lg text-sm transition-colors',
                       currentPage === pageNum
-                        ? 'bg-brand-500 text-white'
-                        : 'hover:bg-slate-100'
+                        ? 'bg-blue-500 text-white'
+                        : 'text-slate-400 hover:bg-white/10'
                     )}
                   >
                     {pageNum}
@@ -625,7 +626,7 @@ const SmartTable = forwardRef(function SmartTable(
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -662,13 +663,20 @@ export const columnHelpers = {
     key,
     header,
     align: 'right',
-    render: (val) =>
-      val !== null && val !== undefined
-        ? `${Number(val).toLocaleString('fr-FR', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}€`
-        : '-',
+    render: (val) => {
+      if (val === null || val === undefined) return '-';
+      const num = Number(val);
+      const formatted = num.toLocaleString('fr-FR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      const isNegative = num < 0;
+      return (
+        <span className={isNegative ? 'text-rose-400' : 'text-emerald-400'}>
+          {formatted}€
+        </span>
+      );
+    },
     sortFn: (a, b) => (a || 0) - (b || 0),
     ...options,
   }),
@@ -710,17 +718,29 @@ export const columnHelpers = {
     ...options,
   }),
 
-  // Badge/Status
+  // Badge/Status - Dark theme
   status: (key, header, statusConfig = {}, options = {}) => ({
     key,
     header,
     render: (val) => {
       const config = statusConfig[val] || { label: val, color: 'slate' };
+      const colorMap = {
+        emerald: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        green: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        amber: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        yellow: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        rose: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+        red: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+        blue: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+        purple: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+        slate: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+        gray: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+      };
       return (
         <span
           className={clsx(
-            'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-            `bg-${config.color}-100 text-${config.color}-700`
+            'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border',
+            colorMap[config.color] || colorMap.slate
           )}
         >
           {config.icon && <span className="mr-1">{config.icon}</span>}
@@ -743,9 +763,9 @@ export const columnHelpers = {
     align: 'center',
     render: (val) =>
       val ? (
-        <Check className="w-4 h-4 text-emerald-500 mx-auto" />
+        <Check className="w-4 h-4 text-emerald-400 mx-auto" />
       ) : (
-        <X className="w-4 h-4 text-slate-300 mx-auto" />
+        <X className="w-4 h-4 text-slate-600 mx-auto" />
       ),
     filterType: 'select',
     filterOptions: [

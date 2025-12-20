@@ -1,4 +1,4 @@
-"""Reporting aggregations for analytics and CSV exports."""
+"""Agrégations de reporting pour l'analytics et les exports CSV."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from core.data_repository import query_df
 
 
 def _as_records(df: DataFrame) -> list[dict[str, Any]]:
-    """Normalize a DataFrame into plain Python dictionaries."""
+    """Normalise un DataFrame en dictionnaires Python simples."""
 
     if df.empty:
         return []
@@ -233,7 +233,7 @@ def build_overview(*, tenant_id: int) -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class ReportExport:
-    """Describe an exportable dataset."""
+    """Décrit un dataset exportable."""
 
     filename: str
     sql: str
@@ -335,7 +335,7 @@ EXPORT_DEFINITIONS: Dict[str, ReportExport] = {
 
 
 def export_dataset(report_type: str, limit: int, *, tenant_id: int) -> Tuple[str, bytes]:
-    """Return (filename, csv_bytes) for the selected dataset."""
+    """Retourne (filename, csv_bytes) pour le dataset sélectionné."""
 
     definition = EXPORT_DEFINITIONS.get(report_type)
     if definition is None:

@@ -1,8 +1,19 @@
+/**
+ * ImportStepper - Composant pour gérer l'import de fichiers bancaires (CSV et PDF)
+ *
+ * Supporte:
+ * - CSV: Format standard avec colonnes date, libelle, montant
+ * - PDF: Relevés LCL, BNP, SumUp (parsing automatique via orchestrator)
+ *
+ * Design: Standards Morning Brief (dark mode, glass-morphism, Framer Motion)
+ */
+
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Upload, FileText, CheckCircle, XCircle, AlertCircle, Loader2, X } from 'lucide-react';
 import clsx from 'clsx';
 import Button from '../../../components/ui/Button.jsx';
-import { useFinanceImport } from '../../../hooks/useFinance.js';
+import { useFinanceImport, useFinanceImportPDF } from '../../../hooks/useFinance.js';
 
 const STATES = {
   IDLE: 'IDLE',
@@ -12,9 +23,18 @@ const STATES = {
   ERROR: 'ERROR',
 };
 
-/**
- * ImportStepper - Composant pour gérer l'import de fichiers CSV bancaires
- */
+const ALLOWED_EXTENSIONS = ['.csv', '.pdf'];
+const ALLOWED_TYPES = ['text/csv', 'application/pdf'];
+
+const isValidFile = (file) => {
+  const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+  return ALLOWED_EXTENSIONS.includes(ext) || ALLOWED_TYPES.includes(file.type);
+};
+
+const isPDFFile = (file) => {
+  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+};
+
 export default function ImportStepper({ accountId, onComplete }) {
   const [state, setState] = useState(STATES.IDLE);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -24,7 +44,8 @@ export default function ImportStepper({ accountId, onComplete }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef(null);
 
-  const importMutation = useFinanceImport();
+  const importCSVMutation = useFinanceImport();
+  const importPDFMutation = useFinanceImportPDF();
 
   const handleDrag = useCallback((e) => {
     e.preventDefault();
@@ -43,10 +64,11 @@ export default function ImportStepper({ accountId, onComplete }) {
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+      if (isValidFile(file)) {
         setSelectedFile(file);
+        setError('');
       } else {
-        setError('Veuillez sélectionner un fichier CSV');
+        setError('Veuillez sélectionner un fichier CSV ou PDF');
       }
     }
   }, []);
@@ -54,11 +76,11 @@ export default function ImportStepper({ accountId, onComplete }) {
   const handleFileInput = useCallback((e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+      if (isValidFile(file)) {
         setSelectedFile(file);
         setError('');
       } else {
-        setError('Veuillez sélectionner un fichier CSV');
+        setError('Veuillez sélectionner un fichier CSV ou PDF');
       }
     }
   }, []);
@@ -78,7 +100,6 @@ export default function ImportStepper({ accountId, onComplete }) {
     setError('');
     setUploadProgress(0);
 
-    // Simulate upload progress
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 90) {
@@ -93,11 +114,14 @@ export default function ImportStepper({ accountId, onComplete }) {
       setState(STATES.PARSING);
       setUploadProgress(100);
 
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('account_id', accountId);
+      // Choisir le bon endpoint selon le type de fichier
+      const isPDF = isPDFFile(selectedFile);
+      const mutation = isPDF ? importPDFMutation : importCSVMutation;
 
-      const data = await importMutation.mutateAsync(formData);
+      const data = await mutation.mutateAsync({
+        accountId,
+        file: selectedFile,
+      });
 
       clearInterval(progressInterval);
       setResult(data);
@@ -108,7 +132,7 @@ export default function ImportStepper({ accountId, onComplete }) {
       }
     } catch (err) {
       clearInterval(progressInterval);
-      setError(err.message || 'Erreur lors de l\'import');
+      setError(err.message || "Erreur lors de l'import");
       setState(STATES.ERROR);
     }
   };
@@ -124,186 +148,246 @@ export default function ImportStepper({ accountId, onComplete }) {
     }
   };
 
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   return (
     <div className="space-y-4">
-      {/* Step 1: IDLE - File Selection */}
-      {state === STATES.IDLE && (
-        <div
-          className={clsx(
-            'relative rounded-2xl border-2 border-dashed p-8 transition-colors duration-150',
-            dragActive
-              ? 'border-brand-500 bg-brand-50'
-              : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100'
-          )}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            onChange={handleFileInput}
-            className="hidden"
-            disabled={!accountId}
-          />
+      {/* IDLE - File Selection */}
+      <AnimatePresence mode="wait">
+        {state === STATES.IDLE && (
+          <motion.div
+            key="idle"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={clsx(
+              'relative rounded-2xl border-2 border-dashed p-8 transition-all duration-200',
+              dragActive
+                ? 'border-blue-500/50 bg-blue-500/10'
+                : 'border-white/20 bg-white/5 hover:border-white/30 hover:bg-white/10'
+            )}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.pdf,text/csv,application/pdf"
+              onChange={handleFileInput}
+              className="hidden"
+              disabled={!accountId}
+            />
 
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="rounded-full bg-white p-4 shadow-sm">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                className={clsx(
+                  'rounded-full p-4',
+                  selectedFile ? 'bg-blue-500/20' : 'bg-white/10'
+                )}
+              >
+                {selectedFile ? (
+                  <FileText className="h-8 w-8 text-blue-400" />
+                ) : (
+                  <Upload className="h-8 w-8 text-slate-400" />
+                )}
+              </motion.div>
+
               {selectedFile ? (
-                <FileText className="h-8 w-8 text-brand-600" />
+                <>
+                  <div>
+                    <p className="text-sm font-medium text-white">{selectedFile.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatFileSize(selectedFile.size)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={handleReset}>
+                      Changer
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={handleUpload} disabled={!accountId}>
+                      Importer
+                    </Button>
+                  </div>
+                </>
               ) : (
-                <Upload className="h-8 w-8 text-slate-400" />
+                <>
+                  <div>
+                    <p className="text-sm font-medium text-white">
+                      Déposez votre fichier CSV ou PDF ici
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">ou cliquez pour parcourir (relevés LCL, BNP, SumUp)</p>
+                  </div>
+                  <Button
+                    variant="subtle"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!accountId}
+                  >
+                    Sélectionner un fichier
+                  </Button>
+                </>
+              )}
+
+              {!accountId && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2"
+                >
+                  <p className="flex items-center gap-2 text-xs text-amber-400">
+                    <AlertCircle className="h-4 w-4" />
+                    Veuillez d'abord sélectionner un compte
+                  </p>
+                </motion.div>
               )}
             </div>
+          </motion.div>
+        )}
 
-            {selectedFile ? (
-              <>
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{selectedFile.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {(selectedFile.size / 1024).toFixed(2)} KB
-                  </p>
+        {/* UPLOADING - Progress */}
+        {state === STATES.UPLOADING && (
+          <motion.div
+            key="uploading"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="rounded-2xl border border-white/10 bg-white/5 p-6"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">Téléchargement en cours...</p>
+                  <p className="text-xs text-slate-500">{selectedFile?.name}</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={handleReset}>
-                    Changer de fichier
-                  </Button>
-                  <Button variant="primary" size="sm" onClick={handleUpload} disabled={!accountId}>
-                    Importer
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <p className="text-sm font-medium text-slate-900">
-                    Déposez votre fichier CSV ici
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">ou cliquez pour parcourir</p>
-                </div>
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={!accountId}
-                >
-                  Sélectionner un fichier
-                </Button>
-              </>
-            )}
-
-            {!accountId && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                <p className="flex items-center gap-2 text-xs text-amber-700">
-                  <AlertCircle className="h-4 w-4" />
-                  Veuillez d'abord sélectionner un compte
-                </p>
               </div>
-            )}
-          </div>
-        </div>
-      )}
+              <div className="relative h-2 overflow-hidden rounded-full bg-white/10">
+                <motion.div
+                  className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-cyan-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${uploadProgress}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+              <p className="text-center text-xs text-slate-500">{uploadProgress}%</p>
+            </div>
+          </motion.div>
+        )}
 
-      {/* Step 2: UPLOADING - Progress Bar */}
-      {state === STATES.UPLOADING && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6">
-          <div className="space-y-4">
+        {/* PARSING */}
+        {state === STATES.PARSING && (
+          <motion.div
+            key="parsing"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="rounded-2xl border border-white/10 bg-white/5 p-6"
+          >
             <div className="flex items-center gap-3">
-              <div className="animate-spin rounded-full border-2 border-slate-200 border-t-brand-600 h-8 w-8" />
+              <Loader2 className="h-8 w-8 text-violet-400 animate-spin" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-slate-900">Téléchargement en cours...</p>
-                <p className="text-xs text-slate-500">{selectedFile?.name}</p>
+                <p className="text-sm font-medium text-white">Analyse du fichier...</p>
+                <p className="text-xs text-slate-500">Traitement des transactions</p>
               </div>
             </div>
-            <div className="relative h-2 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="absolute left-0 top-0 h-full bg-brand-600 transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-            <p className="text-center text-xs text-slate-500">{uploadProgress}%</p>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
 
-      {/* Step 3: PARSING */}
-      {state === STATES.PARSING && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6">
-          <div className="flex items-center gap-3">
-            <div className="animate-spin rounded-full border-2 border-slate-200 border-t-brand-600 h-8 w-8" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-slate-900">Analyse du fichier...</p>
-              <p className="text-xs text-slate-500">Traitement des transactions</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 4: DONE - Success Summary */}
-      {state === STATES.DONE && result && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle className="h-6 w-6 text-emerald-600 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-emerald-900">Import réussi</p>
-                <div className="mt-2 space-y-1 text-xs text-emerald-700">
-                  <p>
-                    <strong>{result.inserted || 0}</strong> ligne{result.inserted > 1 ? 's' : ''} importée
-                    {result.inserted > 1 ? 's' : ''}
-                  </p>
-                  {result.total && result.total !== result.inserted && (
+        {/* DONE - Success */}
+        {state === STATES.DONE && result && (
+          <motion.div
+            key="done"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6"
+          >
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-full bg-emerald-500/20">
+                  <CheckCircle className="h-6 w-6 text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-emerald-400">Import réussi</p>
+                  <div className="mt-2 space-y-1 text-xs text-emerald-300/80">
                     <p>
-                      <strong>{result.total - result.inserted}</strong> ligne
-                      {result.total - result.inserted > 1 ? 's' : ''} ignorée
-                      {result.total - result.inserted > 1 ? 's' : ''} (doublon
-                      {result.total - result.inserted > 1 ? 's' : ''})
+                      <strong className="text-emerald-400">{result.inserted || 0}</strong> ligne
+                      {(result.inserted || 0) > 1 ? 's' : ''} importée
+                      {(result.inserted || 0) > 1 ? 's' : ''}
                     </p>
-                  )}
-                  {result.errors && result.errors > 0 && (
-                    <p className="text-rose-600">
-                      <strong>{result.errors}</strong> erreur{result.errors > 1 ? 's' : ''}
-                    </p>
-                  )}
+                    {result.total && result.total !== result.inserted && (
+                      <p>
+                        <strong>{result.total - result.inserted}</strong> ligne
+                        {result.total - result.inserted > 1 ? 's' : ''} ignorée
+                        {result.total - result.inserted > 1 ? 's' : ''} (doublon
+                        {result.total - result.inserted > 1 ? 's' : ''})
+                      </p>
+                    )}
+                    {result.errors && result.errors > 0 && (
+                      <p className="text-rose-400">
+                        <strong>{result.errors}</strong> erreur{result.errors > 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
+              <Button variant="ghost" size="sm" onClick={handleReset} className="w-full">
+                Importer un autre fichier
+              </Button>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleReset} className="w-full">
-              Importer un autre fichier
-            </Button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
 
-      {/* Step 5: ERROR - Error Message */}
-      {state === STATES.ERROR && (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6">
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <XCircle className="h-6 w-6 text-rose-600 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-rose-900">Erreur d'import</p>
-                <p className="mt-1 text-xs text-rose-700">{error || 'Une erreur est survenue'}</p>
+        {/* ERROR */}
+        {state === STATES.ERROR && (
+          <motion.div
+            key="error"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6"
+          >
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-full bg-rose-500/20">
+                  <XCircle className="h-6 w-6 text-rose-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-rose-400">Erreur d'import</p>
+                  <p className="mt-1 text-xs text-rose-300/80">{error || 'Une erreur est survenue'}</p>
+                </div>
               </div>
+              <Button variant="ghost" size="sm" onClick={handleReset} className="w-full">
+                Réessayer
+              </Button>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleReset} className="w-full">
-              Réessayer
-            </Button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* General Error Message (for IDLE state) */}
-      {state === STATES.IDLE && error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
-          <p className="flex items-center gap-2 text-xs text-rose-700">
-            <XCircle className="h-4 w-4" />
-            {error}
-          </p>
-        </div>
-      )}
+      {/* General Error (IDLE state) */}
+      <AnimatePresence>
+        {state === STATES.IDLE && error && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2"
+          >
+            <p className="flex items-center gap-2 text-xs text-rose-400">
+              <XCircle className="h-4 w-4" />
+              {error}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

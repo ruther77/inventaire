@@ -20,15 +20,16 @@ def create_job(
     supplier_hint: str | None = None,
     margin_percent: float = 40.0,
     auto_confirm: bool = True,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     """Crée un nouveau job zero-click en base de données."""
     sql = text("""
         INSERT INTO zero_click_jobs (
-            job_id, tenant_id, status, filename, supplier_hint,
+            job_id, tenant_id, session_id, status, filename, supplier_hint,
             margin_percent, auto_confirm, created_at, updated_at
         )
         VALUES (
-            :job_id, :tenant_id, 'pending', :filename, :supplier_hint,
+            :job_id, :tenant_id, :session_id, 'pending', :filename, :supplier_hint,
             :margin_percent, :auto_confirm, NOW(), NOW()
         )
         RETURNING job_id, status, created_at
@@ -39,6 +40,7 @@ def create_job(
         params={
             "job_id": job_id,
             "tenant_id": tenant_id,
+            "session_id": session_id,
             "filename": filename,
             "supplier_hint": supplier_hint,
             "margin_percent": margin_percent,
@@ -109,7 +111,7 @@ def get_job(job_id: str, tenant_id: int | None = None) -> dict[str, Any] | None:
 
     sql = text(f"""
         SELECT
-            job_id, tenant_id, status, filename, supplier_hint,
+            job_id, tenant_id, session_id, status, filename, supplier_hint,
             margin_percent, auto_confirm, result, error,
             created_at, updated_at, completed_at
         FROM zero_click_jobs
@@ -127,22 +129,24 @@ def get_job(job_id: str, tenant_id: int | None = None) -> dict[str, Any] | None:
     return {
         "job_id": row[0],
         "tenant_id": row[1],
-        "status": row[2],
-        "filename": row[3],
-        "supplier_hint": row[4],
-        "margin_percent": float(row[5]) if row[5] is not None else 40.0,
-        "auto_confirm": bool(row[6]) if row[6] is not None else True,
-        "result": json.loads(row[7]) if row[7] else None,
-        "error": row[8],
-        "created_at": row[9],
-        "updated_at": row[10],
-        "completed_at": row[11],
+        "session_id": row[2],
+        "status": row[3],
+        "filename": row[4],
+        "supplier_hint": row[5],
+        "margin_percent": float(row[6]) if row[6] is not None else 40.0,
+        "auto_confirm": bool(row[7]) if row[7] is not None else True,
+        "result": json.loads(row[8]) if row[8] else None,
+        "error": row[9],
+        "created_at": row[10],
+        "updated_at": row[11],
+        "completed_at": row[12],
     }
 
 
 def list_jobs(
     tenant_id: int,
     status: str | None = None,
+    session_id: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict[str, Any]], int]:
@@ -153,6 +157,10 @@ def list_jobs(
     if status:
         where_clause += " AND status = :status"
         params["status"] = status
+
+    if session_id:
+        where_clause += " AND session_id = :session_id"
+        params["session_id"] = session_id
 
     # Compter le total
     count_sql = text(f"""
@@ -167,7 +175,7 @@ def list_jobs(
     # Récupérer les jobs
     sql = text(f"""
         SELECT
-            job_id, tenant_id, status, filename, supplier_hint,
+            job_id, tenant_id, session_id, status, filename, supplier_hint,
             margin_percent, auto_confirm, result, error,
             created_at, updated_at, completed_at
         FROM zero_click_jobs
@@ -188,16 +196,17 @@ def list_jobs(
         jobs.append({
             "job_id": row[0],
             "tenant_id": row[1],
-            "status": row[2],
-            "filename": row[3],
-            "supplier_hint": row[4],
-            "margin_percent": float(row[5]) if row[5] is not None else 40.0,
-            "auto_confirm": bool(row[6]) if row[6] is not None else True,
-            "result": json.loads(row[7]) if row[7] else None,
-            "error": row[8],
-            "created_at": row[9],
-            "updated_at": row[10],
-            "completed_at": row[11],
+            "session_id": row[2],
+            "status": row[3],
+            "filename": row[4],
+            "supplier_hint": row[5],
+            "margin_percent": float(row[6]) if row[6] is not None else 40.0,
+            "auto_confirm": bool(row[7]) if row[7] is not None else True,
+            "result": json.loads(row[8]) if row[8] else None,
+            "error": row[9],
+            "created_at": row[10],
+            "updated_at": row[11],
+            "completed_at": row[12],
         })
 
     return jobs, total
@@ -215,12 +224,148 @@ def delete_old_jobs(days: int = 30) -> int:
     return result if isinstance(result, int) else 0
 
 
+def list_import_sessions(
+    tenant_id: int,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], int]:
+    """Liste les sessions d'import avec statistiques agrégées."""
+    # Compter le total de sessions
+    count_sql = text("""
+        SELECT COUNT(DISTINCT session_id)
+        FROM zero_click_jobs
+        WHERE tenant_id = :tenant_id
+          AND session_id IS NOT NULL
+    """)
+
+    count_result = execute_raw_sql(count_sql, params={"tenant_id": tenant_id}, fetch=True)
+    total = count_result[0][0] if count_result else 0
+
+    # Récupérer les sessions avec stats
+    sql = text("""
+        SELECT
+            session_id,
+            MIN(created_at) as date_debut,
+            MAX(completed_at) as date_fin,
+            COUNT(*) as nb_imports,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as nb_completed,
+            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as nb_failed,
+            SUM(
+                CASE
+                    WHEN result IS NOT NULL
+                    THEN COALESCE((result->>'rows_received')::int, 0)
+                    ELSE 0
+                END
+            ) as total_lignes,
+            SUM(
+                CASE
+                    WHEN result IS NOT NULL
+                    THEN COALESCE((result->>'movements_created')::int, 0)
+                    ELSE 0
+                END
+            ) as total_mouvements,
+            SUM(
+                CASE
+                    WHEN result IS NOT NULL
+                    THEN COALESCE((result->>'products_created')::int, 0)
+                    ELSE 0
+                END
+            ) as total_produits_crees,
+            STRING_AGG(DISTINCT supplier_hint, ', ' ORDER BY supplier_hint) as fournisseurs
+        FROM zero_click_jobs
+        WHERE tenant_id = :tenant_id
+          AND session_id IS NOT NULL
+        GROUP BY session_id
+        ORDER BY date_debut DESC
+        LIMIT :limit OFFSET :offset
+    """)
+
+    result = execute_raw_sql(
+        sql,
+        params={"tenant_id": tenant_id, "limit": limit, "offset": offset},
+        fetch=True,
+    )
+
+    if not result:
+        return [], total
+
+    sessions = []
+    for row in result:
+        sessions.append({
+            "session_id": row[0],
+            "date_debut": row[1],
+            "date_fin": row[2],
+            "nb_imports": row[3],
+            "nb_completed": row[4],
+            "nb_failed": row[5],
+            "total_lignes": row[6] or 0,
+            "total_mouvements": row[7] or 0,
+            "total_produits_crees": row[8] or 0,
+            "fournisseurs": row[9],
+        })
+
+    return sessions, total
+
+
+def get_session_details(
+    session_id: str,
+    tenant_id: int,
+) -> dict[str, Any] | None:
+    """Récupère tous les imports d'une session donnée."""
+    # Récupérer les jobs de la session
+    jobs, total = list_jobs(
+        tenant_id=tenant_id,
+        session_id=session_id,
+        limit=1000,  # Limite haute pour récupérer tous les imports d'une session
+        offset=0,
+    )
+
+    if not jobs:
+        return None
+
+    # Calculer les statistiques de la session
+    session_stats = {
+        "session_id": session_id,
+        "nb_imports": len(jobs),
+        "nb_completed": sum(1 for j in jobs if j["status"] == "completed"),
+        "nb_failed": sum(1 for j in jobs if j["status"] == "failed"),
+        "nb_pending": sum(1 for j in jobs if j["status"] in ("pending", "processing")),
+        "date_debut": min(j["created_at"] for j in jobs if j["created_at"]),
+        "date_fin": max((j["completed_at"] for j in jobs if j["completed_at"]), default=None),
+        "total_lignes": sum(
+            j["result"].get("rows_received", 0)
+            for j in jobs
+            if j["result"]
+        ),
+        "total_mouvements": sum(
+            j["result"].get("movements_created", 0)
+            for j in jobs
+            if j["result"]
+        ),
+        "total_produits_crees": sum(
+            j["result"].get("products_created", 0)
+            for j in jobs
+            if j["result"]
+        ),
+        "fournisseurs": list(set(
+            j["supplier_hint"]
+            for j in jobs
+            if j.get("supplier_hint")
+        )),
+        "imports": jobs,
+    }
+
+    return session_stats
+
+
 __all__ = [
     "create_job",
     "update_job_status",
     "get_job",
     "list_jobs",
     "delete_old_jobs",
+    "list_import_sessions",
+    "get_session_details",
 ]
 def execute_raw_sql(sql, params=None, fetch=False):
     """Compat: exécution SQL simple avec option de fetch."""

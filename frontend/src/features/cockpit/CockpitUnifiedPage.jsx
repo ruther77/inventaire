@@ -13,17 +13,17 @@
 import { lazy, Suspense } from 'react';
 import {
   Sun,
-  LayoutDashboard,
   Briefcase,
   AlertTriangle,
   Sparkles,
+  LayoutDashboard,
+  Gauge,
 } from 'lucide-react';
 import { TabView } from '../../components/ui';
 import { Skeleton } from '../../components/ui/Skeleton.jsx';
 
 // Lazy load des sous-pages
 const CockpitContent = lazy(() => import('./CockpitPage.jsx'));
-const DashboardContent = lazy(() => import('../dashboard/DashboardPage.jsx'));
 const PortfolioContent = lazy(() => import('../portfolio/PortfolioPage.jsx'));
 
 // Skeleton de chargement
@@ -113,16 +113,6 @@ export default function CockpitUnifiedPage() {
       ),
     },
     {
-      id: 'dashboard',
-      label: 'Dashboard',
-      icon: <LayoutDashboard className="w-4 h-4" />,
-      content: (
-        <Suspense fallback={<TabSkeleton />}>
-          <DashboardContent />
-        </Suspense>
-      ),
-    },
-    {
       id: 'portfolio',
       label: 'Portfolio',
       icon: <Briefcase className="w-4 h-4" />,
@@ -143,6 +133,20 @@ export default function CockpitUnifiedPage() {
 
   return (
     <div className="min-h-screen">
+      {/* Header Next-Gen 2025 */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20">
+            <Gauge className="w-6 h-6 text-blue-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Cockpit</h1>
+            <p className="text-sm text-slate-400">Vue consolidée 360° - Pilotage & Alertes</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Onglets avec sync URL */}
       <TabView
         tabs={tabs}
         defaultTab="brief"

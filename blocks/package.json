@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
+    "dev:turbo": "next dev --turbopack",
     "generate:registry": "bunx tsx scripts/generate-registry.ts",
     "generate:registry:verbose": "bunx tsx scripts/generate-registry.ts --verbose",
     "validate:registry": "bunx tsx scripts/generate-registry.ts validate public/r/registry.json",

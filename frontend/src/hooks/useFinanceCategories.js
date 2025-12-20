@@ -21,6 +21,7 @@ export const useFinanceCategories = (filters = {}) =>
   useQuery({
     queryKey: ['finance', 'categories', filters],
     queryFn: () => fetchFinanceCategories(filters),
+    staleTime: 5 * 60 * 1000, // 5 minutes - categories rarely change
   });
 
 export const useCreateFinanceCategory = () => {
@@ -37,6 +38,7 @@ export const useFinanceCostCenters = (filters = {}) =>
   useQuery({
     queryKey: ['finance', 'cost-centers', filters],
     queryFn: () => fetchFinanceCostCenters(filters),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
 export const useCreateFinanceCostCenter = () => {
@@ -53,6 +55,7 @@ export const useFinanceAccounts = (filters = {}) =>
   useQuery({
     queryKey: ['finance', 'accounts', filters],
     queryFn: () => fetchFinanceAccounts(filters),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
 export const useFinanceRules = (filters = {}) =>
@@ -67,18 +70,21 @@ export const useFinanceCategoryStats = (filters = {}) =>
   useQuery({
     queryKey: ['finance', 'categories-stats', filters],
     queryFn: () => fetchFinanceCategoryStats(filters),
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
 export const useFinanceAccountsOverviewStats = (filters = {}) =>
   useQuery({
     queryKey: ['finance', 'accounts-overview', filters],
     queryFn: () => fetchFinanceAccountsOverview(filters),
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
 export const useFinanceDashboardSummary = (filters = {}) =>
   useQuery({
     queryKey: ['finance', 'dashboard-summary', filters],
     queryFn: () => fetchFinanceDashboardSummary(filters),
+    staleTime: 60 * 1000, // 1 minute
   });
 
 export const useFinanceTimeline = (filters = {}) =>

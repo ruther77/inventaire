@@ -1,4 +1,4 @@
-"""Pydantic schemas for price history endpoints."""
+"""Schémas Pydantic pour les endpoints d'historique des prix."""
 
 from __future__ import annotations
 

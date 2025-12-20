@@ -1,4 +1,4 @@
-"""FastAPI application exposing the inventory features for the new SPA."""
+"""Application FastAPI qui expose les fonctionnalités d'inventaire pour la nouvelle SPA."""
 
 from __future__ import annotations
 
@@ -15,8 +15,10 @@ from backend.middleware import (
     RequestContextMiddleware,
     PerformanceMiddleware,
     ResponseWrapperMiddleware,
+    IdempotencyMiddleware,
     get_performance_stats,
 )
+from backend.cache import get_redis_client, CacheManager, CacheTTL
 
 from core.data_repository import query_df
 from core.catalog_sql_repository import CatalogSqlRepository
@@ -44,7 +46,7 @@ from backend.api import restaurant as restaurant_router
 from backend.api import capital as capital_router
 from backend.api import analytics as analytics_router
 from backend.api import eurociel as eurociel_router
-# Advanced Finance Modules
+# Modules Finance avancés
 from backend.api import inventory_intelligence as inventory_intelligence_router
 from backend.api import forecasting as forecasting_router
 from backend.api import audit_trail as audit_trail_router
@@ -64,7 +66,7 @@ from core.products_loader import ensure_barcode_constraints
 
 
 class ProductPayload(BaseModel):
-    """Lightweight projection of a product for the SPA."""
+    """Projection légère d'un produit pour la SPA."""
 
     id: int
     nom: str
@@ -152,21 +154,21 @@ def _compute_inventory_value(tenant_id: int) -> dict[str, float]:
 
 
 def _is_production_env() -> bool:
-    """Check if running in production environment."""
+    """Vérifie si l'application tourne dans un environnement de production."""
     env = (os.getenv("APP_ENV") or os.getenv("ENV") or "development").lower()
     return env in {"prod", "production", "staging"}
 
 
 def _load_allowed_origins() -> list[str]:
-    """Load CORS allowed origins with strict production enforcement.
+    """Charge les origines CORS autorisées avec contrôle strict en production.
 
-    In production:
-    - CORS_ALLOWED_ORIGINS must be explicitly set
-    - Raises RuntimeError if not configured
-    - Wildcard (*) is rejected
+    En production :
+    - CORS_ALLOWED_ORIGINS doit être défini explicitement
+    - Lève une RuntimeError si non configuré
+    - Le wildcard (*) est refusé
 
-    In development:
-    - Falls back to common localhost ports if not set
+    En développement :
+    - Repli sur les ports localhost courants si aucune valeur n'est fournie
     """
     raw_origins = os.getenv("CORS_ALLOWED_ORIGINS")
     is_prod = _is_production_env()
@@ -177,7 +179,7 @@ def _load_allowed_origins() -> list[str]:
                 "CORS_ALLOWED_ORIGINS doit etre configure en production. "
                 "Exemple: CORS_ALLOWED_ORIGINS=https://mondomaine.com,https://app.mondomaine.com"
             )
-        # Development fallback - Vite/React dev server (common ports)
+        # Repli en développement : serveurs Vite/React (ports usuels)
         import logging
         logging.getLogger(__name__).warning(
             "CORS_ALLOWED_ORIGINS non defini, utilisation des valeurs dev par defaut"
@@ -194,7 +196,7 @@ def _load_allowed_origins() -> list[str]:
     for entry in raw_origins.split(","):
         cleaned = entry.strip()
         if cleaned:
-            # Reject wildcard in production
+            # Refuser le wildcard en production
             if cleaned == "*" and is_prod:
                 raise RuntimeError(
                     "Wildcard CORS (*) interdit en production. "
@@ -271,15 +273,15 @@ Chaque requete est filtree par tenant_id pour isoler les donnees.
     allowed_origins = settings.cors_allowed_origins or _load_allowed_origins()
     is_prod = _is_production_env()
 
-    # In production, enforce stricter CORS settings
+    # En production, appliquer des réglages CORS plus stricts
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
-        allow_credentials=True,  # Required for httpOnly cookies
+        allow_credentials=True,  # Requis pour les cookies httpOnly
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] if is_prod else ["*"],
         allow_headers=["Authorization", "Content-Type", "X-Request-ID"] if is_prod else ["*"],
         expose_headers=["X-Request-ID", "X-Response-Time"],
-        max_age=86400 if is_prod else 600,  # Preflight cache: 24h in prod, 10min in dev
+        max_age=86400 if is_prod else 600,  # Cache preflight : 24h en prod, 10min en dev
     )
 
     # Middleware UX avancés (ordre inverse d'exécution)
@@ -289,8 +291,21 @@ Chaque requete est filtree par tenant_id pour isoler les donnees.
         exclude_paths=["/health", "/docs", "/redoc", "/openapi.json", "/metrics"],
         wrap_errors_only=False,  # Wrapper toutes les réponses, pas seulement les erreurs
     )
-    app.add_middleware(PerformanceMiddleware)  # Monitoring performance
-    app.add_middleware(RequestContextMiddleware)  # Request ID et contexte
+    app.add_middleware(IdempotencyMiddleware)  # Clés d'idempotence pour sécuriser les retries
+    app.add_middleware(PerformanceMiddleware)  # Suivi des performances
+    app.add_middleware(RequestContextMiddleware)  # ID de requête et contexte
+
+    # Initialiser le cache Redis au démarrage
+    @app.on_event("startup")
+    async def startup_event():
+        """Initialise le pool de connexions Redis au démarrage."""
+        redis_client = get_redis_client()
+        if redis_client:
+            import logging
+            logging.getLogger(__name__).info("Redis cache connected successfully")
+        else:
+            import logging
+            logging.getLogger(__name__).warning("Redis not available - caching disabled")
 
     def _security_dependencies() -> list[Depends]:
         # Force l'authentification + le rôle par défaut sur l'ensemble des routes métier.
@@ -318,22 +333,20 @@ Chaque requete est filtree par tenant_id pour isoler les donnees.
 
     # =========================================================================
     # RESTAURANT - Module restaurant
+    # (Sans dépendances d'auth globales - gérées au niveau des endpoints)
     # =========================================================================
-    restaurant_domain_router = APIRouter(tags=['restaurant'], dependencies=_security_dependencies())
-    restaurant_domain_router.include_router(restaurant_router.router)  # /restaurant/*
-    app.include_router(restaurant_domain_router)
+    app.include_router(restaurant_router.router, tags=['restaurant'])
 
     # =========================================================================
     # FINANCE - Tresorerie, Comptabilite, Rapprochement
+    # (Sans dépendances d'auth globales - gérées au niveau des endpoints)
     # =========================================================================
-    finance_domain_router = APIRouter(tags=['finance'], dependencies=_security_dependencies())
-    finance_domain_router.include_router(finance_router.router)           # /finance/*
-    finance_domain_router.include_router(bank_reconciliation_router.router)  # /bank-reconciliation/*
-    finance_domain_router.include_router(rules_engine_router.router)      # /rules-engine/*
-    finance_domain_router.include_router(audit_trail_router.router)       # /audit-trail/*
-    finance_domain_router.include_router(capital_router.router)           # /capital/*
-    finance_domain_router.include_router(analytics_router.router)         # /analytics/*
-    app.include_router(finance_domain_router)
+    app.include_router(finance_router.router, tags=['finance'])
+    app.include_router(bank_reconciliation_router.router, tags=['finance'])
+    app.include_router(rules_engine_router.router, tags=['finance'])
+    app.include_router(audit_trail_router.router, tags=['finance'])
+    app.include_router(capital_router.router, tags=['finance'])
+    app.include_router(analytics_router.router, tags=['finance'])
 
     # =========================================================================
     # INTELLIGENCE - Previsions, Optimisation, Scoring
@@ -371,6 +384,31 @@ Chaque requete est filtree par tenant_id pour isoler les donnees.
     def performance_metrics():
         """Retourne les statistiques de performance des endpoints."""
         return get_performance_stats()
+
+    @app.get("/metrics/cache", dependencies=_security_dependencies())
+    def cache_metrics():
+        """Retourne les statistiques du cache Redis."""
+        redis_client = get_redis_client()
+        if redis_client is None:
+            return {"status": "disconnected", "message": "Redis not available"}
+        try:
+            info = redis_client.info("memory")
+            return {
+                "status": "connected",
+                "memory_used": info.get("used_memory_human"),
+                "memory_peak": info.get("used_memory_peak_human"),
+                "keys_count": redis_client.dbsize(),
+                "hit_rate": info.get("keyspace_hits", 0) / max(1, info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0)),
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    @app.post("/cache/invalidate/{pattern}", dependencies=_security_dependencies())
+    def invalidate_cache(pattern: str, tenant: Tenant = Depends(get_current_tenant)):
+        """Invalide les entrées de cache correspondant au pattern."""
+        cache = CacheManager(prefix=pattern)
+        count = cache.invalidate_tenant(tenant.id)
+        return {"status": "ok", "invalidated": count}
 
     # Ajout : petit tuto/lexique VSCode (lettres Git U/M et points/icônes)
     @app.get("/vscode/tuto")
@@ -437,9 +475,9 @@ Chaque requete est filtree par tenant_id pour isoler les donnees.
                 payload.barcodes,
                 tenant_id=tenant.id,
             )
-        except ProductNotFoundError as exc:  # pragma: no cover - defensive
+        except ProductNotFoundError as exc:  # pragma: no cover - cas defensif
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-        except InvalidBarcodeError as exc:  # pragma: no cover - defensive
+        except InvalidBarcodeError as exc:  # pragma: no cover - cas defensif
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

@@ -1,4 +1,4 @@
-"""Dashboard overview and forecast services for restaurant module."""
+"""Services d'overview et de prévision pour le tableau de bord restaurant."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from backend.services.restaurant.ingredients import list_plats, list_ingredients
 
 
 def build_dashboard_overview(tenant_id: int) -> dict[str, Any]:
-    """Assemble indicators for Dashboard page (expenses, dish margins, stocks)."""
+    """Assemble les indicateurs pour la page Dashboard (dépenses, marges plats, stocks)."""
     monthly = expense_summary_by_month(tenant_id, months=6)
     by_center = expense_summary_by_cost_center(tenant_id, months=3)
     plats = list_plats(tenant_id)
@@ -51,7 +51,7 @@ def build_dashboard_overview(tenant_id: int) -> dict[str, Any]:
 
 
 def _build_forecast_timeline(total_units: float, total_value: float, horizon: int, granularity: str) -> List[dict[str, Any]]:
-    """Project expected consumption over the chosen scenario (daily/weekly/monthly)."""
+    """Projette la consommation attendue selon le scénario choisi (daily/weekly/monthly)."""
     if total_units < 0:
         total_units = 0.0
     if total_value < 0:
@@ -84,7 +84,7 @@ def build_forecast_overview(
     granularity: str = "weekly",
     top_limit: int = 8,
 ) -> dict[str, Any]:
-    """Build forecast view (estimated daily consumption, timeline, TOP products)."""
+    """Construit la vue de prévision (consommation quotidienne estimée, timeline, top produits)."""
     safe_horizon = max(1, min(int(horizon_days), 180))
     granularity_key = granularity if granularity in ALLOWED_FORECAST_GRANULARITY else "weekly"
     catalog_df = fetch_customer_catalog(tenant_id=tenant_id)

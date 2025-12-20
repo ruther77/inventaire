@@ -14,6 +14,26 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 /**
+ * StaleTime par domaine métier
+ * Finance = volatil, Catalog = stable
+ */
+export const DOMAIN_STALE_TIME = {
+  finance: 1 * 60 * 1000,       // 1 min - transactions volatiles
+  restaurant: 10 * 60 * 1000,   // 10 min - plats/ingrédients
+  catalog: 30 * 60 * 1000,      // 30 min - produits stables
+  intelligence: 5 * 60 * 1000,  // 5 min - analytics
+  dashboard: 2 * 60 * 1000,     // 2 min - métriques
+  default: 5 * 60 * 1000,       // 5 min par défaut
+};
+
+/**
+ * Obtenir le staleTime pour un domaine
+ */
+export function getStaleTime(domain) {
+  return DOMAIN_STALE_TIME[domain] || DOMAIN_STALE_TIME.default;
+}
+
+/**
  * Configuration par défaut pour les queries
  */
 export const defaultQueryConfig = {

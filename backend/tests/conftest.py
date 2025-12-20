@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for backend tests."""
+"""Fixtures pytest partagées pour les tests backend."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-# Add project root to path
+# Ajouter la racine du projet au path
 ROOT = Path(__file__).resolve().parent.parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 
 @pytest.fixture
 def client() -> TestClient:
-    """Create a TestClient instance for the FastAPI app."""
+    """Crée une instance TestClient pour l'app FastAPI."""
     from backend.main import app
 
     return TestClient(app)
@@ -24,7 +24,7 @@ def client() -> TestClient:
 
 @pytest.fixture
 def mock_tenant():
-    """Mock tenant for testing."""
+    """Tenant fictif pour les tests."""
     from backend.dependencies.tenant import Tenant
 
     return Tenant(id=1, code="test", name="Test Tenant")
@@ -32,7 +32,7 @@ def mock_tenant():
 
 @pytest.fixture
 def mock_user():
-    """Mock user for testing."""
+    """Utilisateur fictif pour les tests."""
     from backend.dependencies.security import AuthenticatedUser
 
     return AuthenticatedUser(
@@ -45,7 +45,7 @@ def mock_user():
 
 @pytest.fixture
 def authenticated_client(client, mock_tenant, mock_user):
-    """Client with mocked authentication."""
+    """Client avec authentification simulée."""
     from backend.main import app
     from backend.dependencies.tenant import get_current_tenant
     from backend.dependencies.security import get_current_user

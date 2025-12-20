@@ -19,9 +19,9 @@
   },
   "dependencies": {
     "@headlessui/react": "^1.7.19",
-    "@tanstack/react-query": "^5.28.9",
+    "@tanstack/react-query": "^5.90.12",
     "axios": "^1.6.8",
-    "clsx": "^2.1.0",
+    "clsx": "^2.1.1",
     "framer-motion": "^11.18.2",
     "lucide-react": "^0.422.0",
     "react": "^18.2.0",

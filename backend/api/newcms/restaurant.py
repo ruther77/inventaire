@@ -1,7 +1,7 @@
-"""NewCMS Restaurant and Mobile API endpoints.
+"""Endpoints API NewCMS Restaurant et Mobile.
 
-Restaurant: utilise les tables restaurant_plats, restaurant_ingredients, restaurant_plat_ingredients
-Mobile: utilise la table produits (epicerie, tenant_id=1) avec code-barres EAN
+Restaurant : utilise les tables restaurant_plats, restaurant_ingredients, restaurant_plat_ingredients
+Mobile : utilise la table produits (épicerie, tenant_id=1) avec code-barres EAN
 """
 
 from __future__ import annotations

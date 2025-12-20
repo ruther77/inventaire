@@ -110,8 +110,8 @@ def _chunk_with_overlap(paragraphs: list[str], target_tokens: int = 220, overlap
 
 def _embed_chunks(chunks: list[str], model_name: str, device: str | None = None) -> np.ndarray:
     """
-    Encode les chunks avec SentenceTransformers; si le modèle n'est pas accessible
-    (mode offline / pas de réseau), bascule en fallback TF-IDF L2-normalisé.
+    Encode les chunks avec SentenceTransformers ; si le modèle est inaccessible
+    (mode hors ligne / pas de réseau), bascule sur un repli TF-IDF L2-normalisé.
     """
 
     try:
@@ -121,12 +121,12 @@ def _embed_chunks(chunks: list[str], model_name: str, device: str | None = None)
         embeddings = model.encode(chunks, batch_size=32, normalize_embeddings=True, show_progress_bar=True)
         return np.asarray(embeddings, dtype=np.float32)
     except Exception as exc:
-        print(f"[warn] Impossible de charger le modèle '{model_name}' ({exc}); fallback TF-IDF local.")
+        print(f"[warn] Impossible de charger le modèle '{model_name}' ({exc}); repli TF-IDF local.")
         return _embed_chunks_tfidf(chunks)
 
 
 def _embed_chunks_tfidf(chunks: list[str]) -> np.ndarray:
-    """Fallback offline : TF-IDF (1-2 grams) L2-normalisé, converti en float32 dense."""
+    """Repli hors ligne : TF-IDF (1-2 grams) L2-normalisé, converti en float32 dense."""
 
     TfidfVectorizer = _lazy_import_tfidf()
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=20000)

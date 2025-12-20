@@ -1,4 +1,4 @@
-"""Admin utilities exposed through the FastAPI router."""
+"""Utilitaires d'administration exposés via le routeur FastAPI."""
 
 from __future__ import annotations
 

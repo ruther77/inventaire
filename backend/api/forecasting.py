@@ -80,7 +80,7 @@ class PriceTrendResponse(BaseModel):
     product_name: str
     current_price: float
     predicted_prices: List[ForecastPoint]
-    trend_direction: str  # "increasing", "decreasing", "stable"
+    trend_direction: str  # "en hausse", "en baisse", "stable"
     trend_strength: float  # 0-1
     volatility: float
 

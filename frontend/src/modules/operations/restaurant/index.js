@@ -8,5 +8,4 @@ export { default as RestaurantPriceTrends } from '@/features/restaurant/Restaura
 export { default as RestaurantStockMovementsPage } from '@/features/restaurant/RestaurantStockMovementsPage.jsx';
 export { default as RestaurantConsumptionPage } from '@/features/restaurant/RestaurantConsumptionPage.jsx';
 export { default as RestaurantPriceHistoryComparisonPage } from '@/features/restaurant/RestaurantPriceHistoryComparisonPage.jsx';
-export { default as RestaurantEpicerieLinkPage } from '@/features/restaurant/RestaurantEpicerieLinkPage.jsx';
 export { default as ForecastsPage } from '@/features/restaurant/ForecastsPage.jsx';

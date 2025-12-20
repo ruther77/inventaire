@@ -20,7 +20,8 @@ def categorization_coverage(
     - Distribution par catégorie
     - Libellés non mappés (pour améliorer les règles)
     """
-    from backend.services.parsers.keyword_analyzer import KeywordAnalyzer, CATEGORIES
+    from core.bank_import.categorizer import TransactionCategorizer
+    from core.bank_import.categories import CATEGORIES
 
     entity_id = 2 if tenant.id == 4 else tenant.id
 
@@ -48,7 +49,7 @@ def categorization_coverage(
             "suggestions": []
         }
 
-    analyzer = KeywordAnalyzer()
+    categorizer = TransactionCategorizer()
 
     categorized = 0
     category_counts: dict[str, int] = {}
@@ -59,20 +60,25 @@ def categorization_coverage(
         libelle = str(row.get("libelle_banque", ""))
         montant = float(row.get("montant", 0) or 0)
 
-        # Créer une transaction mock pour l'analyzer
-        from backend.services.parsers.bank_statement_parsers import Transaction
-        tx = Transaction(
-            date=row.get("date_operation"),
+        # Créer une transaction mock pour le categorizer
+        from core.bank_import.models import ParsedTransaction, TransactionDirection
+        from decimal import Decimal
+        tx = ParsedTransaction(
+            date_operation=row.get("date_operation"),
+            date_valeur=row.get("date_operation"),
             libelle=libelle,
-            debit=abs(montant) if montant < 0 else None,
-            credit=montant if montant > 0 else None
+            montant=Decimal(str(abs(montant))),
+            direction=TransactionDirection.OUT if montant < 0 else TransactionDirection.IN
         )
 
-        cat_code, keywords = analyzer.analyze_transaction(tx)
+        result = categorizer.categorize(tx)
+        cat_code = result.category_code
+        keywords = [result.matched_keyword] if result.matched_keyword else []
 
-        if cat_code:
+        if cat_code and cat_code != "a_categoriser":
             categorized += 1
-            cat_name = CATEGORIES.get(cat_code, {}).get("name", cat_code)
+            cat_obj = CATEGORIES.get(cat_code)
+            cat_name = cat_obj.name if cat_obj else cat_code
             category_counts[cat_name] = category_counts.get(cat_name, 0) + 1
             category_amounts[cat_name] = category_amounts.get(cat_name, 0) + abs(montant)
         else:

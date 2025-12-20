@@ -1,172 +1,55 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+/**
+ * DashboardPage - Vue inventaire & stock
+ * Design Next-Gen 2025 - Phase 3
+ *
+ * Affiche :
+ * - Hero avec statut plateforme
+ * - KPIs principaux
+ * - Graphiques flux hebdomadaires & répartition catégories
+ * - Top listes (stock, ventes, fournisseurs)
+ */
+
+import { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Package,
+  TrendingUp,
+  AlertTriangle,
+  BarChart3,
+  RefreshCw,
+} from 'lucide-react';
 import Card from '../../components/ui/Card.jsx';
-import Button from '../../components/ui/Button.jsx';
-import FiltersDrawer from '../../components/ui/FiltersDrawer.jsx';
 import { useProducts } from '../../hooks/useProducts.js';
 import { useDashboardMetrics } from '../../hooks/useDashboard.js';
-import FiltersPanel from './components/FiltersPanel.jsx';
-import StockCards from './components/StockCards.jsx';
 import {
   DashboardHero,
   DashboardMetrics,
-  DashboardChartsGrid,
   WeeklyFlowsChart,
   CategoryStockChart,
-  DashboardListsGrid,
   DashboardList,
-  TopStockList,
-  TopSalesList,
-  SuppliersList,
-  MarginAlertsList,
-  ProductLookup,
 } from './components/index.js';
-
-const SECTION_DEFINITIONS = [
-  {
-    id: 'overview',
-    label: 'Pilotage',
-    groups: [
-      {
-        title: 'Synthèse',
-        items: [
-          {
-            id: 'overview.core',
-            label: 'Cockpit & KPIs',
-            description: 'Vue héro, métriques clés et actions rapides.',
-          },
-          {
-            id: 'overview.productFile',
-            label: 'Fiches produit',
-            description: 'Recherche EAN et visuels produits.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'inventory',
-    label: 'Inventaire',
-    groups: [
-      {
-        title: 'Catalogue',
-        items: [
-          {
-            id: 'inventory.catalog',
-            label: 'Focus catalogue',
-            description: 'Filtres avancés, cartes stock et top listes.',
-          },
-        ],
-      },
-      {
-        title: 'Flux & mix',
-        items: [
-          {
-            id: 'inventory.flows',
-            label: 'Flux & mix',
-            description: 'Entrées/sorties, alertes marge et mix catégories.',
-          },
-        ],
-      },
-    ],
-  },
-];
+import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
+import QueryErrorState from '../../components/feedback/QueryErrorState.jsx';
 
 export default function DashboardPage() {
-  const [filters, setFilters] = useState({
-    search: '',
-    category: 'all',
-    status: 'all',
-    page: 1,
-    per_page: 25,
-  });
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [focusToast, setFocusToast] = useState(null);
   const [weeklyWindow, setWeeklyWindow] = useState(8);
-  const defaultPanel = SECTION_DEFINITIONS[0]?.groups?.[0]?.items?.[0]?.id ?? 'overview.core';
-  const [searchParams, setSearchParams] = useSearchParams();
-  const sectionParam = searchParams.get('section');
-  const [activePanel, setActivePanel] = useState(sectionParam || defaultPanel);
-  useEffect(() => {
-    if (sectionParam && sectionParam !== activePanel) {
-      setActivePanel(sectionParam);
-    } else if (!sectionParam && activePanel !== defaultPanel) {
-      setActivePanel(defaultPanel);
-    }
-  }, [sectionParam, activePanel, defaultPanel]);
 
-  const sectionOptions = useMemo(() => {
-    const options = [];
-    SECTION_DEFINITIONS.forEach((section) => {
-      section.groups?.forEach((group) => {
-        group.items?.forEach((item) => {
-          options.push({
-            id: item.id,
-            label: `${section.label} · ${item.label}`,
-          });
-        });
-      });
-    });
-    return options;
-  }, []);
-
-  useEffect(() => {
-    if (!focusToast) return undefined;
-    const timeout = setTimeout(() => setFocusToast(null), 3000);
-    return () => clearTimeout(timeout);
-  }, [focusToast]);
-
-  const handleFilterChange = (field, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [field]: value,
-      page: field === 'page' ? Number(value) : 1,
-    }));
-  };
-
-  const handleFilterReset = () => {
-    setFilters({
-      search: '',
-      category: 'all',
-      status: 'all',
-      page: 1,
-      per_page: 25,
-    });
-  };
-
-  const triggerFocus = (status, label) => {
-    setFilters((prev) => ({
-      ...prev,
-      status,
-      page: 1,
-    }));
-    setFiltersOpen(true);
-    setFocusToast(`${label} en focus`);
-  };
-
-  const handlePanelSelect = (panelId) => {
-    const params = new URLSearchParams(searchParams);
-    if (!panelId || panelId === defaultPanel) {
-      params.delete('section');
-    } else {
-      params.set('section', panelId);
-    }
-    setSearchParams(params);
-  };
-
+  // Données produits
   const {
     data: productsData,
     isLoading: productsLoading,
-    isError: productsError,
-  } = useProducts(filters);
+  } = useProducts({ page: 1, per_page: 100 });
   const products = productsData?.items ?? [];
-  const productMeta = productsData?.meta;
+
+  // Données dashboard
   const {
     data: dashboardData,
     isLoading: dashboardLoading,
     isError: dashboardError,
+    refetch,
   } = useDashboardMetrics();
 
+  // KPIs
   const kpis = dashboardData?.kpis ?? {
     total_produits: 0,
     valeur_stock_ht: 0,
@@ -175,6 +58,7 @@ export default function DashboardPage() {
     stock_epuise: 0,
   };
 
+  // Analytics calculés
   const analytics = useMemo(() => {
     if (!products.length) {
       return { active: 0, categories: 0, lowStock: [] };
@@ -191,10 +75,7 @@ export default function DashboardPage() {
     };
   }, [products]);
 
-  const inferredCategories = useMemo(() => {
-    return [...new Set(products.map((product) => product.categorie || ''))].filter(Boolean);
-  }, [products]);
-
+  // Série hebdomadaire
   const weeklySeries = useMemo(() => {
     const series = dashboardData?.weekly_variation ?? [];
     return series
@@ -213,6 +94,7 @@ export default function DashboardPage() {
       });
   }, [dashboardData?.weekly_variation, weeklyWindow]);
 
+  // Données par catégorie
   const categoryStockData = useMemo(() => {
     if (!products.length) return [];
     const totals = products.reduce((acc, product) => {
@@ -226,151 +108,142 @@ export default function DashboardPage() {
       .map(([label, qty]) => ({ label, qty }));
   }, [products]);
 
-  const renderPanel = () => {
-    switch (activePanel) {
-      case 'overview.core':
-        return (
-          <>
-            <DashboardHero
-              status={{ level: 'ok', alertCount: kpis.alerte_stock_bas }}
-              loading={dashboardLoading}
-            />
-            <DashboardMetrics
-              kpis={kpis}
-              analytics={analytics}
-              loading={dashboardLoading || dashboardError}
-              onMetricClick={(type) => {
-                if (type === 'alerts') triggerFocus('critical', 'Alertes');
-              }}
-            />
-            <div className="flex flex-wrap items-center gap-3">
-              <Button variant="outline" size="sm" onClick={() => setFiltersOpen(true)}>
-                Ouvrir les filtres
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => triggerFocus('critical', 'Alertes')}>
-                Focus alertes
-              </Button>
-            </div>
-          </>
-        );
-      case 'overview.productFile':
-        return <ProductLookup />;
-      case 'inventory.catalog':
-        return (
-          <>
-            <div className="grid gap-6 lg:grid-cols-2">
-              <FiltersPanel
-                categories={dashboardData?.filters?.categories ?? inferredCategories}
-                filters={filters}
-                meta={productMeta}
-                onChange={handleFilterChange}
-                onReset={handleFilterReset}
-              />
-              <StockCards items={products} />
-            </div>
-            <Card className="grid gap-6 lg:grid-cols-3">
-              <DashboardList
-                title="Top stock (HT)"
-                items={dashboardData?.top_stock_value ?? []}
-                valueKey="valeur_stock"
-                loading={dashboardLoading}
-              />
-              <DashboardList
-                title="Top ventes"
-                items={dashboardData?.top_sales ?? []}
-                valueKey="quantite_vendue"
-                loading={dashboardLoading}
-              />
-              <DashboardList
-                title="Fournisseurs"
-                items={dashboardData?.supplier_breakdown ?? []}
-                valueKey="valeur"
-                loading={dashboardLoading}
-                labelKey="fournisseur"
-                suffix=" €"
-              />
-            </Card>
-          </>
-        );
-      case 'inventory.flows':
-        return (
-          <>
-            <Card className="grid gap-6 lg:grid-cols-2">
-              <WeeklyFlowsChart
-                data={weeklySeries}
-                loading={dashboardLoading}
-                windowSize={weeklyWindow}
-                onWindowChange={setWeeklyWindow}
-              />
-              <MarginAlertsList
-                items={dashboardData?.margin_alerts ?? []}
-                loading={dashboardLoading}
-              />
-            </Card>
-            <CategoryStockChart
-              data={categoryStockData}
-              loading={dashboardLoading}
-            />
-          </>
-        );
-      default:
-        return (
-          <Card>
-            <p className="text-sm text-slate-400">Sélectionnez une section pour afficher son contenu.</p>
-          </Card>
-        );
-    }
-  };
+  const isLoading = dashboardLoading || productsLoading;
+
+  // Gestion erreur avec QueryErrorState
+  if (dashboardError) {
+    return (
+      <QueryErrorState
+        error={dashboardError}
+        onRetry={refetch}
+        variant="full"
+      />
+    );
+  }
 
   return (
-    <div className="relative flex flex-col gap-8">
-      {filtersOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-slate-900/70 backdrop-blur" onClick={() => setFiltersOpen(false)} />
-          <div className="relative h-full w-full max-w-md">
-            <FiltersPanel
-              categories={dashboardData?.filters?.categories ?? inferredCategories}
-              filters={filters}
-              meta={productMeta}
-              onChange={handleFilterChange}
-              onReset={handleFilterReset}
-            />
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="space-y-6"
+    >
+      {/* Hero avec statut */}
+      <DashboardHero
+        status={{ level: kpis.alerte_stock_bas > 5 ? 'warning' : 'ok', alertCount: kpis.alerte_stock_bas }}
+        loading={isLoading}
+      />
+
+      {/* KPIs principaux */}
+      <DashboardMetrics
+        kpis={kpis}
+        analytics={analytics}
+        loading={isLoading}
+      />
+
+      {/* Graphiques */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Flux hebdomadaires */}
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-5 h-5 text-emerald-400" />
+            <h3 className="font-semibold text-white">Flux hebdomadaires</h3>
+          </div>
+          <WeeklyFlowsChart
+            data={weeklySeries}
+            loading={isLoading}
+            windowSize={weeklyWindow}
+            onWindowChange={setWeeklyWindow}
+          />
+        </div>
+
+        {/* Répartition par catégorie */}
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 className="w-5 h-5 text-violet-400" />
+            <h3 className="font-semibold text-white">Stock par catégorie</h3>
+          </div>
+          <CategoryStockChart
+            data={categoryStockData}
+            loading={isLoading}
+          />
+        </div>
+      </div>
+
+      {/* Listes */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10">
+          <div className="flex items-center gap-2 mb-4">
+            <Package className="w-5 h-5 text-blue-400" />
+            <h3 className="font-semibold text-white">Top stock (HT)</h3>
+          </div>
+          <DashboardList
+            items={dashboardData?.top_stock_value ?? []}
+            valueKey="valeur_stock"
+            loading={isLoading}
+          />
+        </div>
+
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-5 h-5 text-amber-400" />
+            <h3 className="font-semibold text-white">Top ventes</h3>
+          </div>
+          <DashboardList
+            items={dashboardData?.top_sales ?? []}
+            valueKey="quantite_vendue"
+            loading={isLoading}
+          />
+        </div>
+
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10">
+          <div className="flex items-center gap-2 mb-4">
+            <Package className="w-5 h-5 text-rose-400" />
+            <h3 className="font-semibold text-white">Fournisseurs</h3>
+          </div>
+          <DashboardList
+            items={dashboardData?.supplier_breakdown ?? []}
+            valueKey="valeur"
+            loading={isLoading}
+            labelKey="fournisseur"
+            suffix=" €"
+          />
+        </div>
+      </div>
+
+      {/* Alertes stock bas */}
+      {analytics.lowStock.length > 0 && (
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-900/20 to-orange-900/20 border border-amber-500/30">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-5 h-5 text-amber-400" />
+            <h3 className="font-semibold text-white">Alertes stock bas</h3>
+            <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+              {analytics.lowStock.length} produit(s)
+            </span>
+          </div>
+          <div className="space-y-2">
+            {analytics.lowStock.map((product, index) => (
+              <motion.div
+                key={product.id || index}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="flex items-center justify-between p-3 rounded-xl bg-white/5"
+              >
+                <div>
+                  <p className="font-medium text-white">{product.nom}</p>
+                  <p className="text-xs text-slate-400">
+                    Seuil : {product.seuil_alerte ?? 8} • Catégorie : {product.categorie || 'NC'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-amber-400">{product.stock_actuel ?? 0}</p>
+                  <p className="text-xs text-slate-500">en stock</p>
+                </div>
+              </motion.div>
+            ))}
           </div>
         </div>
       )}
-      {focusToast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-white/20 bg-slate-900/90 px-5 py-3 text-sm text-white shadow-lg">
-          {focusToast}
-        </div>
-      )}
-      <FiltersDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtres avancés">
-        <FiltersPanel
-          categories={dashboardData?.filters?.categories ?? inferredCategories}
-          filters={filters}
-          meta={productMeta}
-          onChange={handleFilterChange}
-          onReset={handleFilterReset}
-        />
-      </FiltersDrawer>
-
-      <div className="lg:hidden">
-        <label className="text-xs uppercase tracking-[0.3em] text-slate-400" htmlFor="mobile-dashboard-section">
-          Section
-        </label>
-        <select
-          id="mobile-dashboard-section"
-          value={activePanel}
-          onChange={(event) => handlePanelSelect(event.target.value)}
-          className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-brand-400 focus:outline-none"
-        >
-          {sectionOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      {renderPanel()}
-    </div>
+    </motion.div>
   );
 }

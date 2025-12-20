@@ -476,7 +476,7 @@ def auto_categorize(direction: str, label: str) -> Tuple[Optional[str], str]:
         target_code = infer_target_category(source_cat, entry_type)
         return source_cat, target_code
 
-    # Fallback
+    # Repli par défaut
     if direction == "IN":
         return None, "encaissements"
     return None, "frais_generaux"
