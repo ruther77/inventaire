@@ -1,9 +1,25 @@
-"""Services pour la gestion des transactions financières et lignes analytiques."""
+"""
+Module de gestion des transactions financières et analytique.
+
+Ce module fournit les services pour:
+- Création de transactions avec lignes analytiques
+- Validation de cohérence montants/lignes
+- Recherche et filtrage avancés de transactions
+- Catégorisation automatique et manuelle
+- Suggestions d'affectation analytique
+- Mise à jour et verrouillage de transactions
+- Support des transferts inter-comptes
+
+Les transactions représentent tous les mouvements financiers (IN, OUT, TRANSFER)
+et sont décomposées en lignes analytiques pour le suivi par catégorie et
+centre de coût. Le système supporte la TVA et les ventilations multi-lignes.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+import logging
 
 from sqlalchemy import text
 
@@ -25,8 +41,44 @@ def _validate_lines_amount(payload: FinanceTransactionCreate) -> None:
 
 
 def create_transaction(payload: FinanceTransactionCreate) -> dict[str, Any]:
-    """Crée une transaction et ses lignes dans une transaction DB unique."""
+    """
+    Crée une transaction financière complète avec ses lignes analytiques.
 
+    La création est atomique (transaction DB unique). Valide la cohérence
+    des montants entre la transaction et ses lignes, et vérifie les règles
+    métier (ex: transfert nécessite un compte contrepartie).
+
+    Args:
+        payload: Données de la transaction incluant:
+                 - entity_id, account_id: Identification
+                 - direction: IN/OUT/TRANSFER
+                 - amount, currency: Montant et devise
+                 - date_operation, date_value: Dates
+                 - lines: Lignes analytiques optionnelles
+                 - counterparty_account_id: Requis si TRANSFER
+
+    Returns:
+        Dict avec l'ID de la transaction créée et ses informations
+
+    Raises:
+        ValueError: Si validation échoue (transfert sans contrepartie,
+                   somme lignes ≠ montant transaction, etc.)
+
+    Example:
+        >>> tx = create_transaction(FinanceTransactionCreate(
+        ...     entity_id=1,
+        ...     account_id=1,
+        ...     direction="OUT",
+        ...     amount=150.00,
+        ...     currency="EUR",
+        ...     date_operation="2024-01-15",
+        ...     lines=[FinanceTransactionLineCreate(
+        ...         category_id=5,
+        ...         montant_ttc=150.00,
+        ...         description="Achat fournitures"
+        ...     )]
+        ... ))
+    """
     if payload.direction == "TRANSFER" and not payload.counterparty_account_id:
         raise ValueError("counterparty_account_id requis pour un transfert.")
 
@@ -162,6 +214,9 @@ def list_transactions(
         clauses.append("date_operation <= :date_to")
         params["date_to"] = date_to
 
+    # Add soft delete filter
+    clauses.append("deleted_at IS NULL")
+
     where_sql = ""
     if clauses:
         where_sql = "WHERE " + " AND ".join(clauses)
@@ -197,7 +252,7 @@ def update_transaction(transaction_id: int, payload: FinanceTransactionUpdate) -
     engine = get_engine()
     with engine.begin() as conn:
         locked = conn.execute(
-            text("SELECT locked_at FROM finance_transactions WHERE id = :id"),
+            text("SELECT locked_at FROM finance_transactions WHERE id = :id AND deleted_at IS NULL"),
             {"id": int(transaction_id)},
         ).fetchone()
         if not locked:
@@ -205,19 +260,34 @@ def update_transaction(transaction_id: int, payload: FinanceTransactionUpdate) -
         if locked.locked_at:
             raise ValueError("Transaction verrouillée, modification interdite.")
 
+        # Liste blanche des champs autorisés pour éviter les injections SQL
+        # Chaque entrée mappe un champ à sa clause SQL sécurisée avec paramètre nommé
+        ALLOWED_FIELDS = {
+            "note": "note = :note",
+            "status": "status = :status"
+        }
+
         fields = []
         params: dict[str, Any] = {"id": int(transaction_id)}
+
         if payload.note is not None:
-            fields.append("note = :note")
+            # Sécurité : utilisation de la clause pré-définie de ALLOWED_FIELDS
+            fields.append(ALLOWED_FIELDS["note"])
             params["note"] = payload.note
         if payload.status:
-            fields.append("status = :status")
+            # Sécurité : utilisation de la clause pré-définie de ALLOWED_FIELDS
+            fields.append(ALLOWED_FIELDS["status"])
             params["status"] = payload.status.upper()
+
         if not fields:
             return {"id": transaction_id}
 
+        # Sécurité : Construction sécurisée de la requête
+        # Les clauses proviennent uniquement de ALLOWED_FIELDS (whitelist)
+        # Aucune donnée utilisateur n'est interpolée dans la requête SQL
+        update_clause = ", ".join(fields)
         conn.execute(
-            text(f"UPDATE finance_transactions SET {', '.join(fields)}, updated_at = now() WHERE id = :id"),
+            text(f"UPDATE finance_transactions SET {update_clause}, updated_at = now() WHERE id = :id"),
             params,
         )
 
@@ -234,7 +304,7 @@ def lock_transaction(transaction_id: int) -> dict[str, Any]:
                 """
                 UPDATE finance_transactions
                 SET locked_at = :locked_at
-                WHERE id = :id AND locked_at IS NULL
+                WHERE id = :id AND locked_at IS NULL AND deleted_at IS NULL
                 RETURNING id
                 """
             ),
@@ -268,7 +338,7 @@ def search_transactions(
     safe_size = max(1, min(int(size), 500))
     offset = (safe_page - 1) * safe_size
 
-    clauses: list[str] = ["t.direction IN ('IN', 'OUT')"]
+    clauses: list[str] = ["t.direction IN ('IN', 'OUT')", "t.deleted_at IS NULL"]
     params: Dict[str, Any] = {}
     if entity_id is not None:
         clauses.append("t.entity_id = :entity_id")
@@ -349,6 +419,7 @@ def search_transactions(
         text(
             f"""
             SELECT
+              t.id AS id,
               t.id AS line_id,
               t.id AS transaction_id,
               t.entity_id,
@@ -360,6 +431,7 @@ def search_transactions(
               t.date_value,
               t.amount AS transaction_amount,
               t.amount AS amount,
+              t.locked_at,
               COALESCE(tl.category_id, tc.category_id, 0) AS category_id,
               COALESCE(c.code, 'uncategorized') AS category_code,
               COALESCE(c.name, 'Non catégorisé') AS category_name,
@@ -378,7 +450,29 @@ def search_transactions(
         params={**params, "limit": safe_size, "offset": offset},
     )
 
-    items = data_df.where(data_df.notna(), None).to_dict("records") if not data_df.empty else []
+    if data_df.empty:
+        items = []
+    else:
+        items = data_df.where(data_df.notna(), None).to_dict("records")
+        before_count = len(items)
+        items = [item for item in items if item.get("id") is not None]
+        dropped = before_count - len(items)
+        if dropped:
+            logging.getLogger(__name__).warning(
+                "Finance transactions search dropped %s item(s) without id (page=%s size=%s sort=%s entity_id=%s account_id=%s category_id=%s date_from=%s date_to=%s amount_min=%s amount_max=%s q=%s)",
+                dropped,
+                safe_page,
+                safe_size,
+                sort,
+                entity_id,
+                account_id,
+                category_id,
+                date_from,
+                date_to,
+                amount_min,
+                amount_max,
+                q,
+            )
     return FinanceTransactionSearchResponse(
         items=items,
         page=safe_page,
@@ -405,7 +499,7 @@ def batch_categorize(payload: FinanceBatchCategorizeRequest) -> Dict[str, Any]:
         raise ValueError("transaction_ids ou rule est requis.")
 
     params: Dict[str, Any] = {"category_id": int(payload.category_id)}
-    clauses: List[str] = []
+    clauses: List[str] = ["t.deleted_at IS NULL"]
     if payload.transaction_ids:
         clauses.append("tl.transaction_id = ANY(:tx_ids)")
         params["tx_ids"] = list({int(x) for x in payload.transaction_ids})
@@ -458,7 +552,7 @@ def suggest_autre_top(entity_id: Optional[int] = None, limit: int = 50) -> List[
     """Retourne les libellés fréquents restés en fourre-tout (ici frais_generaux)."""
 
     safe_limit = max(1, min(int(limit), 200))
-    clauses = ["(c.code = 'frais_generaux' OR c.code IS NULL)"]
+    clauses = ["(c.code = 'frais_generaux' OR c.code IS NULL)", "t.deleted_at IS NULL"]
     params: Dict[str, Any] = {}
     if entity_id is not None:
         clauses.append("t.entity_id = :entity_id")

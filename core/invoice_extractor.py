@@ -84,6 +84,14 @@ DATE_FACTURE_PATTERN = re.compile(
     r"date\s+facture\s*:\s*\n?\s*(?P<facture_date>\d{2}-\d{2}-\d{4}(?:\s+\d{2}:\d{2})?)",
     re.IGNORECASE,
 )  # Date facture (DD-MM-YYYY) - supporte newline après :
+
+# Pattern pour extraire le numéro de facture Metro
+# Formats supportés: "Facture N° 12345", "N° Facture: 12345", "FACTURE N°12345", etc.
+METRO_INVOICE_ID_PATTERN = re.compile(
+    r"(?:facture|fact\.?)\s*n[°º]?\s*:?\s*(?P<invoice_num>\d{6,12})",
+    re.IGNORECASE,
+)  # Numéro facture Metro (6-12 chiffres)
+
 FINAL_INVOICE_PATTERN = re.compile(r"FIN\s+DE\s+LA\s+FACTURE", re.IGNORECASE)  # Marque fin de facture
 _TRAILING_ALPHA = re.compile(r"[A-Za-z]$")  # Lettre en fin de token (code TVA)
 _METADATA_PATTERNS = (
@@ -623,6 +631,7 @@ def extract_products_from_metro_invoice(
     current_invoice_id: str | None = None  # Identifiant facture en cours
     current_invoice_date: str | None = None  # Date facture en cours
     pending_invoice_date: str | None = None  # Date rencontrée en attente
+    pending_invoice_id: str | None = None  # Numéro facture en attente (extrait du texte)
 
     # --- Pré-segmentation et nettoyage des lignes brutes (couple original/normalisé) ---
     prepared_lines = [
@@ -702,10 +711,18 @@ def extract_products_from_metro_invoice(
         if date_match:  # Si trouvée
             pending_invoice_date = date_match.group("facture_date").strip()  # Stocke la date en attente
             continue  # Passe à la ligne suivante
+
+        # Extraction du numéro de facture Metro (ex: "Facture N° 12345678")
+        invoice_id_match = METRO_INVOICE_ID_PATTERN.search(raw_line)  # Cherche un numéro de facture
+        if invoice_id_match:  # Si trouvé
+            pending_invoice_id = f"METRO-{invoice_id_match.group('invoice_num')}"  # Format: METRO-12345678
+            continue  # Passe à la ligne suivante
+
         if FINAL_INVOICE_PATTERN.search(raw_line):  # Si fin de facture détectée
             current_invoice_id = None  # Réinitialise l'ID facture
             current_invoice_date = None  # Réinitialise la date facture
             pending_invoice_date = None  # Réinitialise la date en attente
+            pending_invoice_id = None  # Réinitialise l'ID facture en attente
             continue  # Passe à la ligne suivante
         # Détection des blocs "*** SECTION Total :" (renseigne la régie/section courante)
         section_match = SECTION_HEADER.match(raw_line)  # Détecte un header de section
@@ -718,19 +735,22 @@ def extract_products_from_metro_invoice(
 
         start_match = START_PATTERN.match(line)  # Détecte une nouvelle ligne produit
         if start_match:  # Si match
-            if pending_invoice_date is not None:  # Si une date était en attente
+            if pending_invoice_date is not None or pending_invoice_id is not None:  # Si une date ou ID en attente
                 needs_new_invoice = current_invoice_id is None or current_invoice_date != pending_invoice_date  # Nouveau document ?
                 if needs_new_invoice:  # Si nouvelle facture
                     invoice_sequence += 1  # Incrémente le compteur
-                    current_invoice_id = f"INV-{invoice_sequence:03d}"  # Génère un ID
+                    # Utilise le vrai numéro de facture si disponible, sinon génère un fallback
+                    current_invoice_id = pending_invoice_id or f"METRO-{invoice_sequence:03d}"
                 elif current_invoice_id is None:  # Cas de fallback
                     invoice_sequence += 1
-                    current_invoice_id = f"INV-{invoice_sequence:03d}"
+                    current_invoice_id = pending_invoice_id or f"METRO-{invoice_sequence:03d}"
                 current_invoice_date = pending_invoice_date  # Applique la date
                 pending_invoice_date = None  # Vide la date en attente
+                pending_invoice_id = None  # Vide l'ID en attente
             elif current_invoice_id is None:  # Pas de facture active
                 invoice_sequence += 1  # Incrémente le compteur
-                current_invoice_id = f"INV-{invoice_sequence:03d}"  # Crée un ID
+                current_invoice_id = pending_invoice_id or f"METRO-{invoice_sequence:03d}"  # Crée un ID
+                pending_invoice_id = None  # Vide l'ID en attente
 
             # Arrivée d'un nouvel article : flush du précédent si complet
             if current and "prix_unitaire" in current:  # Si une ligne précédente existait

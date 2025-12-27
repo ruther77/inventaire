@@ -16,6 +16,36 @@ const paddings = {
   xl: 'p-8',
 };
 
+/**
+ * Composant Card.
+ *
+ * Conteneur de carte réutilisable avec effet glass morphism et différentes variantes visuelles.
+ * Supporte les animations stagger et peut être rendu comme différents éléments sémantiques.
+ * Utilise le design system dark theme avec bordures semi-transparentes et arrière-plans flous.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {React.ElementType} [props.as='section'] - Élément HTML à rendre ('div', 'section', 'article', etc.)
+ * @param {string} [props.className] - Classes CSS additionnelles
+ * @param {React.ReactNode} props.children - Contenu de la carte
+ * @param {string} [props.padding='lg'] - Espacement interne ('none' | 'sm' | 'md' | 'lg' | 'xl')
+ * @param {string} [props.variant='default'] - Variante visuelle ('default' | 'elevated' | 'outline' | 'ghost' | 'interactive')
+ * @param {Function} [props.onClick] - Callback au clic (rend automatiquement la carte interactive)
+ * @param {boolean} [props.stagger=false] - Active l'animation stagger
+ * @param {number} [props.staggerIndex] - Index pour l'animation stagger (délai calculé automatiquement)
+ *
+ * @example
+ * <Card variant="elevated" padding="lg">
+ *   <h3>Titre de la carte</h3>
+ *   <p>Contenu de la carte</p>
+ * </Card>
+ *
+ * @example
+ * <Card variant="interactive" onClick={handleClick}>
+ *   Carte cliquable
+ * </Card>
+ */
 export default function Card({
   as: Component = 'section',
   className,
@@ -48,7 +78,26 @@ export default function Card({
 }
 
 /**
- * CardHeader - En-tête de carte standardisé
+ * CardHeader - En-tête de carte standardisé.
+ *
+ * Composant d'en-tête pour les cartes avec titre, description et zone d'action optionnelle.
+ * Utilise un layout flex pour aligner le contenu à gauche et les actions à droite.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {string} [props.className] - Classes CSS additionnelles
+ * @param {string} [props.title] - Titre principal de l'en-tête
+ * @param {string} [props.description] - Description/sous-titre de l'en-tête
+ * @param {React.ReactNode} [props.action] - Zone d'action (boutons, liens, etc.)
+ * @param {React.ReactNode} [props.children] - Contenu personnalisé (prioritaire sur title/description/action)
+ *
+ * @example
+ * <CardHeader
+ *   title="Statistiques"
+ *   description="Dernières 30 jours"
+ *   action={<Button size="sm">Voir plus</Button>}
+ * />
  */
 export function CardHeader({ className, title, description, action, children }) {
   if (children) {
@@ -71,14 +120,43 @@ export function CardHeader({ className, title, description, action, children }) 
 }
 
 /**
- * CardContent - Corps de carte
+ * CardContent - Corps de carte.
+ *
+ * Conteneur simple pour le contenu principal d'une carte.
+ * Applique un espacement cohérent avec le design system.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {string} [props.className] - Classes CSS additionnelles
+ * @param {React.ReactNode} props.children - Contenu de la carte
+ *
+ * @example
+ * <CardContent>
+ *   <p>Contenu de la carte</p>
+ * </CardContent>
  */
 export function CardContent({ className, children }) {
   return <div className={clsx('', className)}>{children}</div>;
 }
 
 /**
- * CardFooter - Pied de carte
+ * CardFooter - Pied de carte.
+ *
+ * Zone de pied de page pour les cartes avec bordure supérieure et alignement à droite par défaut.
+ * Idéal pour les actions secondaires, boutons de validation, etc.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {string} [props.className] - Classes CSS additionnelles
+ * @param {React.ReactNode} props.children - Contenu du pied de page (généralement des boutons)
+ *
+ * @example
+ * <CardFooter>
+ *   <Button variant="ghost">Annuler</Button>
+ *   <Button variant="primary">Confirmer</Button>
+ * </CardFooter>
  */
 export function CardFooter({ className, children }) {
   return (

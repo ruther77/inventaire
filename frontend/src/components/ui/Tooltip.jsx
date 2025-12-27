@@ -2,8 +2,30 @@ import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 
 /**
- * Tooltip - Composant d'info-bulle accessible
- * Affiche du contenu supplémentaire au survol ou au focus
+ * Composant Tooltip.
+ *
+ * Info-bulle accessible qui affiche du contenu supplémentaire au survol ou au focus.
+ * S'ajuste automatiquement si l'espace manque (repositionnement intelligent).
+ * Supporte 4 positions (top, bottom, left, right) et un délai d'affichage configurable.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {React.ReactNode} props.children - Élément déclencheur du tooltip
+ * @param {React.ReactNode} props.content - Contenu du tooltip
+ * @param {string} [props.position='top'] - Position par défaut ('top' | 'bottom' | 'left' | 'right')
+ * @param {number} [props.delay=200] - Délai en ms avant affichage du tooltip
+ * @param {string} [props.className] - Classes CSS additionnelles pour le tooltip
+ *
+ * @example
+ * <Tooltip content="Cliquez pour copier">
+ *   <button>Copier</button>
+ * </Tooltip>
+ *
+ * @example
+ * <Tooltip content="Informations supplémentaires" position="right" delay={500}>
+ *   <InfoIcon />
+ * </Tooltip>
  */
 export default function Tooltip({
   children,
@@ -137,7 +159,21 @@ export default function Tooltip({
 }
 
 /**
- * TooltipTrigger - Wrapper simple pour ajouter un tooltip à n'importe quel élément
+ * TooltipTrigger - Wrapper simplifié pour ajouter un tooltip.
+ *
+ * Composant wrapper qui simplifie l'ajout d'un tooltip à n'importe quel élément.
+ * Alternative plus concise à l'utilisation directe du composant Tooltip.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {React.ReactNode} props.children - Élément déclencheur
+ * @param {React.ReactNode} props.tooltip - Contenu du tooltip
+ *
+ * @example
+ * <TooltipTrigger tooltip="Supprimer">
+ *   <DeleteButton />
+ * </TooltipTrigger>
  */
 export function TooltipTrigger({ children, tooltip, ...props }) {
   return (
@@ -148,7 +184,19 @@ export function TooltipTrigger({ children, tooltip, ...props }) {
 }
 
 /**
- * InfoTooltip - Icône d'information avec tooltip intégré
+ * InfoTooltip - Icône d'information avec tooltip intégré.
+ *
+ * Composant prêt à l'emploi affichant une icône d'information circulaire avec un tooltip.
+ * Idéal pour ajouter des aides contextuelles dans les formulaires et interfaces.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {React.ReactNode} props.content - Contenu du tooltip
+ * @param {string} [props.className] - Classes CSS additionnelles
+ *
+ * @example
+ * <InfoTooltip content="Ce champ est optionnel mais recommandé" />
  */
 export function InfoTooltip({ content, className }) {
   return (

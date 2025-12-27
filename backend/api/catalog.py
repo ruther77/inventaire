@@ -19,6 +19,8 @@ def list_products(
     search: str | None = None,
     category: str | None = None,
     status: str | None = None,
+    fournisseur: str | None = Query(default=None, description="Filtrer par fournisseur"),
+    supplier_id: int | None = Query(default=None, description="Filtrer par ID fournisseur"),
     page: int = Query(default=1, ge=1, le=10000, description="Numéro de page"),
     per_page: int = Query(default=25, ge=1, le=100, description="Éléments par page (max 100)"),
     tenant: Tenant = Depends(get_current_tenant),
@@ -29,6 +31,8 @@ def list_products(
         search=search,
         category=category,
         status=status,
+        fournisseur=fournisseur,
+        supplier_id=supplier_id,
         page=page,
         per_page=per_page,
     )
@@ -42,6 +46,26 @@ def list_products(
 def get_product(product_id: int, tenant: Tenant = Depends(get_current_tenant)):
     try:
         return catalog_service.get_product(product_id, tenant_id=tenant.id)
+    except catalog_service.ProductNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/products/{product_id}/detail")
+def get_product_detail(product_id: int, tenant: Tenant = Depends(get_current_tenant)):
+    """Retourne un produit avec toutes ses métriques enrichies.
+
+    Inclut:
+    - Données de base du produit
+    - Ventes 30j et 7j avec trends
+    - Rotation stock et jours de couverture
+    - Trend stock vs semaine précédente
+    - Dernier achat (date, source, quantité)
+    - Historique des prix récent
+    - Mouvements récents (10 derniers)
+    - Stock max estimé
+    """
+    try:
+        return catalog_service.get_product_detail(product_id, tenant_id=tenant.id)
     except catalog_service.ProductNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 

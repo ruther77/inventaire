@@ -9,6 +9,10 @@
 export { default as Button } from './Button.jsx';
 export { default as Input } from './Input.jsx';
 export { default as Select } from './Select.jsx';
+export { default as Textarea } from './Textarea.jsx';
+export { default as Toggle, ToggleGroup } from './Toggle.jsx';
+export { default as Checkbox, CheckboxGroup } from './Checkbox.jsx';
+export { default as Radio, RadioGroup } from './Radio.jsx';
 export {
   default as Card,
   CardHeader,
@@ -58,7 +62,13 @@ export {
 
 // Overlay
 export { default as Modal, ConfirmDialog } from './Modal.jsx';
-export { default as FiltersDrawer } from './FiltersDrawer.jsx';
+export {
+  default as FiltersDrawer,
+  FilterSection,
+  FilterOption,
+  RangeFilter,
+  DateRangeFilter,
+} from './FiltersDrawer.jsx';
 export {
   default as Toast,
   ToastProvider,
@@ -153,6 +163,17 @@ export {
   TrendIndicator,
   MiniPie,
 } from './MiniChart.jsx';
+
+// Full Charts (Dashboard)
+export {
+  BarChart,
+  AreaChart,
+  DonutChart,
+  ProgressRings,
+  SparklineCard,
+  ChartCard,
+  CHART_COLORS,
+} from './Charts.jsx';
 
 // Design System - Tokens complets
 export {

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design System - Charts</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-teal: #06b6d4;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --accent-blue: #3b82f6;
+            --accent-violet: #8b5cf6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 40px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .subtitle { color: var(--text-muted); margin-bottom: 40px; }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 40px 0 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+        .chart-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        .chart-title { font-size: 16px; font-weight: 600; }
+        .chart-legend {
+            display: flex;
+            gap: 16px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+
+        /* Bar chart */
+        .bar-chart {
+            height: 200px;
+            display: flex;
+            align-items: flex-end;
+            gap: 16px;
+            padding: 0 20px;
+        }
+        .bar-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .bar {
+            width: 40px;
+            border-radius: 6px 6px 0 0;
+            transition: all 0.3s;
+        }
+        .bar:hover { opacity: 0.8; }
+        .bar-label {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Line chart mockup */
+        .line-chart {
+            height: 200px;
+            position: relative;
+            background:
+                linear-gradient(to bottom, transparent 0%, transparent 25%, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.03) 25.5%, transparent 25.5%),
+                linear-gradient(to bottom, transparent 0%, transparent 50%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.03) 50.5%, transparent 50.5%),
+                linear-gradient(to bottom, transparent 0%, transparent 75%, rgba(255,255,255,0.03) 75%, rgba(255,255,255,0.03) 75.5%, transparent 75.5%);
+        }
+        .line-path {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+        }
+        svg { width: 100%; height: 100%; }
+        .chart-x-axis {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Donut chart */
+        .donut-container {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+        }
+        .donut-chart {
+            width: 160px;
+            height: 160px;
+            position: relative;
+        }
+        .donut-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        .donut-value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .donut-label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .donut-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .donut-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .donut-legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+        .donut-legend-text {
+            font-size: 14px;
+        }
+        .donut-legend-value {
+            margin-left: auto;
+            font-weight: 600;
+        }
+
+        /* Sparkline */
+        .sparkline-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+        .sparkline-info { flex: 1; }
+        .sparkline-title { font-size: 14px; font-weight: 500; }
+        .sparkline-sub { font-size: 12px; color: var(--text-muted); }
+        .sparkline {
+            width: 100px;
+            height: 40px;
+        }
+        .sparkline-value { font-size: 18px; font-weight: 700; }
+
+        /* Progress rings */
+        .progress-rings {
+            display: flex;
+            justify-content: space-around;
+            padding: 20px 0;
+        }
+        .progress-ring {
+            text-align: center;
+        }
+        .ring-svg {
+            width: 80px;
+            height: 80px;
+            transform: rotate(-90deg);
+        }
+        .ring-bg {
+            fill: none;
+            stroke: rgba(255,255,255,0.1);
+            stroke-width: 8;
+        }
+        .ring-fill {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 220;
+        }
+        .ring-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+        .ring-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📈 Charts Components</h1>
+        <p class="subtitle">Visualisations de données pour tableaux de bord</p>
+
+        <div class="section-title">Graphiques principaux</div>
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <span class="chart-title">Ventes par jour</span>
+                    <div class="chart-legend">
+                        <div class="legend-item">
+                            <div class="legend-dot" style="background: var(--accent-emerald);"></div>
+                            <span>Cette semaine</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot" style="background: rgba(255,255,255,0.2);"></div>
+                            <span>Semaine dernière</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bar-chart">
+                    <div class="bar-group">
+                        <div class="bar" style="height: 120px; background: var(--accent-emerald);"></div>
+                        <span class="bar-label">Lun</span>
+                    </div>
+                    <div class="bar-group">
+                        <div class="bar" style="height: 180px; background: var(--accent-emerald);"></div>
+                        <span class="bar-label">Mar</span>
+                    </div>
+                    <div class="bar-group">
+                        <div class="bar" style="height: 140px; background: var(--accent-emerald);"></div>
+                        <span class="bar-label">Mer</span>
+                    </div>
+                    <div class="bar-group">
+                        <div class="bar" style="height: 160px; background: var(--accent-emerald);"></div>
+                        <span class="bar-label">Jeu</span>
+                    </div>
+                    <div class="bar-group">
+                        <div class="bar" style="height: 200px; background: var(--accent-emerald);"></div>
+                        <span class="bar-label">Ven</span>
+                    </div>
+                    <div class="bar-group">
+                        <div class="bar" style="height: 190px; background: var(--accent-teal);"></div>
+                        <span class="bar-label">Sam</span>
+                    </div>
+                    <div class="bar-group">
+                        <div class="bar" style="height: 100px; background: rgba(255,255,255,0.2);"></div>
+                        <span class="bar-label">Dim</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <span class="chart-title">Évolution CA (30 jours)</span>
+                </div>
+                <div class="line-chart">
+                    <svg viewBox="0 0 400 200" preserveAspectRatio="none">
+                        <defs>
+                            <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.3" />
+                                <stop offset="100%" style="stop-color:#10b981;stop-opacity:0" />
+                            </linearGradient>
+                        </defs>
+                        <path d="M0,180 Q50,160 100,140 T200,100 T300,80 T400,40 L400,200 L0,200 Z" fill="url(#gradient)" />
+                        <path d="M0,180 Q50,160 100,140 T200,100 T300,80 T400,40" fill="none" stroke="#10b981" stroke-width="3" />
+                    </svg>
+                </div>
+                <div class="chart-x-axis">
+                    <span>1 Déc</span>
+                    <span>8 Déc</span>
+                    <span>15 Déc</span>
+                    <span>22 Déc</span>
+                    <span>24 Déc</span>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <span class="chart-title">Répartition des ventes</span>
+                </div>
+                <div class="donut-container">
+                    <div class="donut-chart">
+                        <svg viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--accent-emerald)" stroke-width="12" stroke-dasharray="100 151" stroke-dashoffset="0" transform="rotate(-90 50 50)" />
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--accent-amber)" stroke-width="12" stroke-dasharray="60 191" stroke-dashoffset="-100" transform="rotate(-90 50 50)" />
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--accent-blue)" stroke-width="12" stroke-dasharray="40 211" stroke-dashoffset="-160" transform="rotate(-90 50 50)" />
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--accent-violet)" stroke-width="12" stroke-dasharray="51 200" stroke-dashoffset="-200" transform="rotate(-90 50 50)" />
+                        </svg>
+                        <div class="donut-center">
+                            <div class="donut-value">€45K</div>
+                            <div class="donut-label">Total</div>
+                        </div>
+                    </div>
+                    <div class="donut-legend">
+                        <div class="donut-legend-item">
+                            <div class="donut-legend-color" style="background: var(--accent-emerald);"></div>
+                            <span class="donut-legend-text">Épicerie</span>
+                            <span class="donut-legend-value">40%</span>
+                        </div>
+                        <div class="donut-legend-item">
+                            <div class="donut-legend-color" style="background: var(--accent-amber);"></div>
+                            <span class="donut-legend-text">Restaurant</span>
+                            <span class="donut-legend-value">24%</span>
+                        </div>
+                        <div class="donut-legend-item">
+                            <div class="donut-legend-color" style="background: var(--accent-blue);"></div>
+                            <span class="donut-legend-text">Boissons</span>
+                            <span class="donut-legend-value">16%</span>
+                        </div>
+                        <div class="donut-legend-item">
+                            <div class="donut-legend-color" style="background: var(--accent-violet);"></div>
+                            <span class="donut-legend-text">Autres</span>
+                            <span class="donut-legend-value">20%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <span class="chart-title">Objectifs</span>
+                </div>
+                <div class="progress-rings">
+                    <div class="progress-ring">
+                        <svg class="ring-svg" viewBox="0 0 80 80">
+                            <circle class="ring-bg" cx="40" cy="40" r="35" />
+                            <circle class="ring-fill" cx="40" cy="40" r="35" stroke="var(--accent-emerald)" stroke-dashoffset="55" />
+                        </svg>
+                        <div class="ring-value">75%</div>
+                        <div class="ring-label">CA Mensuel</div>
+                    </div>
+                    <div class="progress-ring">
+                        <svg class="ring-svg" viewBox="0 0 80 80">
+                            <circle class="ring-bg" cx="40" cy="40" r="35" />
+                            <circle class="ring-fill" cx="40" cy="40" r="35" stroke="var(--accent-amber)" stroke-dashoffset="110" />
+                        </svg>
+                        <div class="ring-value">50%</div>
+                        <div class="ring-label">Marge</div>
+                    </div>
+                    <div class="progress-ring">
+                        <svg class="ring-svg" viewBox="0 0 80 80">
+                            <circle class="ring-bg" cx="40" cy="40" r="35" />
+                            <circle class="ring-fill" cx="40" cy="40" r="35" stroke="var(--accent-teal)" stroke-dashoffset="22" />
+                        </svg>
+                        <div class="ring-value">90%</div>
+                        <div class="ring-label">Stock</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

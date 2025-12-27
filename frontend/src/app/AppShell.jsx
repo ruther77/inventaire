@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { motion } from 'framer-motion';
 import SidebarNav from './SidebarNav.jsx';
 import TopBar from './TopBar.jsx';
 import CommandBar from '../components/layout/CommandBar.jsx';
@@ -9,17 +10,24 @@ import { CommandBarProvider } from '../contexts/CommandBarContext.jsx';
 import OfflineBanner from '../components/feedback/OfflineBanner.jsx';
 
 // ============================================================================
-// PAGE TRANSITION - Désactivé pour éviter conflits avec Suspense/lazy
+// APP SHELL 2025 - Unified Layout avec sidebar collapsible
 // ============================================================================
-// Note: AnimatePresence mode="wait" + Suspense lazy loading = navigation bloquée
-// La transition simple CSS est plus fiable
 
-// ============================================================================
-// APP SHELL 2025 - Unified Layout
-// ============================================================================
+// Routes qui n'affichent pas la TopBar (ont leur propre header)
+const ROUTES_WITHOUT_TOPBAR = ['/operations'];
 
 export default function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const location = useLocation();
+
+  // Largeur du sidebar selon l'état
+  const sidebarWidth = sidebarCollapsed ? 72 : 260;
+
+  // Vérifier si la route actuelle doit masquer la TopBar
+  const hideTopBar = ROUTES_WITHOUT_TOPBAR.some(
+    (route) => location.pathname === route || location.pathname.startsWith(route + '/')
+  );
 
   return (
     <CommandBarProvider>
@@ -31,14 +39,21 @@ export default function AppShell() {
         <SidebarNav
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
 
-        {/* Main content area */}
-        <div className="flex flex-1 flex-col lg:pl-72 pb-16 lg:pb-0">
-          {/* TopBar */}
-          <TopBar onMenuToggle={() => setSidebarOpen(true)} />
+        {/* Main content area - dynamic padding */}
+        <motion.div
+          className="flex flex-1 flex-col pb-16 lg:pb-0"
+          initial={false}
+          animate={{ paddingLeft: typeof window !== 'undefined' && window.innerWidth >= 1024 ? sidebarWidth : 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        >
+          {/* TopBar - Masquée sur certaines routes qui ont leur propre header */}
+          {!hideTopBar && <TopBar onMenuToggle={() => setSidebarOpen(true)} />}
 
-          {/* Page content - Sans AnimatePresence pour éviter blocage avec Suspense */}
+          {/* Page content */}
           <main className="flex-1 px-4 pb-12 pt-6 sm:px-6 lg:px-8">
             <div className="mx-auto w-full max-w-7xl">
               <Outlet />
@@ -52,7 +67,7 @@ export default function AppShell() {
               <p>v2.0.0</p>
             </div>
           </footer>
-        </div>
+        </motion.div>
 
         {/* Toast notifications */}
         <Toaster

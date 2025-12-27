@@ -189,7 +189,7 @@ def _fuzzy_amount_match(amount1: float, amount2: float, tolerance: float = 0.03)
 
 @router.post("/run", response_model=List[ReconciliationMatchResponse])
 def run_reconciliation(
-    days_back: int = Query(default=60, ge=1, le=180),
+    days_back: int = Query(default=60, ge=1, le=730),
     auto_confirm_threshold: float = Query(default=0.95, ge=0.5, le=1.0),
     tenant: Tenant = Depends(get_current_tenant_or_default)
 ):
@@ -652,7 +652,7 @@ def delete_supplier_alias(
 
 @router.get("/summary", response_model=ReconciliationSummaryResponse)
 def get_reconciliation_summary(
-    days_back: int = Query(default=30, ge=1, le=180),
+    days_back: int = Query(default=30, ge=1, le=730),
     tenant: Tenant = Depends(get_current_tenant_or_default)
 ):
     """

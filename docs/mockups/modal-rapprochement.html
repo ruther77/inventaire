@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modal - Rapprochement bancaire</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal {
+            background: rgba(20, 20, 30, 0.95);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), transparent);
+        }
+        .modal-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.06);
+            border: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .modal-body { padding: 24px; }
+        .matching-container {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+        .matching-side {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .side-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .transaction-item {
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .transaction-item:hover {
+            background: rgba(255,255,255,0.06);
+        }
+        .transaction-item.selected {
+            border-color: var(--accent-amber);
+            background: rgba(245, 158, 11, 0.1);
+        }
+        .transaction-item.matched {
+            border-color: var(--accent-emerald);
+            background: rgba(16, 185, 129, 0.1);
+        }
+        .trans-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .trans-date { font-size: 12px; color: var(--text-muted); }
+        .trans-amount { font-weight: 600; }
+        .trans-amount.negative { color: var(--accent-rose); }
+        .trans-desc { font-size: 13px; }
+        .trans-ref { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+        .matching-arrow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 20px 0;
+        }
+        .arrow-icon {
+            font-size: 24px;
+            color: var(--text-muted);
+        }
+        .match-btn {
+            padding: 10px 20px;
+            background: var(--accent-emerald);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .match-btn:disabled {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+        .match-summary {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+        }
+        .summary-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--accent-emerald);
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+        }
+        .summary-label { color: var(--text-muted); }
+        .summary-value { font-weight: 500; }
+        .difference { color: var(--accent-rose); }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 24px;
+            border-top: 1px solid var(--border);
+        }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        .btn-primary {
+            background: var(--accent-emerald);
+            border: none;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">🔗 Rapprochement bancaire</h2>
+                <button class="modal-close" onclick="alert('Fermer')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="matching-container">
+                    <div class="matching-side">
+                        <div class="side-title">🏦 Transactions bancaires</div>
+                        <div class="transaction-item selected" onclick="this.classList.toggle('selected')">
+                            <div class="trans-header">
+                                <span class="trans-date">20/12/2025</span>
+                                <span class="trans-amount negative">-€847.50</span>
+                            </div>
+                            <div class="trans-desc">METRO FRANCE PAIEMENT</div>
+                            <div class="trans-ref">Réf: VIR-2025122047</div>
+                        </div>
+                        <div class="transaction-item" onclick="this.classList.toggle('selected')">
+                            <div class="trans-header">
+                                <span class="trans-date">18/12/2025</span>
+                                <span class="trans-amount negative">-€312.80</span>
+                            </div>
+                            <div class="trans-desc">BRAKE FRANCE</div>
+                            <div class="trans-ref">Réf: VIR-2025121834</div>
+                        </div>
+                        <div class="transaction-item matched">
+                            <div class="trans-header">
+                                <span class="trans-date">15/12/2025</span>
+                                <span class="trans-amount negative">-€156.40</span>
+                            </div>
+                            <div class="trans-desc">POMONA FRUITS</div>
+                            <div class="trans-ref">Réf: VIR-2025121521 ✓ Rapproché</div>
+                        </div>
+                    </div>
+
+                    <div class="matching-arrow">
+                        <span class="arrow-icon">↔</span>
+                        <button class="match-btn" onclick="alert('Rapprocher')">Rapprocher</button>
+                    </div>
+
+                    <div class="matching-side">
+                        <div class="side-title">📄 Factures fournisseurs</div>
+                        <div class="transaction-item selected" onclick="this.classList.toggle('selected')">
+                            <div class="trans-header">
+                                <span class="trans-date">18/12/2025</span>
+                                <span class="trans-amount">€847.50</span>
+                            </div>
+                            <div class="trans-desc">Facture Metro #F2025-1847</div>
+                            <div class="trans-ref">Épicerie générale • 47 articles</div>
+                        </div>
+                        <div class="transaction-item" onclick="this.classList.toggle('selected')">
+                            <div class="trans-header">
+                                <span class="trans-date">16/12/2025</span>
+                                <span class="trans-amount">€312.80</span>
+                            </div>
+                            <div class="trans-desc">Facture Brake #BK-78542</div>
+                            <div class="trans-ref">Produits surgelés • 12 articles</div>
+                        </div>
+                        <div class="transaction-item matched">
+                            <div class="trans-header">
+                                <span class="trans-date">14/12/2025</span>
+                                <span class="trans-amount">€156.40</span>
+                            </div>
+                            <div class="trans-desc">Facture Pomona #POM-4521</div>
+                            <div class="trans-ref">Fruits & légumes ✓ Rapproché</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="match-summary">
+                    <div class="summary-title">📊 Résumé du rapprochement</div>
+                    <div class="summary-row">
+                        <span class="summary-label">Transaction bancaire</span>
+                        <span class="summary-value">-€847.50</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Facture sélectionnée</span>
+                        <span class="summary-value">€847.50</span>
+                    </div>
+                    <div class="summary-row" style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 8px;">
+                        <span class="summary-label">Différence</span>
+                        <span class="summary-value" style="color: var(--accent-emerald);">€0.00 ✓</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="alert('Annuler')">Annuler</button>
+                <button class="btn btn-primary" onclick="alert('Rapprochement validé !')">Valider le rapprochement</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

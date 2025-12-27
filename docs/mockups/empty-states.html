@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design System - Empty States</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-amber: #f59e0b;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 40px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .subtitle { color: var(--text-muted); margin-bottom: 40px; }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 40px 0 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+        }
+        .example-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .example-header {
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .example-content { padding: 40px 24px; }
+
+        /* Empty States */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.6;
+        }
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .empty-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            max-width: 300px;
+            margin: 0 auto 20px;
+            line-height: 1.5;
+        }
+        .empty-action {
+            padding: 12px 24px;
+            background: var(--accent-emerald);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .empty-action.secondary {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        .empty-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        /* Illustration style */
+        .empty-illustration {
+            width: 200px;
+            height: 150px;
+            margin: 0 auto 24px;
+            background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(6,182,212,0.1));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .illustration-icon {
+            font-size: 48px;
+        }
+
+        /* Search no results */
+        .search-empty {
+            padding: 60px 20px;
+        }
+        .search-query {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🫙 Empty States</h1>
+        <p class="subtitle">États vides pour différents contextes de l'application</p>
+
+        <div class="section-title">États de liste vide</div>
+        <div class="examples-grid">
+            <div class="example-card">
+                <div class="example-header">Pas de produits</div>
+                <div class="example-content">
+                    <div class="empty-state">
+                        <div class="empty-icon">📦</div>
+                        <div class="empty-title">Aucun produit</div>
+                        <div class="empty-desc">Commencez par ajouter vos premiers produits pour gérer votre inventaire.</div>
+                        <button class="empty-action">➕ Ajouter un produit</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header">Pas de factures</div>
+                <div class="example-content">
+                    <div class="empty-state">
+                        <div class="empty-icon">📄</div>
+                        <div class="empty-title">Aucune facture</div>
+                        <div class="empty-desc">Importez vos factures fournisseurs pour suivre vos achats automatiquement.</div>
+                        <div class="empty-actions">
+                            <button class="empty-action">📥 Importer</button>
+                            <button class="empty-action secondary">En savoir plus</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header">Pas de mouvements</div>
+                <div class="example-content">
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <div class="empty-title">Aucun mouvement</div>
+                        <div class="empty-desc">Les mouvements de stock apparaîtront ici une fois que vous aurez commencé à utiliser l'application.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">Recherche sans résultat</div>
+        <div class="examples-grid">
+            <div class="example-card">
+                <div class="example-header">Aucun résultat de recherche</div>
+                <div class="example-content">
+                    <div class="empty-state search-empty">
+                        <div class="empty-icon">🔍</div>
+                        <div class="empty-title">Aucun résultat</div>
+                        <div class="search-query">"tomates vertes bio"</div>
+                        <div class="empty-desc">Aucun produit ne correspond à votre recherche. Essayez avec d'autres termes.</div>
+                        <button class="empty-action secondary">Effacer la recherche</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header">Filtres trop restrictifs</div>
+                <div class="example-content">
+                    <div class="empty-state">
+                        <div class="empty-icon">🎯</div>
+                        <div class="empty-title">Aucun résultat avec ces filtres</div>
+                        <div class="empty-desc">Essayez d'élargir vos critères de recherche ou de retirer certains filtres.</div>
+                        <button class="empty-action secondary">Réinitialiser les filtres</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">États avec illustration</div>
+        <div class="examples-grid">
+            <div class="example-card">
+                <div class="example-header">Premier plat</div>
+                <div class="example-content">
+                    <div class="empty-state">
+                        <div class="empty-illustration">
+                            <span class="illustration-icon">🍽️</span>
+                        </div>
+                        <div class="empty-title">Créez votre premier plat</div>
+                        <div class="empty-desc">Définissez la composition de vos plats pour calculer automatiquement le food cost.</div>
+                        <button class="empty-action">🍽️ Créer un plat</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header">Pas d'alertes</div>
+                <div class="example-content">
+                    <div class="empty-state">
+                        <div class="empty-illustration" style="background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.1));">
+                            <span class="illustration-icon">✅</span>
+                        </div>
+                        <div class="empty-title">Tout est en ordre !</div>
+                        <div class="empty-desc">Aucune alerte à signaler. Votre gestion est optimale.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

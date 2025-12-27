@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant - Consommations</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-orange: #f97316;
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(249, 115, 22, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .filters-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .filter-select {
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .summary-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .summary-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .summary-value { font-size: 24px; font-weight: 700; }
+        .card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .consumption-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .consumption-table th {
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        .consumption-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .consumption-table tr:hover { background: rgba(255,255,255,0.03); cursor: pointer; }
+        .ingredient-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .ingredient-icon { font-size: 20px; }
+        .consumption-bar {
+            width: 100px;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .consumption-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-emerald), var(--accent-amber));
+            border-radius: 3px;
+        }
+        .variance {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .variance.positive { background: rgba(244,63,94,0.2); color: var(--accent-rose); }
+        .variance.negative { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .variance.neutral { background: rgba(107,114,128,0.2); color: var(--text-muted); }
+        .chart-area {
+            height: 250px;
+            background: linear-gradient(180deg, rgba(249,115,22,0.1) 0%, transparent 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            padding: 20px;
+        }
+        .bar-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .bars {
+            display: flex;
+            gap: 4px;
+            align-items: flex-end;
+        }
+        .bar {
+            width: 20px;
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+        }
+        .bar.theoretical { background: rgba(16,185,129,0.5); }
+        .bar.actual { background: var(--accent-orange); }
+        .bar-label { font-size: 11px; color: var(--text-muted); }
+        .legend {
+            display: flex;
+            gap: 24px;
+            justify-content: center;
+            margin-top: 16px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+        @media (max-width: 1024px) {
+            .summary-row { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="restaurant.html">Restaurant</a>
+            <span>/</span>
+            <span>Consommations</span>
+        </div>
+
+        <h1>📊 Consommations</h1>
+        <p class="subtitle">Analyse des consommations réelles vs théoriques par ingrédient</p>
+
+        <div class="filters-bar">
+            <select class="filter-select">
+                <option>Cette semaine</option>
+                <option>Ce mois</option>
+                <option>Mois dernier</option>
+                <option>3 derniers mois</option>
+            </select>
+            <select class="filter-select">
+                <option>Tous les ingrédients</option>
+                <option>Viandes</option>
+                <option>Légumes</option>
+                <option>Produits laitiers</option>
+            </select>
+        </div>
+
+        <div class="summary-row">
+            <div class="summary-card">
+                <div class="summary-label">Conso. théorique</div>
+                <div class="summary-value">€4,250</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Conso. réelle</div>
+                <div class="summary-value">€4,680</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Écart</div>
+                <div class="summary-value" style="color: var(--accent-rose);">+€430</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Variance</div>
+                <div class="summary-value" style="color: var(--accent-rose);">+10.1%</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📈 Comparaison théorique vs réel</div>
+            <div class="chart-area">
+                <div class="bar-group">
+                    <div class="bars">
+                        <div class="bar theoretical" style="height: 120px;"></div>
+                        <div class="bar actual" style="height: 140px;"></div>
+                    </div>
+                    <span class="bar-label">Lun</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bars">
+                        <div class="bar theoretical" style="height: 100px;"></div>
+                        <div class="bar actual" style="height: 105px;"></div>
+                    </div>
+                    <span class="bar-label">Mar</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bars">
+                        <div class="bar theoretical" style="height: 130px;"></div>
+                        <div class="bar actual" style="height: 155px;"></div>
+                    </div>
+                    <span class="bar-label">Mer</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bars">
+                        <div class="bar theoretical" style="height: 140px;"></div>
+                        <div class="bar actual" style="height: 150px;"></div>
+                    </div>
+                    <span class="bar-label">Jeu</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bars">
+                        <div class="bar theoretical" style="height: 180px;"></div>
+                        <div class="bar actual" style="height: 195px;"></div>
+                    </div>
+                    <span class="bar-label">Ven</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bars">
+                        <div class="bar theoretical" style="height: 200px;"></div>
+                        <div class="bar actual" style="height: 220px;"></div>
+                    </div>
+                    <span class="bar-label">Sam</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bars">
+                        <div class="bar theoretical" style="height: 90px;"></div>
+                        <div class="bar actual" style="height: 85px;"></div>
+                    </div>
+                    <span class="bar-label">Dim</span>
+                </div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(16,185,129,0.5);"></div>
+                    <span>Théorique</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--accent-orange);"></div>
+                    <span>Réel</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📋 Détail par ingrédient</div>
+            <table class="consumption-table">
+                <thead>
+                    <tr>
+                        <th>Ingrédient</th>
+                        <th>Théorique</th>
+                        <th>Réel</th>
+                        <th>Écart</th>
+                        <th>Variance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr onclick="alert('Détail Entrecôte')">
+                        <td>
+                            <div class="ingredient-cell">
+                                <span class="ingredient-icon">🥩</span>
+                                <span>Entrecôte de boeuf</span>
+                            </div>
+                        </td>
+                        <td>12.5 kg</td>
+                        <td>14.2 kg</td>
+                        <td>+1.7 kg</td>
+                        <td><span class="variance positive">+13.6%</span></td>
+                    </tr>
+                    <tr onclick="alert('Détail Tomates')">
+                        <td>
+                            <div class="ingredient-cell">
+                                <span class="ingredient-icon">🍅</span>
+                                <span>Tomates</span>
+                            </div>
+                        </td>
+                        <td>8.0 kg</td>
+                        <td>9.5 kg</td>
+                        <td>+1.5 kg</td>
+                        <td><span class="variance positive">+18.8%</span></td>
+                    </tr>
+                    <tr onclick="alert('Détail Frites')">
+                        <td>
+                            <div class="ingredient-cell">
+                                <span class="ingredient-icon">🍟</span>
+                                <span>Frites</span>
+                            </div>
+                        </td>
+                        <td>25.0 kg</td>
+                        <td>24.5 kg</td>
+                        <td>-0.5 kg</td>
+                        <td><span class="variance negative">-2.0%</span></td>
+                    </tr>
+                    <tr onclick="alert('Détail Salade')">
+                        <td>
+                            <div class="ingredient-cell">
+                                <span class="ingredient-icon">🥗</span>
+                                <span>Salade verte</span>
+                            </div>
+                        </td>
+                        <td>5.0 kg</td>
+                        <td>5.1 kg</td>
+                        <td>+0.1 kg</td>
+                        <td><span class="variance neutral">+2.0%</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

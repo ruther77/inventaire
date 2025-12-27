@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design System - Topbar</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 40px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .subtitle { color: var(--text-muted); margin-bottom: 40px; }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 40px 0 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .example-container {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .example-label {
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Topbar styles */
+        .topbar {
+            display: flex;
+            align-items: center;
+            padding: 16px 24px;
+            background: rgba(15, 15, 25, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .topbar-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .breadcrumb-separator { opacity: 0.5; }
+        .breadcrumb-current { color: var(--text-primary); font-weight: 500; }
+        .topbar-center {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+        }
+        .topbar-search {
+            width: 400px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        .search-icon { color: var(--text-muted); font-size: 16px; }
+        .search-input {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+        }
+        .search-input::placeholder { color: var(--text-muted); }
+        .search-shortcut {
+            padding: 4px 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .topbar-icon-btn {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.06);
+            border: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .topbar-icon-btn:hover { background: rgba(255,255,255,0.1); }
+        .notification-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 18px;
+            height: 18px;
+            background: var(--accent-rose);
+            border-radius: 50%;
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .topbar-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent-emerald), #06b6d4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .user-info { text-align: left; }
+        .user-name { font-size: 14px; font-weight: 500; }
+        .user-role { font-size: 12px; color: var(--text-muted); }
+        .user-dropdown { color: var(--text-muted); }
+
+        /* Tenant selector */
+        .tenant-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .tenant-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: rgba(16,185,129,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        .tenant-name { font-size: 14px; font-weight: 500; }
+        .tenant-arrow { color: var(--text-muted); font-size: 12px; }
+
+        /* Minimal topbar */
+        .topbar-minimal {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            background: transparent;
+            border-bottom: 1px solid var(--border);
+        }
+        .page-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .topbar-actions {
+            display: flex;
+            gap: 12px;
+        }
+        .btn-outline {
+            padding: 10px 16px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .btn-primary {
+            padding: 10px 16px;
+            background: var(--accent-emerald);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📍 Topbar Component</h1>
+        <p class="subtitle">Barre de navigation supérieure avec différentes variantes</p>
+
+        <div class="section-title">Topbar complète</div>
+        <div class="example-container">
+            <div class="example-label">Avec recherche, notifications et profil utilisateur</div>
+            <div class="topbar">
+                <div class="topbar-left">
+                    <div class="tenant-selector">
+                        <div class="tenant-icon">🏪</div>
+                        <span class="tenant-name">Épicerie</span>
+                        <span class="tenant-arrow">▼</span>
+                    </div>
+                    <div class="topbar-breadcrumb">
+                        <span>Opérations</span>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current">Gestion Stock</span>
+                    </div>
+                </div>
+                <div class="topbar-center">
+                    <div class="topbar-search">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" class="search-input" placeholder="Rechercher produits, factures, fournisseurs...">
+                        <span class="search-shortcut">⌘K</span>
+                    </div>
+                </div>
+                <div class="topbar-right">
+                    <button class="topbar-icon-btn">
+                        🔔
+                        <span class="notification-badge">3</span>
+                    </button>
+                    <button class="topbar-icon-btn">❓</button>
+                    <div class="topbar-user">
+                        <div class="user-avatar">JD</div>
+                        <div class="user-info">
+                            <div class="user-name">Jean Dupont</div>
+                            <div class="user-role">Administrateur</div>
+                        </div>
+                        <span class="user-dropdown">▼</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">Topbar page</div>
+        <div class="example-container">
+            <div class="example-label">Titre de page avec actions</div>
+            <div class="topbar-minimal">
+                <div>
+                    <div class="topbar-breadcrumb" style="margin-bottom: 4px;">
+                        <span>Opérations</span>
+                        <span class="breadcrumb-separator">/</span>
+                        <span>Stock</span>
+                    </div>
+                    <h1 class="page-title">Gestion du Stock</h1>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn-outline">📥 Exporter</button>
+                    <button class="btn-primary">➕ Ajouter produit</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">Topbar minimaliste</div>
+        <div class="example-container">
+            <div class="example-label">Version simplifiée</div>
+            <div class="topbar" style="justify-content: space-between;">
+                <div class="topbar-left">
+                    <div class="topbar-breadcrumb">
+                        <span>Cockpit</span>
+                    </div>
+                </div>
+                <div class="topbar-right">
+                    <button class="topbar-icon-btn">
+                        🔔
+                        <span class="notification-badge">3</span>
+                    </button>
+                    <div class="user-avatar">JD</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -19,6 +19,9 @@ import {
   Loader2,
   Copy,
   BarChart3,
+  Zap,
+  Receipt,
+  Banknote,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -375,6 +378,55 @@ export default function FinanceImportsPage() {
           />
         </motion.div>
 
+        {/* Quick Imports Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="w-5 h-5 text-amber-400" />
+            <h2 className="text-lg font-semibold text-white">Imports rapides</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <motion.div
+              whileHover={{ scale: 1.02, y: -2 }}
+              className="rounded-xl border border-white/10 bg-white/5 p-5 cursor-pointer hover:bg-white/10 transition-all"
+              onClick={() => alert('Import relevé BNP - Fonctionnalité à venir')}
+            >
+              <div className="p-3 rounded-lg bg-blue-500/20 w-fit mb-3">
+                <Building2 className="w-6 h-6 text-blue-400" />
+              </div>
+              <h3 className="font-semibold text-white mb-1">Relevé BNP Paribas</h3>
+              <p className="text-sm text-slate-400">Import automatique via connexion bancaire</p>
+            </motion.div>
+
+            <motion.div
+              whileHover={{ scale: 1.02, y: -2 }}
+              className="rounded-xl border border-white/10 bg-white/5 p-5 cursor-pointer hover:bg-white/10 transition-all"
+              onClick={() => alert('Import factures fournisseurs - Fonctionnalité à venir')}
+            >
+              <div className="p-3 rounded-lg bg-violet-500/20 w-fit mb-3">
+                <FileText className="w-6 h-6 text-violet-400" />
+              </div>
+              <h3 className="font-semibold text-white mb-1">Factures fournisseurs</h3>
+              <p className="text-sm text-slate-400">OCR automatique des PDF</p>
+            </motion.div>
+
+            <motion.div
+              whileHover={{ scale: 1.02, y: -2 }}
+              className="rounded-xl border border-white/10 bg-white/5 p-5 cursor-pointer hover:bg-white/10 transition-all"
+              onClick={() => alert('Import tickets Z - Fonctionnalité à venir')}
+            >
+              <div className="p-3 rounded-lg bg-emerald-500/20 w-fit mb-3">
+                <Receipt className="w-6 h-6 text-emerald-400" />
+              </div>
+              <h3 className="font-semibold text-white mb-1">Tickets Z (caisse)</h3>
+              <p className="text-sm text-slate-400">Depuis votre logiciel de caisse</p>
+            </motion.div>
+          </div>
+        </motion.div>
+
         {/* Section Import */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -390,6 +442,17 @@ export default function FinanceImportsPage() {
             <p className="text-sm text-slate-400">
               Importez un fichier CSV de relevé bancaire pour un compte
             </p>
+            {/* Format badges */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              {['CSV', 'OFX', 'QIF', 'PDF', 'Excel'].map((format) => (
+                <span
+                  key={format}
+                  className="px-3 py-1 rounded-md bg-blue-500/20 text-blue-400 text-xs font-medium"
+                >
+                  {format}
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* Account Selection */}

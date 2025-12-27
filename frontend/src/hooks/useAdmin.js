@@ -1,3 +1,8 @@
+/**
+ * Module de hooks pour l'administration système (sauvegardes, utilisateurs, diagnostics).
+ * @module hooks/useAdmin
+ */
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -13,6 +18,20 @@ import {
   updateAdminUserRole,
 } from '../api/client.js';
 
+/**
+ * Hook pour récupérer la vue d'ensemble de l'administration système.
+ *
+ * Fournit les statistiques globales du système : nombre d'utilisateurs,
+ * dernière sauvegarde, espace disque, santé de la base de données, etc.
+ *
+ * @returns {Object} Query TanStack avec les données d'administration
+ * @property {Object} data - Statistiques et état du système
+ * @property {boolean} isLoading - État de chargement
+ *
+ * @example
+ * const { data: overview } = useAdminOverview();
+ * console.log(overview.lastBackup, overview.systemHealth);
+ */
 export function useAdminOverview() {
   return useQuery({
     queryKey: ['admin-overview'],
@@ -21,6 +40,18 @@ export function useAdminOverview() {
   });
 }
 
+/**
+ * Hook pour récupérer la liste des utilisateurs du système.
+ *
+ * Liste tous les utilisateurs avec leurs rôles, permissions et statut.
+ * Utilisé pour la gestion des accès et des droits.
+ *
+ * @returns {Object} Query TanStack avec la liste des utilisateurs
+ * @property {Array} data - Liste des utilisateurs
+ *
+ * @example
+ * const { data: users } = useAdminUsers();
+ */
 export function useAdminUsers() {
   return useQuery({
     queryKey: ['admin-users'],
@@ -29,6 +60,19 @@ export function useAdminUsers() {
   });
 }
 
+/**
+ * Hook mutation pour créer une sauvegarde manuelle de la base de données.
+ *
+ * Déclenche une sauvegarde complète immédiate et affiche une notification.
+ * Invalide les caches pour refléter la nouvelle sauvegarde.
+ *
+ * @returns {Object} Mutation TanStack pour créer une sauvegarde
+ * @property {Function} mutate - Fonction pour déclencher la sauvegarde
+ *
+ * @example
+ * const createBackup = useCreateBackup();
+ * createBackup.mutate();
+ */
 export function useCreateBackup() {
   const queryClient = useQueryClient();
   return useMutation({

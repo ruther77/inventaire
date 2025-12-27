@@ -1,12 +1,36 @@
 /**
- * ImportPage - Orchestrateur de l'import de factures
+ * Page Import de Factures avec flux Zero-Click.
+ *
+ * Cette page orchestre le processus complet d'import de factures avec extraction automatique.
+ * Elle affiche:
+ * - Un système d'upload PDF/TXT avec extraction OCR automatique
+ * - Un sélecteur de documents multiples détectés
+ * - Un éditeur de lignes de facture avec prévisualisation PDF
+ * - Une carte de traitement temps réel avec étapes et alertes
+ * - Un historique des imports précédents
+ * - Des paramètres avancés (fournisseur, date, marge)
  *
  * Architecture modulaire:
- * - InvoiceUploadCard: Upload PDF/TXT et extraction
- * - InvoiceDocumentSelector: Selection des sous-documents
- * - InvoiceLinesEditor: Edition des lignes detectees
- * - InvoiceImportActions: Boutons d'import et resultats
- * - InvoiceHistoryPanel: Historique et conflits
+ * - InvoiceUploadCard: Upload PDF/TXT et extraction OCR
+ * - InvoiceDocumentSelector: Sélection des sous-documents détectés
+ * - InvoiceLinesEditor: Édition des lignes extraites
+ * - InvoiceImportActions: Actions d'import (stock + finance)
+ * - InvoiceHistoryPanel: Historique et gestion des conflits
+ * - PDFPreview: Prévisualisation du PDF côté du formulaire
+ *
+ * Fonctionnalités principales:
+ * - Extraction automatique OCR avec matching catalogue
+ * - Détection de produits nouveaux et anomalies de prix
+ * - Split view PDF + éditeur sur desktop
+ * - Import automatique en stock et finance
+ * - Gestion des multi-documents dans un même PDF
+ * - Export CSV des lignes préparées
+ * - Flux Zero-Click pour import complet sans intervention
+ *
+ * @component
+ *
+ * @example
+ * <ImportPage />
  */
 
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
@@ -234,6 +258,8 @@ export default function ImportPage() {
     setInvoiceDate('');
   };
 
+  // Handler succès d'extraction: normalise les documents et prépare l'affichage du snapshot de traitement
+  // Détecte automatiquement les nouveaux produits et anomalies de prix
   const handleExtractionSuccess = (payload) => {
     const normalizedDocs = buildDocumentsFromExtraction(payload);
     setDocuments(normalizedDocs);

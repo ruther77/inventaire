@@ -466,11 +466,11 @@ class ForecastingEngine:
         with engine.connect() as conn:
             result = conn.execute(
                 text(f"""
-                    SELECT date, prix
-                    FROM historique_prix
-                    WHERE product_id = :product_id
-                      AND date >= NOW() - INTERVAL '{days} days'
-                    ORDER BY date
+                    SELECT facture_date as date, prix_achat as prix
+                    FROM produits_price_history
+                    WHERE produit_id = :product_id
+                      AND facture_date >= NOW() - INTERVAL '{days} days'
+                    ORDER BY facture_date
                 """),
                 {"product_id": product_id}
             )

@@ -37,6 +37,7 @@ class InvoiceExtractDocument(BaseModel):
     line_count: int
     items: List[InvoiceLine]
     pdf_path: Optional[str] = None
+    file_hash: Optional[str] = None  # SHA-256 hash for duplicate prevention
 
 
 class InvoiceExtractResponse(BaseModel):
@@ -53,6 +54,32 @@ class InvoiceHistoryEntry(BaseModel):
     file_path: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    # Champs calculés pour le frontend (alias)
+    reference: Optional[str] = None
+    fournisseur: Optional[str] = None
+    montant: Optional[float] = None
+    total: Optional[float] = None
+    status: str = "pending"
+    id: Optional[str] = None
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+    def model_post_init(self, __context):
+        """Initialise les champs alias après création."""
+        if self.reference is None:
+            object.__setattr__(self, 'reference', self.invoice_id)
+        if self.id is None:
+            object.__setattr__(self, 'id', self.invoice_id)
+        if self.fournisseur is None:
+            object.__setattr__(self, 'fournisseur', self.supplier)
+        if self.montant is None:
+            object.__setattr__(self, 'montant', self.total_ttc)
+        if self.total is None:
+            object.__setattr__(self, 'total', self.total_ttc)
+        if self.status == "pending":
+            object.__setattr__(self, 'status', "processed" if self.line_count > 0 else "pending")
 
 
 class InvoiceHistoryResponse(BaseModel):
@@ -66,6 +93,7 @@ class InvoiceImportRequest(BaseModel):
     reception_date: Optional[date] = None
     invoice_date: Optional[date] = None
     username: Optional[str] = None
+    file_hash: Optional[str] = None  # SHA-256 hash for duplicate prevention
 
 
 class InvoiceImportSummary(BaseModel):

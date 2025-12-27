@@ -1,7 +1,34 @@
+/**
+ * Page Transactions Bancaires.
+ *
+ * Cette page permet de gérer et catégoriser les transactions bancaires.
+ * Elle affiche:
+ * - Une liste complète des transactions avec pagination infinie
+ * - Des statistiques en temps réel (entrées, sorties, solde net, non rapprochées)
+ * - Des filtres avancés (entité, compte, catégorie, date, montant)
+ * - Un éditeur inline de catégories avec suggestions IA
+ * - Des badges de confiance IA pour les suggestions de catégorisation
+ * - Mode mobile avec cartes swipables et actions rapides
+ *
+ * Fonctionnalités principales:
+ * - Catégorisation inline avec mise à jour optimiste
+ * - Suggestions IA avec niveau de confiance
+ * - Filtrage multi-critères avec sauvegarde des préférences
+ * - Verrouillage des transactions validées
+ * - Export CSV des transactions filtrées
+ * - Scroll infini pour charger plus de données
+ * - Pull-to-refresh sur mobile
+ *
+ * @component
+ *
+ * @example
+ * <FinanceTransactionsPage />
+ */
+
 import React, { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFinanceTransactions, useUpdateFinanceTransaction, useLockFinanceTransaction } from '../../hooks/useFinance.js';
-import { useFinanceCategories, useFinanceAccounts } from '../../hooks/useFinanceCategories.js';
+import { useFinanceCategories, useFinanceAccounts, useFinanceTreasury } from '../../hooks/useFinanceCategories.js';
 import usePersistedFilters from '../../hooks/usePersistedFilters.js';
 import TransactionFilters from './components/TransactionFilters.jsx';
 import CategoryInlineEdit from './components/CategoryInlineEdit.jsx';
@@ -10,7 +37,7 @@ import AIConfidenceBadge from '../../components/ui/AIConfidenceBadge.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { EmptyTransactions, EmptyFilteredResults } from '../../components/feedback/ActionableEmptyStates.jsx';
-import { Download, RefreshCw, Sparkles, Tag, Info, Lock } from 'lucide-react';
+import { Download, RefreshCw, Sparkles, Tag, Info, Lock, TrendingUp, TrendingDown, Wallet, AlertCircle } from 'lucide-react';
 import PullToRefresh from '../../components/ui/PullToRefresh.jsx';
 import { SwipeableRow, SwipeableRowProvider } from '../../components/ui/SwipeableRow.jsx';
 import Modal from '../../components/ui/Modal.jsx';
@@ -75,6 +102,7 @@ export default function FinanceTransactionsPage() {
   // Load data
   const categoriesQuery = useFinanceCategories({});
   const accountsQuery = useFinanceAccounts({});
+  const treasuryQuery = useFinanceTreasury({ period: '30d' });
 
   // Préparer les filtres pour l'API
   const apiFilters = useMemo(() => {
@@ -94,11 +122,27 @@ export default function FinanceTransactionsPage() {
 
   // Flatten all pages
   const transactions = useMemo(() => {
-    return transactionsQuery.data?.pages?.flatMap((page) => page.items || []) || [];
+    const pages = transactionsQuery.data?.pages || [];
+    return pages.flatMap((page) => page?.items || []).filter(Boolean);
   }, [transactionsQuery.data]);
 
   const categories = categoriesQuery.data || [];
   const accounts = accountsQuery.data || [];
+  const treasury = treasuryQuery.data || {};
+
+  // Calculer les stats pour les transactions affichées
+  const transactionStats = useMemo(() => {
+    const incomeTotal = transactions
+      .filter(tx => tx.direction === 'IN')
+      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const expenseTotal = transactions
+      .filter(tx => tx.direction === 'OUT')
+      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const netBalance = incomeTotal - expenseTotal;
+    const unmatchedCount = transactions.filter(tx => tx.status !== 'matched').length;
+
+    return { incomeTotal, expenseTotal, netBalance, unmatchedCount };
+  }, [transactions]);
 
   // Créer un map pour les catégories
   const categoryById = useMemo(() => {
@@ -114,7 +158,8 @@ export default function FinanceTransactionsPage() {
     return map;
   }, [accounts]);
 
-  // Callback pour mise à jour inline avec mutation optimiste
+  // Mise à jour inline avec mutation optimiste
+  // Les changements sont appliqués immédiatement dans l'UI avant la confirmation serveur
   const handleEdit = useCallback((transactionId, field, value) => {
     updateTransaction.mutate({
       transactionId,
@@ -263,19 +308,22 @@ export default function FinanceTransactionsPage() {
         pending: { label: 'En attente', color: 'amber', icon: null },
         ignored: { label: 'Ignoré', color: 'slate', icon: null },
       }),
-      columnHelpers.actions((row) => (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleLockTransaction(row.id || row.transaction_id)}
-            disabled={!!row.locked_at}
-            title={row.locked_at ? 'Transaction déjà verrouillée' : 'Verrouiller la transaction'}
-          >
-            <Lock className={`h-4 w-4 ${row.locked_at ? 'text-slate-500' : ''}`} />
-          </Button>
-        </div>
-      )),
+      columnHelpers.actions((row) => {
+        if (!row) return null;
+        return (
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleLockTransaction(row.id || row.transaction_id)}
+              disabled={!!row.locked_at}
+              title={row.locked_at ? 'Transaction déjà verrouillée' : 'Verrouiller la transaction'}
+            >
+              <Lock className={`h-4 w-4 ${row.locked_at ? 'text-slate-500' : ''}`} />
+            </Button>
+          </div>
+        );
+      }),
     ],
     [categoryById, accountById, handleCategoryUpdate, handleLockTransaction]
   );
@@ -431,6 +479,49 @@ export default function FinanceTransactionsPage() {
           </Button>
         </div>
       </header>
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-colors cursor-pointer">
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="h-4 w-4 text-emerald-400" />
+            <span className="text-xs text-slate-400">Entrées ce mois</span>
+          </div>
+          <div className="text-xl font-bold text-emerald-400">
+            +{transactionStats.incomeTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+          </div>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-colors cursor-pointer">
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingDown className="h-4 w-4 text-rose-400" />
+            <span className="text-xs text-slate-400">Sorties ce mois</span>
+          </div>
+          <div className="text-xl font-bold text-rose-400">
+            -{transactionStats.expenseTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+          </div>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-colors cursor-pointer">
+          <div className="flex items-center gap-2 mb-1">
+            <Wallet className="h-4 w-4 text-amber-400" />
+            <span className="text-xs text-slate-400">Solde net</span>
+          </div>
+          <div className={`text-xl font-bold ${transactionStats.netBalance >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
+            {transactionStats.netBalance >= 0 ? '+' : ''}{transactionStats.netBalance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+          </div>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-colors cursor-pointer">
+          <div className="flex items-center gap-2 mb-1">
+            <AlertCircle className="h-4 w-4 text-slate-400" />
+            <span className="text-xs text-slate-400">Non rapprochées</span>
+          </div>
+          <div className="text-xl font-bold text-white">
+            {transactionStats.unmatchedCount}
+          </div>
+        </div>
+      </div>
 
       {/* Filtres */}
       <TransactionFilters

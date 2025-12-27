@@ -1,11 +1,29 @@
-"""Services de synthèse finance (catégories, comptes).
+"""
+Module de statistiques et agrégations financières.
 
-Utilise les vues matérialisées pour de meilleures performances:
-- mv_daily_balance: Solde journalier par compte
+Ce module fournit les services pour:
+- Statistiques par catégorie (inflow/outflow/count)
+- Vue d'ensemble des comptes avec soldes
+- Chronologie agrégée des flux financiers
+- Répartition par catégorie pour graphiques
+- Résumé de trésorerie consolidé
+
+Performance:
+Utilise des vues matérialisées pour optimiser les requêtes lourdes:
+- mv_daily_balance: Solde journalier par compte (rafraîchissement quotidien)
 - mv_category_monthly: Répartition mensuelle par catégorie
 - mv_reconciliation_status: État de rapprochement par compte
 - mv_top_vendors: Top fournisseurs par montant
 - mv_import_summary: Résumé des importations
+
+Les vues sont rafraîchies manuellement via refresh_materialized_views() ou
+automatiquement par un job périodique. En cas d'indisponibilité, le système
+bascule automatiquement sur des requêtes directes (fallback).
+
+Note:
+    Les vues matérialisées offrent des gains de 10x à 100x en performance
+    sur les requêtes d'agrégation complexes, au prix d'une fraîcheur
+    des données potentiellement décalée.
 """
 
 from __future__ import annotations
@@ -16,6 +34,7 @@ from typing import Any, Dict, List
 from sqlalchemy import text
 
 from core.data_repository import query_df
+from backend.cache import cached, CacheTTL
 
 logger = logging.getLogger(__name__)
 
@@ -563,6 +582,7 @@ def import_summary(
     return df.where(df.notna(), None).to_dict("records")
 
 
+@cached(ttl=CacheTTL.SHORT, prefix="reconciliation_dashboard", tenant_aware=False)
 def reconciliation_dashboard(entity_id: int | None = None) -> List[dict]:
     """Retourne le dashboard de rapprochement par compte.
 

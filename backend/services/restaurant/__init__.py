@@ -91,6 +91,7 @@ from backend.services.restaurant.overview import (
     simulate_price_change,
     list_alerts_detailed,
 )
+from backend.services.restaurant.sales_import import import_sales_csv_bytes
 
 __all__ = [
     # Constants
@@ -162,4 +163,5 @@ __all__ = [
     "analyze_food_cost",
     "simulate_price_change",
     "list_alerts_detailed",
+    "import_sales_csv_bytes",
 ]

@@ -1,4 +1,24 @@
-"""Dépendance réutilisable pour déterminer le tenant courant via les en-têtes."""
+"""
+Module de gestion du multi-tenancy.
+
+Ce module fournit la logique de séparation des données par tenant incluant:
+- Résolution du tenant depuis le token JWT ou headers
+- Support de tenants fixes par module (restaurant, trésorerie, intelligence)
+- Tenant par défaut pour le mode démo/anonyme
+- Routing intelligent basé sur l'URL
+- Cache LRU pour optimiser les requêtes DB
+
+Tenants disponibles:
+1. Épicerie (id=1, code='epicerie') - Tenant par défaut
+2. Restaurant (id=2, code='restaurant') - Module restaurant
+3. Trésorerie (id=3, code='tresorerie') - Module finance
+4. Intelligence (id=4, code='intelligence') - Module ML/scoring
+
+Modes d'authentification:
+- Mode strict: Authentification obligatoire avec validation du tenant JWT
+- Mode permissif: Autorise l'accès anonyme avec tenant par défaut (démo)
+- Mode routing: Détermine automatiquement le tenant selon l'URL
+"""
 
 from __future__ import annotations
 
@@ -65,6 +85,22 @@ def _load_tenant(identifier: str) -> Tenant | None:
 
 
 def resolve_tenant(identifier: Optional[str | int]) -> Tenant | None:
+    """
+    Résout un tenant à partir de son ID ou code.
+
+    Recherche le tenant dans la base de données en utilisant soit l'ID numérique
+    soit le code string. Utilise un cache LRU pour optimiser les performances.
+
+    Args:
+        identifier: ID numérique ou code string du tenant (ex: 1 ou "epicerie")
+
+    Returns:
+        Objet Tenant si trouvé, None sinon
+
+    Example:
+        >>> tenant = resolve_tenant(1)  # Par ID
+        >>> tenant = resolve_tenant("restaurant")  # Par code
+    """
     if identifier is None:
         return None
     text_id = str(identifier).strip()

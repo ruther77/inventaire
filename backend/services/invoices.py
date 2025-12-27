@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from pathlib import Path
@@ -17,12 +18,89 @@ from core.data_repository import exec_sql, query_df
 from core.inventory_service import match_invoice_products, register_invoice_reception, suggest_product_matches
 from core.pdf_utils import split_pdf_into_invoices
 from core.price_history_service import record_price_history
+from core.finance.event_sourcing import emit_invoice_imported
 from sqlalchemy import text as sa_text
 
 
-# Mapping pour harmoniser les noms de fournisseurs
-# Les clés sont des patterns (regex) et les valeurs sont les noms normalisés
-SUPPLIER_NORMALIZATION_MAP = {
+LOGGER = logging.getLogger(__name__)
+
+
+# =============================================================================
+# FILE HASH FUNCTIONS - Prévention doublons factures
+# =============================================================================
+
+def compute_file_hash(content: bytes) -> str:
+    """Calcule le hash SHA-256 du contenu d'un fichier.
+
+    Args:
+        content: Contenu binaire du fichier
+
+    Returns:
+        Hash SHA-256 en hexadécimal (64 caractères)
+    """
+    return hashlib.sha256(content).hexdigest()
+
+
+def check_file_hash_exists(file_hash: str, tenant_id: int) -> dict | None:
+    """Vérifie si un fichier avec ce hash existe déjà.
+
+    Args:
+        file_hash: Hash SHA-256 du fichier
+        tenant_id: ID du tenant
+
+    Returns:
+        Dict avec infos de la facture existante, ou None si pas de doublon
+    """
+    try:
+        sql = text("""
+            SELECT invoice_id, supplier, facture_date, created_at
+            FROM processed_invoices
+            WHERE file_hash = :file_hash AND tenant_id = :tenant_id
+            LIMIT 1
+        """)
+        df = query_df(sql, {"file_hash": file_hash, "tenant_id": tenant_id})
+        if df.empty:
+            return None
+        row = df.iloc[0]
+        return {
+            "invoice_id": row.get("invoice_id"),
+            "supplier": row.get("supplier"),
+            "facture_date": str(row.get("facture_date")) if row.get("facture_date") else None,
+            "imported_at": str(row.get("created_at")) if row.get("created_at") else None,
+        }
+    except Exception as exc:
+        LOGGER.warning(f"Erreur vérification hash facture: {exc}")
+        return None
+
+
+def store_file_hash(invoice_id: str, file_hash: str, tenant_id: int) -> bool:
+    """Stocke le hash du fichier pour une facture.
+
+    Args:
+        invoice_id: ID de la facture
+        file_hash: Hash SHA-256 du fichier
+        tenant_id: ID du tenant
+
+    Returns:
+        True si le hash a été stocké, False sinon
+    """
+    try:
+        sql = text("""
+            UPDATE processed_invoices
+            SET file_hash = :file_hash
+            WHERE invoice_id = :invoice_id AND tenant_id = :tenant_id AND file_hash IS NULL
+        """)
+        exec_sql(sql, {"file_hash": file_hash, "invoice_id": invoice_id, "tenant_id": tenant_id})
+        return True
+    except Exception as exc:
+        LOGGER.warning(f"Erreur stockage hash facture: {exc}")
+        return False
+
+
+# Mapping de fallback pour harmoniser les noms de fournisseurs
+# Ce mapping est utilisé UNIQUEMENT si aucun alias n'est trouvé en base
+# Préférer l'ajout d'alias dans la table supplier_aliases
+SUPPLIER_NORMALIZATION_MAP_FALLBACK = {
     r"metro": "METRO",
     r"eurociel|euro\s*ciel": "EUROCIEL",
     r"tai\s*yat|taiyat": "TAIYAT",
@@ -35,15 +113,59 @@ SUPPLIER_NORMALIZATION_MAP = {
     r"brake": "BRAKE",
 }
 
+# Cache des alias fournisseurs (chargé depuis la DB)
+_supplier_aliases_cache: dict[str, str] | None = None
+_supplier_aliases_cache_time: float = 0
+SUPPLIER_ALIASES_CACHE_TTL = 300  # 5 minutes
 
-def normalize_supplier_name(supplier: str | None) -> str:
+
+def _load_supplier_aliases(tenant_id: int = 1) -> dict[str, str]:
+    """Charge les alias fournisseurs depuis la base de données.
+
+    Returns:
+        Dict mapping alias (lowercase) -> supplier_name (normalized)
+    """
+    global _supplier_aliases_cache, _supplier_aliases_cache_time
+    import time
+
+    # Vérifier si le cache est encore valide
+    now = time.time()
+    if _supplier_aliases_cache is not None and (now - _supplier_aliases_cache_time) < SUPPLIER_ALIASES_CACHE_TTL:
+        return _supplier_aliases_cache
+
+    try:
+        sql = text("""
+            SELECT LOWER(alias) as alias, supplier_name
+            FROM supplier_aliases
+            WHERE tenant_id = :tenant_id
+            ORDER BY LENGTH(alias) DESC
+        """)
+        df = query_df(sql, {"tenant_id": tenant_id})
+
+        if df.empty:
+            _supplier_aliases_cache = {}
+        else:
+            _supplier_aliases_cache = dict(zip(df["alias"], df["supplier_name"]))
+
+        _supplier_aliases_cache_time = now
+        return _supplier_aliases_cache
+    except Exception:
+        # En cas d'erreur DB, retourner un dict vide
+        return {}
+
+
+def normalize_supplier_name(supplier: str | None, tenant_id: int = 1) -> str:
     """Normalise le nom d'un fournisseur selon les conventions standard.
+
+    Priorité:
+    1. Cherche dans la table supplier_aliases (base de données)
+    2. Cherche dans le mapping de fallback hardcodé
+    3. Retourne le nom nettoyé en majuscules
 
     Exemples:
         - "METRO" -> "METRO"
         - "euro ciel" -> "EUROCIEL"
         - "TAI YAT DISTRIBUTION" -> "TAIYAT"
-        - "L'INCONTOURNABLE" -> "TAIYAT" (si détecté comme facture TAIYAT)
         - "Inconnu" -> "Inconnu"
     """
     if not supplier:
@@ -55,13 +177,26 @@ def normalize_supplier_name(supplier: str | None) -> str:
 
     lowered = cleaned.lower()
 
-    # Vérifie chaque pattern de normalisation
-    for pattern, normalized_name in SUPPLIER_NORMALIZATION_MAP.items():
+    # 1. Cherche dans les alias de la base de données
+    aliases = _load_supplier_aliases(tenant_id)
+    for alias, normalized_name in aliases.items():
+        if alias in lowered:
+            return normalized_name
+
+    # 2. Fallback sur le mapping hardcodé (pour rétrocompatibilité)
+    for pattern, normalized_name in SUPPLIER_NORMALIZATION_MAP_FALLBACK.items():
         if re.search(pattern, lowered, re.IGNORECASE):
             return normalized_name
 
-    # Si pas de match, retourne le nom nettoyé en majuscules
+    # 3. Si pas de match, retourne le nom nettoyé en majuscules
     return cleaned.upper()
+
+
+def invalidate_supplier_aliases_cache():
+    """Invalide le cache des alias fournisseurs (à appeler après modification de la table)."""
+    global _supplier_aliases_cache, _supplier_aliases_cache_time
+    _supplier_aliases_cache = None
+    _supplier_aliases_cache_time = 0
 
 
 def detect_supplier_from_invoice(invoice_df: pd.DataFrame, raw_text: str | None = None) -> str:
@@ -474,6 +609,7 @@ def apply_invoice_import(
     movement_type: str = "ENTREE",
     invoice_date: datetime | date | None = None,
     tenant_id: int = 1,
+    file_hash: str | None = None,
 ) -> dict[str, object]:
     """Persiste les mouvements à partir des lignes de facture."""
 
@@ -496,7 +632,26 @@ def apply_invoice_import(
         reception_date=normalized_invoice_dt,
         tenant_id=tenant_id,
     )
-    record_processed_invoices(prepared_df, supplier=supplier, tenant_id=tenant_id)
+    record_processed_invoices(prepared_df, supplier=supplier, tenant_id=tenant_id, file_hash=file_hash)
+
+    # Émet un événement d'import de facture
+    try:
+        if "invoice_id" in prepared_df.columns and not prepared_df.empty:
+            invoice_id = str(prepared_df["invoice_id"].iloc[0]) if not prepared_df["invoice_id"].empty else "unknown"
+            total_ttc = float(prepared_df["total_ttc"].sum()) if "total_ttc" in prepared_df.columns else 0.0
+            items_count = len(prepared_df)
+
+            emit_invoice_imported(
+                tenant_id=tenant_id,
+                invoice_id=invoice_id,
+                filename=file_hash or invoice_id,
+                supplier=supplier or "Unknown",
+                total=total_ttc,
+                items_count=items_count,
+            )
+    except Exception as e:
+        LOGGER.warning(f"Failed to emit invoice imported event: {e}")
+
     return result
 
 
@@ -543,8 +698,11 @@ __all__ = [
     "get_processed_invoice_file",
     "normalize_supplier_name",
     "detect_supplier_from_invoice",
+    "invalidate_supplier_aliases_cache",
+    "compute_file_hash",
+    "check_file_hash_exists",
+    "store_file_hash",
 ]
-LOGGER = logging.getLogger(__name__)
 INVOICE_ARCHIVE_DIR = Path("data/processed_invoices")
 INVOICE_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -609,7 +767,13 @@ def _fetch_processed_invoice_ids(invoice_ids: set[str], *, tenant_id: int) -> se
     return {str(entry) for entry in df["invoice_id"].tolist()}
 
 
-def record_processed_invoices(invoice_df: pd.DataFrame, *, supplier: str | None, tenant_id: int) -> None:
+def record_processed_invoices(
+    invoice_df: pd.DataFrame,
+    *,
+    supplier: str | None,
+    tenant_id: int,
+    file_hash: str | None = None,
+) -> None:
     groups = _collect_invoice_groups(invoice_df)
     if not groups:
         return
@@ -620,14 +784,15 @@ def record_processed_invoices(invoice_df: pd.DataFrame, *, supplier: str | None,
         supplier_label = detect_supplier_from_invoice(invoice_df)
     sql = text(
         """
-        INSERT INTO processed_invoices (tenant_id, invoice_id, supplier, facture_date, line_count, file_path)
-        VALUES (:tenant_id, :invoice_id, :supplier, :facture_date, :line_count, :file_path)
+        INSERT INTO processed_invoices (tenant_id, invoice_id, supplier, facture_date, line_count, file_path, file_hash)
+        VALUES (:tenant_id, :invoice_id, :supplier, :facture_date, :line_count, :file_path, :file_hash)
         ON CONFLICT (tenant_id, invoice_id)
         DO UPDATE SET
             supplier = EXCLUDED.supplier,
             facture_date = COALESCE(EXCLUDED.facture_date, processed_invoices.facture_date),
             line_count = EXCLUDED.line_count,
             file_path = COALESCE(EXCLUDED.file_path, processed_invoices.file_path),
+            file_hash = COALESCE(EXCLUDED.file_hash, processed_invoices.file_hash),
             updated_at = now()
         """
     )
@@ -644,6 +809,7 @@ def record_processed_invoices(invoice_df: pd.DataFrame, *, supplier: str | None,
                 "facture_date": group.get("facture_date"),
                 "line_count": group.get("line_count", 0),
                 "file_path": file_path,
+                "file_hash": file_hash,
             }
         )
     try:
@@ -806,7 +972,8 @@ def list_processed_invoices(
 def persist_invoice_documents(pdf_bytes: bytes, *, tenant_id: int, supplier: str | None = None) -> dict[str, dict[str, str]]:
     """Découpe et stocke physiquement chaque facture détectée."""
 
-    documents = split_pdf_into_invoices(pdf_bytes)
+    # Passe le supplier_hint pour utiliser le bon pattern de découpage
+    documents = split_pdf_into_invoices(pdf_bytes, supplier_hint=supplier)
     if not documents:
         return {}
 

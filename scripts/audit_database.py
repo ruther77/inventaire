@@ -1,13 +1,104 @@
 #!/usr/bin/env python3
 """
-================================================================================
-AUDIT COMPLET DE LA BASE DE DONNEES
-================================================================================
-Ce script analyse toutes les tables de la base de donnees et genere un rapport
-detaille des erreurs et incoherences trouvees.
+Module d'audit complet de la cohérence et qualité des données de la base.
 
-Usage: python scripts/audit_database.py
-================================================================================
+Ce script permet de:
+- Analyser toutes les tables principales de la base de données
+- Détecter les erreurs de cohérence (NULL invalides, FK orphelines, etc.)
+- Identifier les problèmes de qualité (stocks négatifs, marges négatives, etc.)
+- Vérifier les contraintes métier (prix, quantités, dates)
+- Détecter les doublons potentiels
+- Générer un rapport détaillé avec recommandations
+- Sauvegarder le rapport dans docs/AUDIT_DATABASE_REPORT.md
+
+Tables auditées:
+    - produits: Catalogue de produits de l'épicerie
+    - finance_transactions: Transactions financières
+    - finance_accounts, finance_categories, finance_entities
+    - mouvements_stock: Historique des mouvements de stock
+    - restaurant_plats, restaurant_ingredients, restaurant_depenses
+    - processed_invoices: Factures traitées
+    - produits_barcodes: Codes-barres associés aux produits
+    - produits_price_history: Historique des prix
+    - vendor_aliases: Alias de fournisseurs
+    - tenants, app_users
+    - Tables additionnelles (supplier_scores, anomalies, etc.)
+
+Types d'erreurs détectées:
+    ERREURS CRITIQUES (bloquantes):
+    - Valeurs NULL sur champs requis (nom, prix, montant, etc.)
+    - Clés étrangères orphelines (références invalides)
+    - Stocks négatifs
+    - Tenants ou entités manquants
+    - Utilisateurs sans mot de passe
+
+    AVERTISSEMENTS (à examiner):
+    - Doublons potentiels (même nom, même date+montant)
+    - Marges négatives (prix_vente < prix_achat)
+    - Prix ou montants manquants
+    - Données de qualité suspecte (prix > 10000€, stock > 10000)
+
+Usage:
+    # Audit complet avec rapport
+    python scripts/audit_database.py
+
+    # Le rapport est sauvegardé dans docs/AUDIT_DATABASE_REPORT.md
+
+Variables d'environnement:
+    DB_HOST: Hôte PostgreSQL (défaut: localhost)
+    DB_PORT: Port PostgreSQL (défaut: 5432)
+    DB_NAME: Nom de la base (défaut: epicerie)
+    DB_USER: Utilisateur (défaut: postgres)
+    DB_PASSWORD: Mot de passe (défaut: postgres)
+
+Prérequis:
+    - PostgreSQL avec base de données configurée
+    - psycopg2 pour la connexion
+    - Accès en lecture sur toutes les tables
+
+Fichiers de sortie:
+    - Rapport console (stdout) avec résumé et détails
+    - docs/AUDIT_DATABASE_REPORT.md : Rapport complet en markdown
+
+Structure du rapport:
+    1. RÉSUMÉ: Nombre d'erreurs, avertissements, statistiques
+    2. ERREURS CRITIQUES: Liste détaillée des problèmes bloquants
+    3. AVERTISSEMENTS: Problèmes à examiner
+    4. STATISTIQUES DES TABLES: Nombre d'enregistrements par table
+    5. RECOMMANDATIONS: Actions prioritaires à effectuer
+
+Code de sortie:
+    0: Aucune erreur critique
+    1: Erreurs critiques détectées
+    2: Erreur d'exécution du script
+
+Exemple de sortie:
+    AUDIT COMPLET DE LA BASE DE DONNEES
+    Date: 2025-01-15T10:30:00
+
+    RÉSUMÉ
+    - Erreurs critiques: 5
+    - Avertissements: 23
+    - Informations: 45
+
+    ERREURS CRITIQUES
+    ### Erreur #1
+    - Table: produits
+    - Catégorie: NULL_NAME
+    - Message: 3 produits sans nom
+    - Details: [42, 89, 123]
+
+    RECOMMANDATIONS
+    ### Priorité HAUTE (Erreurs critiques à corriger)
+    - Ajouter les noms manquants dans produits
+    - Corriger les stocks négatifs dans produits
+    - Corriger les references produit invalides dans mouvements_stock
+
+Notes:
+    - L'audit est non-destructif (lecture seule)
+    - Temps d'exécution: 10-30 secondes selon la taille de la base
+    - Peut être exécuté quotidiennement via cron pour monitoring
+    - Les requêtes SQL sont protégées contre les erreurs
 """
 
 import os

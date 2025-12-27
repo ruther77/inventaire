@@ -27,6 +27,7 @@ from backend.api import (
     rules_engine,
     stock,
     supplier_scoring,
+    suppliers,
     supply,
 )
 
@@ -44,6 +45,7 @@ def include_routes(app: FastAPI) -> None:
     app.include_router(anomaly_detection.router)
     app.include_router(margins.router)
     app.include_router(supplier_scoring.router)
+    app.include_router(suppliers.router)
     app.include_router(analytics.router)
     app.include_router(dashboard.router)
     app.include_router(cockpit.router)

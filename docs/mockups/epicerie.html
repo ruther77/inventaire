@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Épicerie - Gestion complète</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-teal: #06b6d4;
+            --accent-blue: #3b82f6;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.15), transparent),
+                        radial-gradient(ellipse 60% 40% at 100% 0%, rgba(6, 182, 212, 0.1), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 32px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .page-header .left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .page-header .icon-wrapper {
+            padding: 16px;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.2));
+            border-radius: 16px;
+        }
+
+        .page-header .icon {
+            width: 32px;
+            height: 32px;
+            color: var(--accent-emerald);
+        }
+
+        .page-header h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .page-header p {
+            font-size: 18px;
+            color: var(--text-muted);
+        }
+
+        .page-header .actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-primary {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--accent-emerald), var(--accent-teal));
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-secondary {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px;
+            border-radius: 16px;
+            margin-bottom: 32px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(6, 182, 212, 0.2));
+            color: var(--text-primary);
+        }
+
+        /* KPIs Grid */
+        .kpis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 48px;
+        }
+
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .kpi-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .kpi-card .label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .kpi-card .value {
+            font-size: 36px;
+            font-weight: 700;
+            font-family: 'Sora', sans-serif;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .kpi-card .trend {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .kpi-card .trend.positive {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-emerald);
+        }
+
+        .kpi-card .trend.negative {
+            background: rgba(244, 63, 94, 0.15);
+            color: var(--accent-rose);
+        }
+
+        .kpi-card .hint {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        /* Main Layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+
+        /* Catalogue Section avec filtres */
+        .catalogue-section {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
+        }
+
+        .catalogue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .catalogue-header h2 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .search-filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .search-box {
+            flex: 1;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .search-box::placeholder {
+            color: var(--text-muted);
+        }
+
+        .filter-btn {
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover, .filter-btn.active {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: var(--accent-emerald);
+        }
+
+        /* Products Table */
+        .products-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .products-table thead tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .products-table th {
+            padding: 16px 12px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .products-table th:hover {
+            color: var(--text-primary);
+        }
+
+        .products-table tbody tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+
+        .products-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .products-table td {
+            padding: 16px 12px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .products-table td.product-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .products-table td.price {
+            font-family: 'Sora', monospace;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .stock-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .stock-indicator.good {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-emerald);
+        }
+
+        .stock-indicator.low {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-amber);
+        }
+
+        .stock-indicator.critical {
+            background: rgba(244, 63, 94, 0.15);
+            color: var(--accent-rose);
+        }
+
+        .action-icon {
+            width: 32px;
+            height: 32px;
+            padding: 6px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--accent-blue);
+        }
+
+        .action-icon:hover {
+            background: rgba(59, 130, 246, 0.2);
+            transform: scale(1.1);
+        }
+
+        /* Sidebar - Recent Activity */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .sidebar-card {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 24px;
+        }
+
+        .sidebar-card h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .activity-item {
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .activity-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .activity-item .title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+        }
+
+        .activity-item .meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .activity-item .amount {
+            font-weight: 600;
+            color: var(--accent-emerald);
+        }
+
+        /* Interactive Chart Modal */
+        .chart-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+        }
+
+        .chart-modal.active {
+            display: flex;
+        }
+
+        .chart-modal-content {
+            background: rgba(18, 18, 26, 0.95);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 48px;
+            max-width: 1200px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .chart-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .chart-modal-header h2 {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .close-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 20px;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: rotate(90deg);
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 24px;
+        }
+
+        .pagination button {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pagination button:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .pagination button.active {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(6, 182, 212, 0.2));
+            border-color: rgba(16, 185, 129, 0.5);
+            color: var(--text-primary);
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
+
+            .page-header h1 {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="left">
+                <div class="icon-wrapper">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>Épicerie</h1>
+                    <p>Catalogue, Stock, Factures & Prix</p>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn-primary">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Importer factures
+                </button>
+                <button class="btn-secondary">Nouveau produit</button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active">Catalogue (1,247)</button>
+            <button class="tab">Factures récentes (12)</button>
+            <button class="tab">Suivi Prix</button>
+            <button class="tab">Mouvements Stock</button>
+            <button class="tab">Fournisseurs (8)</button>
+        </div>
+
+        <!-- KPIs -->
+        <div class="kpis-grid">
+            <div class="kpi-card" onclick="alert('Drill-down vers détails stock')">
+                <div class="label">Valeur Stock HT</div>
+                <div class="value">€45,230</div>
+                <div class="hint">
+                    <span class="trend positive">↗ +2.4%</span>
+                    vs mois dernier
+                </div>
+            </div>
+
+            <div class="kpi-card" onclick="alert('Drill-down vers produits actifs')">
+                <div class="label">Produits Actifs</div>
+                <div class="value">1,247</div>
+                <div class="hint">38 catégories • 8 fournisseurs</div>
+            </div>
+
+            <div class="kpi-card" onclick="alert('Drill-down vers liste alertes stock')">
+                <div class="label">Alertes Stock</div>
+                <div class="value">7</div>
+                <div class="hint">
+                    <span class="trend negative">3 critiques</span>
+                    4 warnings
+                </div>
+            </div>
+
+            <div class="kpi-card" onclick="alert('Drill-down vers factures en attente')">
+                <div class="label">Factures en attente</div>
+                <div class="value">12</div>
+                <div class="hint">Total: €8,420 • 3 fournisseurs</div>
+            </div>
+
+            <div class="kpi-card" onclick="alert('Drill-down vers analyse prix')">
+                <div class="label">Prix Moyen Achat</div>
+                <div class="value">€3.62</div>
+                <div class="hint">
+                    <span class="trend negative">↘ -0.8%</span>
+                    Optimisation fournisseurs
+                </div>
+            </div>
+
+            <div class="kpi-card" onclick="alert('Drill-down vers rotation stock')">
+                <div class="label">Rotation Stock</div>
+                <div class="value">12.4j</div>
+                <div class="hint">Moyenne sur 90 jours</div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Catalogue Section -->
+            <div class="catalogue-section">
+                <div class="catalogue-header">
+                    <h2>Catalogue Produits</h2>
+                    <button class="btn-secondary">Exporter CSV</button>
+                </div>
+
+                <!-- Search & Filters -->
+                <div class="search-filters">
+                    <input type="text" class="search-box" placeholder="🔍 Rechercher un produit..." />
+                    <button class="filter-btn active">Tous</button>
+                    <button class="filter-btn">Stock bas</button>
+                    <button class="filter-btn">Favoris</button>
+                    <button class="filter-btn">Catégories ▾</button>
+                </div>
+
+                <!-- Products Table -->
+                <table class="products-table">
+                    <thead>
+                        <tr>
+                            <th>Produit ↕</th>
+                            <th>Catégorie</th>
+                            <th>Stock ↕</th>
+                            <th>Prix d'achat</th>
+                            <th>Prix de vente</th>
+                            <th>Marge</th>
+                            <th>Statut</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr onclick="alert('Ouvre fiche produit détaillée avec historique prix, mouvements stock, etc.')">
+                            <td class="product-name">Tomates cerises (kg)</td>
+                            <td>Légumes</td>
+                            <td>2.0 kg</td>
+                            <td class="price">€4.20</td>
+                            <td class="price">€6.80</td>
+                            <td>38%</td>
+                            <td><span class="stock-indicator critical">🔴 Critique</span></td>
+                            <td>
+                                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </td>
+                        </tr>
+                        <tr onclick="alert('Ouvre fiche produit')">
+                            <td class="product-name">Farine T55 (kg)</td>
+                            <td>Épicerie</td>
+                            <td>0.0 kg</td>
+                            <td class="price">€1.10</td>
+                            <td class="price">€1.95</td>
+                            <td>44%</td>
+                            <td><span class="stock-indicator critical">🔴 Épuisé</span></td>
+                            <td>
+                                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </td>
+                        </tr>
+                        <tr onclick="alert('Ouvre fiche produit')">
+                            <td class="product-name">Huile d'olive (L)</td>
+                            <td>Épicerie</td>
+                            <td>3.5 L</td>
+                            <td class="price">€8.90</td>
+                            <td class="price">€14.50</td>
+                            <td>39%</td>
+                            <td><span class="stock-indicator low">⚠️ Bas</span></td>
+                            <td>
+                                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </td>
+                        </tr>
+                        <tr onclick="alert('Ouvre fiche produit')">
+                            <td class="product-name">Mozzarella (kg)</td>
+                            <td>Fromages</td>
+                            <td>12.0 kg</td>
+                            <td class="price">€6.40</td>
+                            <td class="price">€10.20</td>
+                            <td>37%</td>
+                            <td><span class="stock-indicator good">✓ OK</span></td>
+                            <td>
+                                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </td>
+                        </tr>
+                        <tr onclick="alert('Ouvre fiche produit')">
+                            <td class="product-name">Pâtes Spaghetti 500g</td>
+                            <td>Épicerie</td>
+                            <td>48 unités</td>
+                            <td class="price">€0.82</td>
+                            <td class="price">€1.45</td>
+                            <td>43%</td>
+                            <td><span class="stock-indicator good">✓ OK</span></td>
+                            <td>
+                                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </td>
+                        </tr>
+                        <tr onclick="alert('Ouvre fiche produit')">
+                            <td class="product-name">Lait demi-écrémé (L)</td>
+                            <td>Produits laitiers</td>
+                            <td>18.0 L</td>
+                            <td class="price">€0.95</td>
+                            <td class="price">€1.40</td>
+                            <td>32%</td>
+                            <td><span class="stock-indicator good">✓ OK</span></td>
+                            <td>
+                                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </td>
+                        </tr>
+                        <tr onclick="alert('Ouvre fiche produit')">
+                            <td class="product-name">Poulet fermier (kg)</td>
+                            <td>Viandes</td>
+                            <td>8.5 kg</td>
+                            <td class="price">€12.40</td>
+                            <td class="price">€18.90</td>
+                            <td>34%</td>
+                            <td><span class="stock-indicator low">⚠️ Bas</span></td>
+                            <td>
+                                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </td>
+                        </tr>
+                        <tr onclick="alert('Ouvre fiche produit')">
+                            <td class="product-name">Riz Basmati 1kg</td>
+                            <td>Épicerie</td>
+                            <td>32 unités</td>
+                            <td class="price">€2.10</td>
+                            <td class="price">€3.50</td>
+                            <td>40%</td>
+                            <td><span class="stock-indicator good">✓ OK</span></td>
+                            <td>
+                                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Pagination -->
+                <div class="pagination">
+                    <button>← Préc.</button>
+                    <button class="active">1</button>
+                    <button>2</button>
+                    <button>3</button>
+                    <button>...</button>
+                    <button>42</button>
+                    <button>Suiv. →</button>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <!-- Factures récentes -->
+                <div class="sidebar-card">
+                    <h3>
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Factures récentes
+                    </h3>
+
+                    <div class="activity-item">
+                        <div class="title">Facture Metro #2847</div>
+                        <div class="meta">
+                            <span>Aujourd'hui 14:32</span>
+                            <span class="amount">€842.50</span>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="title">Facture Brake #1820</div>
+                        <div class="meta">
+                            <span>Hier 09:15</span>
+                            <span class="amount">€1,240.00</span>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="title">Facture PromoC #5612</div>
+                        <div class="meta">
+                            <span>Il y a 2 jours</span>
+                            <span class="amount">€420.80</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mouvements Stock -->
+                <div class="sidebar-card">
+                    <h3>
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                        </svg>
+                        Mouvements récents
+                    </h3>
+
+                    <div class="activity-item">
+                        <div class="title">Entrée: Tomates cerises</div>
+                        <div class="meta">
+                            <span>+15 kg</span>
+                            <span style="color: var(--accent-emerald);">Metro</span>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="title">Sortie: Mozzarella</div>
+                        <div class="meta">
+                            <span style="color: var(--accent-rose);">-3 kg</span>
+                            <span>Restaurant</span>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="title">Entrée: Farine T55</div>
+                        <div class="meta">
+                            <span>+50 kg</span>
+                            <span style="color: var(--accent-emerald);">Brake</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="sidebar-card">
+                    <h3>Actions rapides</h3>
+                    <button class="btn-primary" style="width: 100%; margin-bottom: 12px;">Commander stock bas</button>
+                    <button class="btn-secondary" style="width: 100%; margin-bottom: 12px;">Valider factures</button>
+                    <button class="btn-secondary" style="width: 100%;">Voir rapports</button>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Interactive Chart Modal (exemple) -->
+    <div class="chart-modal" id="chartModal">
+        <div class="chart-modal-content">
+            <div class="chart-modal-header">
+                <h2>Évolution Stock - Tomates cerises</h2>
+                <button class="close-btn" onclick="document.getElementById('chartModal').classList.remove('active')">×</button>
+            </div>
+            <p style="color: var(--text-muted); margin-bottom: 32px;">
+                Graphique interactif montrant l'évolution du stock sur les 90 derniers jours,
+                avec annotations des commandes et alertes.
+            </p>
+            <p style="color: var(--text-secondary);">
+                [Ici viendrait un vrai graphique interactif avec Chart.js ou similaire,
+                permettant de zoomer, filtrer par période, voir les détails au hover, etc.]
+            </p>
+        </div>
+    </div>
+</body>
+</html>

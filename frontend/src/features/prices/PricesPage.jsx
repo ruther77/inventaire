@@ -86,7 +86,7 @@ const downloadCsv = (rows) => {
   URL.revokeObjectURL(url);
 };
 
-export default function PricesPage() {
+export default function PricesPage({ embedded = false }) {
   const { data: products = [] } = useProducts();
   const [filters, setFilters] = useState({
     productId: 'all',
@@ -273,27 +273,29 @@ export default function PricesPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-slate-400">prix & inflation</p>
-            <h2 className="text-2xl font-semibold text-white">Historique fournisseur</h2>
-            <p className="text-sm text-slate-400">
-              Comparez les évolutions de prix d&apos;achat par produit, fournisseur et période.
-            </p>
+        {!embedded && (
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.4em] text-slate-400">prix & inflation</p>
+              <h2 className="text-2xl font-semibold text-white">Historique fournisseur</h2>
+              <p className="text-sm text-slate-400">
+                Comparez les évolutions de prix d&apos;achat par produit, fournisseur et période.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  downloadCsv(items.map((item) => ({ ...item, nom: resolveProductName(item) })))
+                }
+                disabled={!items.length}
+              >
+                Export CSV
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                downloadCsv(items.map((item) => ({ ...item, nom: resolveProductName(item) })))
-              }
-              disabled={!items.length}
-            >
-              Export CSV
-            </Button>
-          </div>
-        </div>
+        )}
         <div className="grid gap-4 md:grid-cols-3">
           <label className="text-sm text-slate-300">
             Produit

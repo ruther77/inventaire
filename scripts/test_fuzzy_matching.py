@@ -1,12 +1,70 @@
 #!/usr/bin/env python3
 """
-Script de test pour le fuzzy matching de produits.
+Module de test et démonstration du système de fuzzy matching de produits.
+
+Ce script permet de:
+- Tester la fonction de recherche floue (fuzzy matching) du catalogue
+- Vérifier la qualité des suggestions de produits similaires
+- Évaluer les scores de pertinence
+- Tester différents cas d'usage (fautes d'orthographe, ordre des mots, etc.)
+- Afficher les résultats de manière formatée avec émojis et couleurs
+
+Le fuzzy matching est crucial pour:
+- Associer automatiquement les factures aux produits du catalogue
+- Aider les utilisateurs à trouver des produits malgré les variations d'orthographe
+- Gérer les différences de nommage entre fournisseurs
+- Supporter la recherche intelligente dans l'interface
 
 Usage:
+    # Test complet avec exemples prédéfinis
     python scripts/test_fuzzy_matching.py
 
-Ce script teste la fonctionnalité de fuzzy matching en recherchant
-des produits similaires dans le catalogue.
+Prérequis:
+    - Base de données avec table produits remplie
+    - Module backend.services.product_matching configuré
+    - Tenant ID 1 actif avec des produits
+
+Tests effectués:
+    1. Recherche simple (mot unique): "Tomate"
+    2. Faute d'orthographe: "Lait demi écréme"
+    3. Produit avec détails: "Pomme Golden 1kg"
+    4. Ordre inversé: "UHT Lait"
+    5. Produit inexistant: "Produit inexistant XYZ123"
+    6. Meilleur match unique avec seuil élevé
+
+Scoring:
+    - Score >= 90%: Excellent match (émoji vert)
+    - Score >= 75%: Bon match (émoji jaune)
+    - Score >= 60%: Match acceptable (émoji orange)
+    - Score < 60%: Match faible (émoji rouge)
+
+Exemple de sortie:
+    TEST DU FUZZY MATCHING DE PRODUITS
+    ==================================================================
+
+    Test avec un mot simple
+    ==================================================================
+    Recherche: 'Tomate'
+    ==================================================================
+    3 suggestion(s) trouvée(s):
+
+    1. TOMATE RONDE
+       Score: 95%
+       ID: 42
+       Catégorie: Légumes
+       Prix achat: 2.50€
+       Prix vente: 3.50€
+
+    2. TOMATE CERISE 500G
+       Score: 78%
+       ID: 89
+       EAN: 3245678901234
+
+Notes:
+    - Le script est autonome et peut être exécuté sans arguments
+    - Les scores sont calculés via l'algorithme de Levenshtein
+    - Les résultats incluent les métadonnées (catégorie, prix, EAN)
+    - Utile pour diagnostiquer les problèmes de matching
 """
 
 import sys

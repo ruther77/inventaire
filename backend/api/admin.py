@@ -1,4 +1,16 @@
-"""Endpoints d'administration et d'outillage."""
+"""
+Module de gestion de l'administration système.
+
+Ce module fournit les endpoints d'administration réservés aux utilisateurs
+avec le rôle 'admin' incluant:
+- Gestion des utilisateurs (liste, rôles, mots de passe)
+- Création et restauration de sauvegardes
+- Rapports d'intégrité des données
+- Configuration des paramètres de sauvegarde
+- Statistiques d'utilisation et monitoring
+
+Tous les endpoints de ce module nécessitent le rôle 'admin'.
+"""
 
 from __future__ import annotations
 
@@ -27,18 +39,46 @@ router = APIRouter(
 
 @router.get("/overview", response_model=AdminOverviewResponse)
 def admin_overview(tenant: Tenant = Depends(get_current_tenant)):
+    """
+    Récupère une vue d'ensemble des statistiques d'administration.
+
+    Args:
+        tenant: Tenant actuel (injecté automatiquement)
+
+    Returns:
+        AdminOverviewResponse avec statistiques système et utilisateurs
+    """
     payload = admin_service.fetch_admin_overview(tenant_id=tenant.id)
     return AdminOverviewResponse(**payload)
 
 
 @router.get("/users", response_model=AdminUsersResponse)
 def list_users():
+    """
+    Liste tous les utilisateurs du système avec leurs rôles.
+
+    Returns:
+        AdminUsersResponse avec la liste des utilisateurs et rôles disponibles
+    """
     users = admin_service.list_admin_users()
     return AdminUsersResponse(users=users, roles=list(admin_service.ALLOWED_ROLES))
 
 
 @router.post("/users/{user_id}/role")
 def change_user_role(user_id: int, payload: UpdateRolePayload):
+    """
+    Change le rôle d'un utilisateur.
+
+    Args:
+        user_id: ID de l'utilisateur
+        payload: Nouveau rôle à assigner
+
+    Returns:
+        Dict avec statut de la mise à jour
+
+    Raises:
+        HTTPException 400: Si le rôle est invalide ou l'utilisateur inexistant
+    """
     try:
         admin_service.update_role(user_id, payload.role)
     except ValueError as exc:
@@ -48,6 +88,19 @@ def change_user_role(user_id: int, payload: UpdateRolePayload):
 
 @router.post("/users/{user_id}/reset-password")
 def reset_user_password(user_id: int, payload: ResetPasswordPayload | None = None):
+    """
+    Réinitialise le mot de passe d'un utilisateur.
+
+    Args:
+        user_id: ID de l'utilisateur
+        payload: Nouveau mot de passe (optionnel, auto-généré si absent)
+
+    Returns:
+        Dict avec le nouveau mot de passe
+
+    Raises:
+        HTTPException 400: Si l'utilisateur est inexistant
+    """
     try:
         password = admin_service.reset_password(user_id, (payload or ResetPasswordPayload()).new_password)
     except ValueError as exc:

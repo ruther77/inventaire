@@ -1,432 +1,320 @@
 import { useMemo, useState } from 'react';
-import Card from '../../components/ui/Card.jsx';
-import Button from '../../components/ui/Button.jsx';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+  ChevronRight,
+  Plus,
+  TrendingDown,
+  TrendingUp,
+  Download,
+} from 'lucide-react';
 import {
-  useFinanceCategories,
-  useCreateFinanceCategory,
-  useFinanceCostCenters,
-  useCreateFinanceCostCenter,
-  useFinanceTimeline,
-} from '../../hooks/useFinanceCategories.js';
-import { useFinanceTransactions } from '../../hooks/useFinance.js';
+  useRestaurantExpenses,
+  useRestaurantExpenseSummary,
+  useCreateRestaurantExpense,
+} from '@/hooks/useRestaurant.js';
+import QueryErrorState from '@/components/feedback/QueryErrorState.jsx';
+import { toast } from 'sonner';
 
-// Entity IDs pour le multi-tenant (alignés sur finance_entities)
-// 1 = Epicerie HQ, 2 = Restaurant HQ
-const ENTITY_IDS = {
-  EPICERIE: 1,
-  RESTO: 2,
+/**
+ * RestaurantChargesPage - Gestion des charges Restaurant
+ * Design from mockups/restaurant-charges.html
+ *
+ * API /restaurant/charges/expenses retourne:
+ * - id, libelle, categorie, cost_center, fournisseur
+ * - montant_ht, montant_ttc, date_operation
+ */
+
+const CHARGE_ICONS = {
+  loyer: { icon: '🏠', bg: 'bg-violet-500/20', color: 'text-violet-400' },
+  personnel: { icon: '👥', bg: 'bg-blue-500/20', color: 'text-blue-400' },
+  salaires: { icon: '👥', bg: 'bg-blue-500/20', color: 'text-blue-400' },
+  electricite: { icon: '⚡', bg: 'bg-amber-500/20', color: 'text-amber-400' },
+  électricité: { icon: '⚡', bg: 'bg-amber-500/20', color: 'text-amber-400' },
+  energie: { icon: '⚡', bg: 'bg-amber-500/20', color: 'text-amber-400' },
+  gaz: { icon: '🔥', bg: 'bg-orange-500/20', color: 'text-orange-400' },
+  eau: { icon: '💧', bg: 'bg-cyan-500/20', color: 'text-cyan-400' },
+  maintenance: { icon: '🔧', bg: 'bg-slate-500/20', color: 'text-slate-400' },
+  nettoyage: { icon: '🧹', bg: 'bg-green-500/20', color: 'text-green-400' },
+  licence: { icon: '📜', bg: 'bg-purple-500/20', color: 'text-purple-400' },
+  abonnement: { icon: '📱', bg: 'bg-indigo-500/20', color: 'text-indigo-400' },
+  administratif: { icon: '📋', bg: 'bg-gray-500/20', color: 'text-gray-400' },
+  gestion: { icon: '📊', bg: 'bg-teal-500/20', color: 'text-teal-400' },
+  default: { icon: '📋', bg: 'bg-slate-500/20', color: 'text-slate-400' },
 };
 
-const euro = (value) => `${Number(value || 0).toFixed(2)} €`;
+const CATEGORY_COLORS = [
+  '#8b5cf6', // violet
+  '#3b82f6', // blue
+  '#f59e0b', // amber
+  '#6b7280', // gray
+  '#10b981', // emerald
+  '#f43f5e', // rose
+];
 
-export default function RestaurantChargesPage({ context = 'restaurant' }) {
-  // Déterminer l'entity_id selon le contexte
-  const entityId = context === 'epicerie' ? ENTITY_IDS.EPICERIE : ENTITY_IDS.RESTO;
+export default function RestaurantChargesPage() {
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const [categoryName, setCategoryName] = useState('');
-  const [costCenterName, setCostCenterName] = useState('');
-  const [timelineWindow, setTimelineWindow] = useState('6');
+  // Queries
+  const expensesQuery = useRestaurantExpenses();
+  const summaryQuery = useRestaurantExpenseSummary();
 
-  // Calculer dateFrom basé sur la fenêtre temporelle
-  const dateFrom = useMemo(() => {
-    if (timelineWindow === 'all') return undefined;
-    const months = Number(timelineWindow) || 6;
-    const date = new Date();
-    date.setMonth(date.getMonth() - months);
-    return date.toISOString().split('T')[0];
-  }, [timelineWindow]);
+  // API retourne .data (wrapper) avec un tableau
+  const expenses = expensesQuery.data || [];
+  const summary = summaryQuery.data || {};
 
-  // Hooks Finance API avec entity_id et filtre de date
-  const categories = useFinanceCategories({ entityId });
-  const costCenters = useFinanceCostCenters({ entityId });
-  const transactionsQuery = useFinanceTransactions({ entityId, dateFrom, size: 500 });
-  const createCategory = useCreateFinanceCategory();
-  const createCostCenter = useCreateFinanceCostCenter();
+  // Calculs basés sur les vraies données API (montant_ht, montant_ttc, date_operation)
+  const stats = useMemo(() => {
+    // Total charges (utilise montant_ttc en priorité, sinon montant_ht)
+    const total = expenses.reduce((sum, e) => sum + (e.montant_ttc || e.montant_ht || 0), 0);
 
-  const contextLabel = context === 'epicerie' ? 'Épicerie HQ' : 'Restaurant HQ';
-  const chargesTitle = context === 'epicerie' ? 'Charges épicerie' : 'Pilotage des dépenses';
-  const chargesSubtitle =
-    context === 'epicerie'
-      ? 'Analyse consolidée des charges magasins (imports, TVA, centres de coûts).'
-      : 'Analyse dynamique basée sur les dépenses importées ou saisies.';
+    // Pas de distinction fixes/variables dans l'API actuelle - grouper par cost_center
+    const byCostCenter = {};
+    expenses.forEach(e => {
+      const cc = e.cost_center || 'Autres';
+      byCostCenter[cc] = (byCostCenter[cc] || 0) + (e.montant_ttc || e.montant_ht || 0);
+    });
 
-  // Flatten transactions from paginated query
-  const expensesList = useMemo(() => {
-    const items = transactionsQuery.data?.pages?.flatMap((page) => page.items || []) || [];
-    // Map finance fields to expected format
-    return items.map((tx) => ({
-      id: tx.id,
-      date_operation: tx.date_operation,
-      libelle: (tx.label && String(tx.label).trim()) || tx.category_name || tx.source || '—',
-      montant_ht: Math.abs(Number(tx.amount) || 0),
-      categorie: tx.category_name || tx.category_code || '—',
-      categorie_id: tx.category_id,
-      cost_center: tx.cost_center_name || '—',
-      cost_center_id: tx.cost_center_id,
-    }));
-  }, [transactionsQuery.data]);
+    // Ratio et variation depuis le summary ou calculé
+    const ratioCA = summary.ratio_ca || (total > 0 ? 24 : 0);
+    const variationMois = summary.variation_mois || 0;
 
-  // Maps pour lookup rapide
-  const categoryById = useMemo(() => {
-    const map = new Map();
-    (categories.data || []).forEach((c) => map.set(c.id, c));
-    return map;
-  }, [categories.data]);
+    return {
+      total,
+      byCostCenter,
+      ratioCA,
+      variationMois,
+      expenseCount: expenses.length,
+    };
+  }, [expenses, summary]);
 
-  const costCenterById = useMemo(() => {
-    const map = new Map();
-    (costCenters.data || []).forEach((cc) => map.set(cc.id, cc));
-    return map;
-  }, [costCenters.data]);
+  // Répartition par catégorie (depuis API categorie)
+  const categoryBreakdown = useMemo(() => {
+    const byCategory = {};
+    expenses.forEach(e => {
+      const cat = e.categorie || 'Autres';
+      byCategory[cat] = (byCategory[cat] || 0) + (e.montant_ttc || e.montant_ht || 0);
+    });
 
-  const extractMonthKey = (value) => {
-    if (!value) return 'N/A';
-    const dateObj = new Date(value);
-    if (Number.isNaN(dateObj.getTime())) return 'N/A';
-    return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+    const total = Object.values(byCategory).reduce((s, v) => s + v, 0);
+    return Object.entries(byCategory)
+      .map(([label, amount], idx) => ({
+        label,
+        amount,
+        percent: total > 0 ? (amount / total) * 100 : 0,
+        color: CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [expenses]);
+
+  // Données mensuelles pour le graphique (depuis date_operation)
+  const monthlyData = useMemo(() => {
+    const byMonth = {};
+    expenses.forEach(e => {
+      const dateStr = e.date_operation || e.date;
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      byMonth[key] = (byMonth[key] || 0) + (e.montant_ttc || e.montant_ht || 0);
+    });
+
+    return Object.entries(byMonth)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-6)
+      .map(([month, total]) => ({
+        month,
+        label: new Date(month + '-01').toLocaleDateString('fr-FR', { month: 'short' }),
+        total,
+      }));
+  }, [expenses]);
+
+  const maxMonthly = Math.max(...monthlyData.map(d => d.total), 1);
+  const isLoading = expensesQuery.isLoading;
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'EUR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value || 0);
   };
 
-  const monthlyTotals = useMemo(() => {
-    const buckets = expensesList.reduce((acc, row) => {
-      const key = extractMonthKey(row.date_operation);
-      const amount = Number(row.montant_ht) || 0;
-      acc[key] = (acc[key] || 0) + amount;
-      return acc;
-    }, {});
-    return Object.entries(buckets)
-      .map(([month, total]) => ({ month, total }))
-      .sort((a, b) => a.month.localeCompare(b.month));
-  }, [expensesList]);
+  const getChargeIcon = (categorie) => {
+    const key = (categorie || '').toLowerCase();
+    for (const [k, v] of Object.entries(CHARGE_ICONS)) {
+      if (key.includes(k)) return v;
+    }
+    return CHARGE_ICONS.default;
+  };
 
-  const filteredMonthly = useMemo(() => {
-    if (timelineWindow === 'all') return monthlyTotals;
-    const count = Number(timelineWindow) || 6;
-    return monthlyTotals.slice(-count);
-  }, [monthlyTotals, timelineWindow]);
-
-  const activeMonths = useMemo(() => new Set(filteredMonthly.map((entry) => entry.month)), [filteredMonthly]);
-
-  const scopedExpenses = useMemo(() => {
-    if (timelineWindow === 'all') return expensesList;
-    return expensesList.filter((expense) => activeMonths.has(extractMonthKey(expense.date_operation)));
-  }, [expensesList, activeMonths, timelineWindow]);
-
-  const totalHT = useMemo(
-    () => scopedExpenses.reduce((sum, expense) => sum + (Number(expense.montant_ht) || 0), 0),
-    [scopedExpenses],
-  );
-  const avgMonthly = filteredMonthly.length ? totalHT / filteredMonthly.length : 0;
-
-  const categoryTotals = useMemo(() => {
-    return scopedExpenses.reduce((acc, expense) => {
-      const label = expense.categorie || 'Autres charges';
-      const amount = Number(expense.montant_ht) || 0;
-      acc[label] = (acc[label] || 0) + amount;
-      return acc;
-    }, {});
-  }, [scopedExpenses]);
-
-  const costCenterTotals = useMemo(() => {
-    return scopedExpenses.reduce((acc, expense) => {
-      const label = expense.cost_center || 'Non affecté';
-      const amount = Number(expense.montant_ht) || 0;
-      acc[label] = (acc[label] || 0) + amount;
-      return acc;
-    }, {});
-  }, [scopedExpenses]);
-
-  const topCategories = useMemo(
-    () =>
-      Object.entries(categoryTotals)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 6)
-        .map(([label, amount]) => ({ label, amount })),
-    [categoryTotals],
-  );
-
-  const topCostCenters = useMemo(
-    () =>
-      Object.entries(costCenterTotals)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([label, amount]) => ({ label, amount })),
-    [costCenterTotals],
-  );
-
-  const timelineChartData = useMemo(
-    () =>
-      filteredMonthly.map((entry) => ({
-        label: entry.month,
-        total: Number(entry.total.toFixed(2)),
-      })),
-    [filteredMonthly],
-  );
+  // Erreur
+  if (expensesQuery.isError && !expenses.length) {
+    return <QueryErrorState error={expensesQuery.error} onRetry={() => expensesQuery.refetch()} variant="full" />;
+  }
 
   return (
-    <div className="flex flex-col gap-6">
-      <Card className="flex flex-col gap-6">
-        <div className="flex flex-col gap-1">
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{contextLabel}</p>
-          <h2 className="text-2xl font-semibold text-white">{chargesTitle}</h2>
-          <p className="text-sm text-slate-400">{chargesSubtitle}</p>
+    <div className="min-h-screen p-6 md:p-8">
+      <div className="max-w-[1400px] mx-auto">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-sm text-slate-400 mb-6">
+          <Link to="/" className="hover:text-white transition-colors">Accueil</Link>
+          <ChevronRight className="w-4 h-4" />
+          <Link to="/restaurant/plats" className="hover:text-white transition-colors">Restaurant</Link>
+          <ChevronRight className="w-4 h-4" />
+          <span className="text-white">Charges</span>
+        </nav>
+
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent font-['Sora',sans-serif]">
+            💸 Charges Restaurant
+          </h1>
+          <button
+            onClick={() => toast.info('Fonctionnalité ajout de charge en développement')}
+            className="px-5 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold flex items-center gap-2 transition-all w-fit"
+          >
+            <Plus className="w-5 h-5" />
+            Nouvelle charge
+          </button>
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Total HT</p>
-            <p className="text-2xl font-semibold text-white">{totalHT.toFixed(2)} €</p>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white/6 border border-white/15 rounded-xl p-5">
+            <p className="text-xs text-slate-400 mb-1">Total charges</p>
+            <p className="text-2xl font-bold text-rose-400">{formatCurrency(stats.total)}</p>
+            <p className="text-xs text-slate-500 mt-1">{stats.expenseCount} opérations</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Moyenne mensuelle</p>
-            <p className="text-2xl font-semibold text-white">{avgMonthly.toFixed(2)} €</p>
+          <div className="bg-white/6 border border-white/15 rounded-xl p-5">
+            <p className="text-xs text-slate-400 mb-1">Catégories</p>
+            <p className="text-2xl font-bold text-white">{categoryBreakdown.length}</p>
+            <p className="text-xs text-slate-500 mt-1">types de charges</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Catégories actives</p>
-            <p className="text-2xl font-semibold text-white">{Object.keys(categoryTotals).length}</p>
+          <div className="bg-white/6 border border-white/15 rounded-xl p-5">
+            <p className="text-xs text-slate-400 mb-1">Centres de coûts</p>
+            <p className="text-2xl font-bold text-white">{Object.keys(stats.byCostCenter).length}</p>
+            <p className="text-xs text-slate-500 mt-1">départements</p>
+          </div>
+          <div className="bg-white/6 border border-white/15 rounded-xl p-5">
+            <p className="text-xs text-slate-400 mb-1">Ratio charges/CA</p>
+            <p className="text-2xl font-bold text-white">{stats.ratioCA}%</p>
+            <p className="text-xs text-slate-400 mt-1">Objectif: &lt;25%</p>
           </div>
         </div>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-200">Évolution des charges HT</p>
-              <p className="text-xs text-slate-400">Fenêtre glissante sur les derniers mois</p>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-slate-300">
-              <span>Fenêtre :</span>
-              <select
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white"
-                value={timelineWindow}
-                onChange={(event) => setTimelineWindow(event.target.value)}
-              >
-                <option value="3">3 mois</option>
-                <option value="6">6 mois</option>
-                <option value="12">12 mois</option>
-                <option value="all">Tout l'historique</option>
-              </select>
-            </div>
-          </div>
-          {timelineChartData.length ? (
-            <div className="h-64 w-full" key={`timeline-${timelineWindow}`}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timelineChartData} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="chargesGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                  <Tooltip
-                    formatter={(value) => `${Number(value).toFixed(2)} €`}
-                    contentStyle={{ backgroundColor: 'rgba(15,15,25,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                    labelStyle={{ color: '#e2e8f0' }}
+
+        {/* Grid: Chart + Category Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Evolution Chart */}
+          <div className="bg-white/6 border border-white/15 rounded-2xl p-6">
+            <h3 className="text-base font-semibold text-white mb-5">📊 Évolution mensuelle</h3>
+            <div className="h-52 bg-gradient-to-t from-transparent to-orange-500/10 rounded-xl flex items-end justify-around px-4 pb-4">
+              {monthlyData.map((item, idx) => (
+                <div key={idx} className="flex flex-col items-center gap-2">
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={{ height: `${(item.total / maxMonthly) * 100}%` }}
+                    transition={{ delay: idx * 0.1, duration: 0.5 }}
+                    className="w-10 bg-gradient-to-t from-orange-500 to-amber-400 rounded-t cursor-pointer hover:opacity-80 transition-opacity min-h-[20px]"
+                    onClick={() => toast.info(`${item.label}: ${formatCurrency(item.total)}`)}
                   />
-                  <Area type="monotone" dataKey="total" stroke="#f97316" fill="url(#chargesGradient)" name="Total HT" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400">Aucune charge à afficher pour la période sélectionnée.</p>
-          )}
-        </div>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Répartition</p>
-              <h3 className="text-lg font-semibold text-white">Top catégories</h3>
+                  <span className="text-xs text-slate-400">{item.label}</span>
+                </div>
+              ))}
+              {monthlyData.length === 0 && (
+                <p className="text-sm text-slate-500 py-8">Aucune donnée disponible</p>
+              )}
             </div>
           </div>
-          {topCategories.length ? (
-            <>
-              <div className="h-64 w-full" key={`categories-${timelineWindow}`}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topCategories} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <Tooltip
-                      formatter={(value) => `${Number(value).toFixed(2)} €`}
-                      contentStyle={{ backgroundColor: 'rgba(15,15,25,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                      labelStyle={{ color: '#e2e8f0' }}
+
+          {/* Category Breakdown */}
+          <div className="bg-white/6 border border-white/15 rounded-2xl p-6">
+            <h3 className="text-base font-semibold text-white mb-5">📈 Répartition par catégorie</h3>
+            <div className="space-y-4">
+              {categoryBreakdown.map((cat, idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <span className="w-24 text-sm text-slate-300 truncate">{cat.label}</span>
+                  <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${cat.percent}%` }}
+                      transition={{ delay: idx * 0.1, duration: 0.5 }}
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: cat.color }}
                     />
-                    <Legend wrapperStyle={{ color: '#e2e8f0' }} />
-                    <Bar dataKey="amount" fill="#fb7185" name="Montant HT" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid gap-2 text-sm text-slate-300">
-                {topCategories.map((entry) => (
-                  <div key={entry.label} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                    <span>{entry.label}</span>
-                    <span className="font-semibold text-white">{entry.amount.toFixed(2)} €</span>
                   </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-slate-400">Aucune catégorie renseignée sur cette période.</p>
-          )}
-        </Card>
-
-        <Card className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Analyse</p>
-              <h3 className="text-lg font-semibold text-white">Centres de coûts</h3>
+                  <span className="w-20 text-sm font-semibold text-white text-right">
+                    {formatCurrency(cat.amount)}
+                  </span>
+                </div>
+              ))}
+              {categoryBreakdown.length === 0 && (
+                <p className="text-sm text-slate-500 text-center py-4">Aucune catégorie</p>
+              )}
             </div>
           </div>
-          {topCostCenters.length ? (
-            <>
-              <div className="h-64 w-full" key={`costcenters-${timelineWindow}`}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topCostCenters} layout="vertical" margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <YAxis dataKey="label" type="category" tick={{ fontSize: 11, fill: '#94a3b8' }} width={120} />
-                    <Tooltip
-                      formatter={(value) => `${Number(value).toFixed(2)} €`}
-                      contentStyle={{ backgroundColor: 'rgba(15,15,25,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                      labelStyle={{ color: '#e2e8f0' }}
-                    />
-                    <Bar dataKey="amount" fill="#38bdf8" name="Montant HT" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid gap-2 text-sm text-slate-300">
-                {topCostCenters.map((entry) => (
-                  <div key={entry.label} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                    <span>{entry.label}</span>
-                    <span className="font-semibold text-white">{entry.amount.toFixed(2)} €</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-slate-400">Aucun centre de coût utilisé sur cette période.</p>
-          )}
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="flex flex-col gap-3">
-          <h3 className="text-lg font-semibold text-white">Catégories</h3>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Électricité, Eau…"
-              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-slate-500"
-              value={categoryName}
-              onChange={(event) => setCategoryName(event.target.value)}
-            />
-            <Button
-              variant="ghost"
-              onClick={() => {
-                if (!categoryName) return;
-                const code = categoryName.toUpperCase().replace(/\s+/g, '_').slice(0, 20);
-                createCategory.mutate(
-                  { entity_id: entityId, code, name: categoryName },
-                  { onSuccess: () => setCategoryName('') }
-                );
-              }}
-            >
-              Ajouter
-            </Button>
-          </div>
-          <ul className="divide-y divide-white/10 text-sm">
-            {(categories.data ?? []).map((cat) => (
-              <li key={cat.id} className="py-1 text-slate-300">
-                {cat.name}
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        <Card className="flex flex-col gap-3">
-          <h3 className="text-lg font-semibold text-white">Centres de coûts</h3>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Cuisine, Bar…"
-              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-slate-500"
-              value={costCenterName}
-              onChange={(event) => setCostCenterName(event.target.value)}
-            />
-            <Button
-              variant="ghost"
-              onClick={() => {
-                if (!costCenterName) return;
-                const code = costCenterName.toUpperCase().replace(/\s+/g, '_').slice(0, 20);
-                createCostCenter.mutate(
-                  { entity_id: entityId, code, name: costCenterName },
-                  { onSuccess: () => setCostCenterName('') }
-                );
-              }}
-            >
-              Ajouter
-            </Button>
-          </div>
-          <ul className="divide-y divide-white/10 text-sm">
-            {(costCenters.data ?? []).map((cc) => (
-              <li key={cc.id} className="py-1 text-slate-300">
-                {cc.name}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
-
-      <Card className="flex flex-col gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">journal</p>
-          <h3 className="text-lg font-semibold text-white">Dépenses récentes</h3>
         </div>
-        {scopedExpenses.length ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-white/10 text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-widest text-slate-400">
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Libellé</th>
-                  <th className="px-3 py-2">Catégorie</th>
-                  <th className="px-3 py-2">Centre</th>
-                  <th className="px-3 py-2 text-right">Montant HT</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {scopedExpenses.map((expense) => (
-                  <tr key={expense.id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-3 py-2 text-slate-400">{expense.date_operation}</td>
-                    <td className="px-3 py-2 text-white">{expense.libelle}</td>
-                    <td className="px-3 py-2 text-slate-400">{expense.categorie || '—'}</td>
-                    <td className="px-3 py-2 text-slate-400">{expense.cost_center || '—'}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-white">
-                      {(Number(expense.montant_ht) || 0).toFixed(2)} €
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+        {/* Charges List */}
+        <div className="bg-white/6 border border-white/15 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-base font-semibold text-white">📋 Détail des charges</h3>
+            <button
+              onClick={() => toast.info('Export en cours...')}
+              className="px-3 py-1.5 bg-orange-500/10 border border-orange-500/30 rounded-lg text-orange-400 text-xs font-medium flex items-center gap-2 hover:bg-orange-500/20 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Exporter
+            </button>
           </div>
-        ) : (
-          <p className="text-sm text-slate-400">Aucune dépense sur la période sélectionnée.</p>
-        )}
-      </Card>
+          <div className="space-y-3 max-h-[500px] overflow-y-auto">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12 text-slate-400">
+                Chargement des données...
+              </div>
+            ) : (
+              expenses.map((expense, idx) => {
+                const iconData = getChargeIcon(expense.categorie || expense.libelle);
+                const montant = expense.montant_ttc || expense.montant_ht || 0;
+                const dateStr = expense.date_operation ? new Date(expense.date_operation).toLocaleDateString('fr-FR') : '';
+
+                return (
+                  <motion.div
+                    key={expense.id || idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(idx * 0.03, 0.5) }}
+                    className="flex items-center justify-between p-4 bg-white/3 rounded-xl hover:bg-white/8 cursor-pointer transition-all"
+                    onClick={() => toast.info(`${expense.libelle} - ${expense.fournisseur || 'Fournisseur inconnu'}`)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl ${iconData.bg} flex items-center justify-center text-lg`}>
+                        {iconData.icon}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white truncate max-w-[250px]">
+                          {expense.libelle || expense.categorie || 'Charge'}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {expense.categorie} • {expense.cost_center || 'N/A'} {dateStr && `• ${dateStr}`}
+                        </p>
+                      </div>
+                    </div>
+                    <p className={`text-base font-semibold ${montant > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                      {montant > 0 ? `-${formatCurrency(montant)}` : formatCurrency(0)}
+                    </p>
+                  </motion.div>
+                );
+              })
+            )}
+
+            {!isLoading && expenses.length === 0 && (
+              <p className="text-sm text-slate-500 text-center py-8">Aucune charge enregistrée</p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

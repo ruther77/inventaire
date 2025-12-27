@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finances - Comptes</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-amber: #f59e0b;
+            --accent-yellow: #fbbf24;
+            --accent-emerald: #10b981;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(245, 158, 11, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-amber), var(--accent-yellow));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .total-card {
+            background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(251,191,36,0.1));
+            border: 1px solid rgba(245,158,11,0.3);
+            border-radius: 20px;
+            padding: 32px;
+            margin-bottom: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .total-label { font-size: 14px; color: var(--text-muted); margin-bottom: 8px; }
+        .total-value {
+            font-family: 'Sora', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--accent-amber);
+        }
+        .total-trend {
+            font-size: 14px;
+            color: var(--accent-emerald);
+            margin-top: 8px;
+        }
+        .accounts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+        }
+        .account-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .account-card:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-4px);
+        }
+        .account-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        .account-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .account-icon.bank { background: rgba(59,130,246,0.2); }
+        .account-icon.cash { background: rgba(16,185,129,0.2); }
+        .account-icon.savings { background: rgba(139,92,246,0.2); }
+        .account-status {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: rgba(16,185,129,0.2);
+            color: var(--accent-emerald);
+        }
+        .account-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .account-number { font-size: 13px; color: var(--text-muted); }
+        .account-balance {
+            font-family: 'Sora', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            margin: 20px 0;
+        }
+        .account-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .detail-item {
+            font-size: 13px;
+        }
+        .detail-label { color: var(--text-muted); }
+        .detail-value { font-weight: 500; margin-top: 2px; }
+        .detail-value.positive { color: var(--accent-emerald); }
+        .detail-value.negative { color: #f43f5e; }
+        .add-account {
+            background: rgba(255,255,255,0.03);
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 48px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .add-account:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: var(--accent-amber);
+        }
+        .add-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+        .add-text { color: var(--text-muted); font-size: 14px; }
+        @media (max-width: 768px) {
+            .total-card { flex-direction: column; text-align: center; }
+            .accounts-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="finances.html">Finances</a>
+            <span>/</span>
+            <span>Comptes</span>
+        </div>
+
+        <h1>💳 Comptes bancaires</h1>
+        <p class="subtitle">Vue consolidée de tous vos comptes</p>
+
+        <div class="total-card">
+            <div>
+                <div class="total-label">Solde total consolidé</div>
+                <div class="total-value">€24,847.50</div>
+                <div class="total-trend">↑ +€2,340 ce mois</div>
+            </div>
+            <div style="text-align: right;">
+                <div class="total-label">Dernière synchronisation</div>
+                <div style="font-size: 14px; margin-top: 8px;">Il y a 2 heures</div>
+                <button style="margin-top: 12px; padding: 8px 16px; background: rgba(245,158,11,0.2); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; color: var(--accent-amber); cursor: pointer;">
+                    🔄 Synchroniser
+                </button>
+            </div>
+        </div>
+
+        <div class="accounts-grid">
+            <div class="account-card" onclick="alert('Détail compte BNP')">
+                <div class="account-header">
+                    <div class="account-icon bank">🏦</div>
+                    <span class="account-status">Actif</span>
+                </div>
+                <div class="account-name">BNP Paribas - Compte Pro</div>
+                <div class="account-number">FR76 •••• •••• •••• 4521</div>
+                <div class="account-balance" style="color: var(--accent-emerald);">€18,420.30</div>
+                <div class="account-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Entrées (30j)</div>
+                        <div class="detail-value positive">+€12,450</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Sorties (30j)</div>
+                        <div class="detail-value negative">-€8,230</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Transactions</div>
+                        <div class="detail-value">156</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Non rapprochées</div>
+                        <div class="detail-value">8</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="account-card" onclick="alert('Détail compte Caisse')">
+                <div class="account-header">
+                    <div class="account-icon cash">💵</div>
+                    <span class="account-status">Actif</span>
+                </div>
+                <div class="account-name">Caisse Restaurant</div>
+                <div class="account-number">Espèces</div>
+                <div class="account-balance" style="color: var(--accent-emerald);">€1,847.20</div>
+                <div class="account-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Entrées (30j)</div>
+                        <div class="detail-value positive">+€4,520</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Sorties (30j)</div>
+                        <div class="detail-value negative">-€3,890</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Transactions</div>
+                        <div class="detail-value">89</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Non rapprochées</div>
+                        <div class="detail-value">3</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="account-card" onclick="alert('Détail compte épargne')">
+                <div class="account-header">
+                    <div class="account-icon savings">💰</div>
+                    <span class="account-status">Actif</span>
+                </div>
+                <div class="account-name">Livret Pro</div>
+                <div class="account-number">FR76 •••• •••• •••• 8742</div>
+                <div class="account-balance" style="color: var(--accent-emerald);">€4,580.00</div>
+                <div class="account-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Entrées (30j)</div>
+                        <div class="detail-value positive">+€500</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Sorties (30j)</div>
+                        <div class="detail-value">€0</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Transactions</div>
+                        <div class="detail-value">2</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Intérêts (an)</div>
+                        <div class="detail-value positive">+€45</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="add-account" onclick="alert('Ajouter un nouveau compte')">
+                <div class="add-icon">+</div>
+                <div class="add-text">Ajouter un compte</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

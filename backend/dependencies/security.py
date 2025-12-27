@@ -1,4 +1,25 @@
-"""Utilitaires JWT/OAuth2 et dépendances réutilisables."""
+"""
+Module de sécurité et authentification JWT/OAuth2.
+
+Ce module fournit toute la logique de sécurité de l'application incluant:
+- Création et validation de tokens JWT (access et refresh)
+- Gestion des cookies httpOnly sécurisés
+- Révocation de tokens avec mémoire en RAM
+- Extraction et validation des utilisateurs authentifiés
+- Contrôle d'accès basé sur les rôles (RBAC)
+- Support multi-secrets pour rotation de clés
+
+Flux d'authentification supportés:
+1. OAuth2 Password Bearer (Authorization header) - Pour clients API
+2. Cookies httpOnly (recommandé) - Pour navigateurs web
+
+Sécurité:
+- Tokens courts (15 min) avec refresh automatique (7 jours)
+- Protection contre les replay attacks via révocation JTI
+- Validation stricte des rôles et claims
+- Secrets configurables via variables d'environnement
+- Protection CSRF via cookies SameSite
+"""
 
 from __future__ import annotations
 
@@ -18,7 +39,9 @@ from core.user_service import ALLOWED_ROLES
 from backend.settings import Settings
 
 
-DEFAULT_SECRET = "change-me-in-prod"
+# Sécurité : Ne jamais utiliser de secret hardcodé en production
+# Le secret par défaut génère un avertissement et est rejeté en production
+DEFAULT_SECRET = "INSECURE-DEFAULT-DO-NOT-USE-IN-PRODUCTION"
 DEFAULT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
@@ -96,8 +119,28 @@ def _get_algorithm() -> str:
 
 
 def create_access_token(claims: dict[str, Any], expires_delta: timedelta | None = None) -> str:
-    """Sérialise les claims fournis dans un JWT signé avec des claims adaptés à la rotation."""
+    """
+    Crée un token d'accès JWT signé.
 
+    Sérialise les claims utilisateur dans un JWT avec expiration courte (15 min).
+    Ajoute automatiquement un JTI unique pour permettre la révocation et
+    marque le type comme 'access'.
+
+    Args:
+        claims: Dictionnaire des claims à inclure (sub, username, role, tenant_id, etc.)
+        expires_delta: Durée d'expiration personnalisée (optionnel)
+
+    Returns:
+        Token JWT signé encodé en string
+
+    Example:
+        >>> token = create_access_token({
+        ...     "sub": "123",
+        ...     "username": "john",
+        ...     "role": "manager",
+        ...     "tenant_id": 1
+        ... })
+    """
     payload = claims.copy()
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -186,15 +229,23 @@ def _decode_token(token: str) -> dict[str, Any]:
 
 
 def _extract_token_from_request(request: Request) -> str | None:
-    """Extrait le token depuis le cookie uniquement (mode HTTP-Only strict).
+    """Extrait le token depuis le cookie HTTP-Only ou l'en-tête Authorization.
 
-    Note : Le repli sur l'en-tête Authorization a été supprimé afin de
-    forcer l'utilisation exclusive des cookies HTTP-Only.
+    Priorité:
+    1. Cookie HTTP-Only (préféré pour les navigateurs)
+    2. En-tête Authorization: Bearer (pour les clients API/curl)
     """
-
-    # Extraction uniquement depuis le cookie HTTP-Only
+    # 1. Essayer le cookie HTTP-Only d'abord
     token = request.cookies.get(COOKIE_NAME_ACCESS)
-    return token if token else None
+    if token:
+        return token
+
+    # 2. Fallback sur l'en-tête Authorization: Bearer
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[7:].strip()
+
+    return None
 
 
 def get_current_user_from_request(request: Request) -> AuthenticatedUser:
@@ -301,7 +352,27 @@ async def require_user(request: Request) -> AuthenticatedUser:
 
 
 def require_roles(*roles: str) -> Callable:
-    """Exige des rôles spécifiques pour accéder à la ressource."""
+    """
+    Factory pour créer une dépendance de vérification de rôles.
+
+    Retourne une fonction de dépendance FastAPI qui vérifie que l'utilisateur
+    authentifié possède l'un des rôles autorisés.
+
+    Args:
+        *roles: Liste des rôles autorisés (ex: "admin", "manager")
+                Si aucun rôle n'est fourni, tous les rôles sont acceptés
+
+    Returns:
+        Fonction de dépendance FastAPI qui valide le rôle
+
+    Raises:
+        HTTPException 403: Si l'utilisateur n'a pas un rôle autorisé
+
+    Example:
+        >>> @router.get("/admin", dependencies=[Depends(require_roles("admin"))])
+        >>> def admin_only():
+        ...     return {"message": "Admin access"}
+    """
     allowed = {role.lower() for role in roles} or set(ALLOWED_ROLES)
 
     async def _checker(request: Request) -> AuthenticatedUser:

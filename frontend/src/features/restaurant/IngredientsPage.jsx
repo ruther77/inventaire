@@ -9,8 +9,9 @@ import Modal, { ConfirmDialog } from '@/components/ui/Modal.jsx';
 import { PullToRefresh } from '@/components/ui/PullToRefresh.jsx';
 import { SwipeableRowProvider } from '@/components/ui/SwipeableRow.jsx';
 import MobileIngredientRow from './components/MobileIngredientRow.jsx';
-import { useRestaurantIngredients, useCreateRestaurantIngredient, useUpdateRestaurantIngredient, useDeleteRestaurantIngredient, useSyncIngredientPrices, usePriceSyncStatus, useRestaurantIngredientPriceHistory } from '@/hooks/useRestaurant.js';
-import { Search, Filter, TrendingUp, TrendingDown, Minus, ChevronRight, Package, AlertTriangle, Link2, Edit3, Trash2, Calendar, DollarSign, Box, Save, X, Edit, Plus, RefreshCw } from 'lucide-react';
+import { AddIngredientModal, IngredientDetailDrawer } from './components';
+import { useRestaurantIngredients, useUpdateRestaurantIngredient, useDeleteRestaurantIngredient, useSyncIngredientPrices, usePriceSyncStatus, useRestaurantIngredientPriceHistory } from '@/hooks/useRestaurant.js';
+import { Search, Filter, TrendingUp, TrendingDown, Minus, ChevronRight, Package, AlertTriangle, Link2, Edit3, Trash2, Calendar, DollarSign, Box, Save, X, Plus, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { TableSkeleton } from '@/components/ui/Skeleton.jsx';
 import QueryErrorState from '@/components/feedback/QueryErrorState.jsx';
 
@@ -40,16 +41,7 @@ export default function IngredientsPage() {
   const [quickStockUpdate, setQuickStockUpdate] = useState(null);
   const [quickStockValue, setQuickStockValue] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    nom: '',
-    unite_base: 'kg',
-    cout_unitaire: '',
-    stock_actuel: '',
-    stock_min: '',
-    categorie: '',
-    fournisseur: '',
-    produit_epicerie_id: null,
-  });
+  const [drawerIngredient, setDrawerIngredient] = useState(null);
 
   // Queries
   const ingredientsQuery = useRestaurantIngredients();
@@ -68,7 +60,6 @@ export default function IngredientsPage() {
   }, [ingredientHistory]);
 
   // Mutations
-  const createMutation = useCreateRestaurantIngredient();
   const updateMutation = useUpdateRestaurantIngredient();
   const deleteMutation = useDeleteRestaurantIngredient();
   const syncPricesMutation = useSyncIngredientPrices();
@@ -148,69 +139,6 @@ export default function IngredientsPage() {
   const handleDeleteWithConfirm = async (ingredient) => {
     if (window.confirm(`Supprimer "${ingredient.nom}" ?`)) {
       await handleDelete(ingredient.id);
-    }
-  };
-
-  const handleOpenCreateModal = () => {
-    setCreateForm({
-      nom: '',
-      unite_base: 'kg',
-      cout_unitaire: '',
-      stock_actuel: '',
-      stock_min: '',
-      categorie: '',
-      fournisseur: '',
-      produit_epicerie_id: null,
-    });
-    setShowCreateModal(true);
-  };
-
-  const handleCloseCreateModal = () => {
-    setShowCreateModal(false);
-    setCreateForm({
-      nom: '',
-      unite_base: 'kg',
-      cout_unitaire: '',
-      stock_actuel: '',
-      stock_min: '',
-      categorie: '',
-      fournisseur: '',
-      produit_epicerie_id: null,
-    });
-  };
-
-  const handleCreateIngredient = async () => {
-    if (!createForm.nom || !createForm.unite_base) {
-      alert('Le nom et l\'unité de base sont obligatoires');
-      return;
-    }
-
-    try {
-      const payload = {
-        nom: createForm.nom,
-        unite_base: createForm.unite_base,
-        cout_unitaire: parseFloat(createForm.cout_unitaire) || 0,
-        stock_actuel: parseFloat(createForm.stock_actuel) || 0,
-      };
-
-      // Only add optional fields if they have values
-      if (createForm.stock_min && createForm.stock_min !== '') {
-        payload.stock_min = parseFloat(createForm.stock_min);
-      }
-      if (createForm.categorie && createForm.categorie !== '') {
-        payload.categorie = createForm.categorie;
-      }
-      if (createForm.fournisseur && createForm.fournisseur !== '') {
-        payload.fournisseur = createForm.fournisseur;
-      }
-      if (createForm.produit_epicerie_id) {
-        payload.produit_epicerie_id = createForm.produit_epicerie_id;
-      }
-
-      await createMutation.mutateAsync(payload);
-      handleCloseCreateModal();
-    } catch (error) {
-      alert(`Erreur: ${error.response?.data?.detail || error.message}`);
     }
   };
 
@@ -403,13 +331,25 @@ export default function IngredientsPage() {
       header: '',
       sortable: false,
       render: (_, row) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleOpenDetail(row)}
-        >
-          <ChevronRight className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDrawerIngredient(row);
+            }}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            title="Aperçu rapide"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-slate-400" />
+          </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleOpenDetail(row)}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
       ),
     },
   ], [handleOpenDetail]);
@@ -447,7 +387,7 @@ export default function IngredientsPage() {
           <div className="flex flex-wrap gap-2">
             <Button
               variant="primary"
-              onClick={handleOpenCreateModal}
+              onClick={() => setShowCreateModal(true)}
               className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -960,167 +900,34 @@ export default function IngredientsPage() {
       </Modal>
 
       {/* Modal Création Ingrédient */}
-      <Modal
+      <AddIngredientModal
         open={showCreateModal}
-        onClose={handleCloseCreateModal}
-        title="Nouvel ingrédient"
-        size="lg"
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-slate-400 uppercase mb-1 font-medium">
-                Nom <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={createForm.nom}
-                onChange={(e) => setCreateForm({ ...createForm, nom: e.target.value })}
-                placeholder="Ex: Tomate"
-                className="w-full px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-white placeholder-slate-500 focus:border-teal-500/50 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                required
-              />
-            </div>
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          ingredientsQuery.refetch();
+          setShowCreateModal(false);
+        }}
+      />
 
-            <div>
-              <label className="block text-xs text-slate-400 uppercase mb-1 font-medium">
-                Unité de base <span className="text-rose-400">*</span>
-              </label>
-              <Select
-                value={createForm.unite_base}
-                onChange={(e) => setCreateForm({ ...createForm, unite_base: e.target.value })}
-                required
-              >
-                <option value="kg">kg</option>
-                <option value="g">g</option>
-                <option value="L">L</option>
-                <option value="ml">ml</option>
-                <option value="pièce">pièce</option>
-                <option value="unité">unité</option>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-slate-400 uppercase mb-1 font-medium">
-                Prix unitaire (€)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={createForm.cout_unitaire}
-                onChange={(e) => setCreateForm({ ...createForm, cout_unitaire: e.target.value })}
-                placeholder="0.00"
-                className="w-full px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-white placeholder-slate-500 focus:border-teal-500/50 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-slate-400 uppercase mb-1 font-medium">
-                Stock initial
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={createForm.stock_actuel}
-                onChange={(e) => setCreateForm({ ...createForm, stock_actuel: e.target.value })}
-                placeholder="0.00"
-                className="w-full px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-white placeholder-slate-500 focus:border-teal-500/50 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs text-slate-400 uppercase mb-1 font-medium">
-                Stock minimum
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={createForm.stock_min}
-                onChange={(e) => setCreateForm({ ...createForm, stock_min: e.target.value })}
-                placeholder="Optionnel"
-                className="w-full px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-white placeholder-slate-500 focus:border-teal-500/50 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-slate-400 uppercase mb-1 font-medium">
-                Catégorie
-              </label>
-              <input
-                type="text"
-                value={createForm.categorie}
-                onChange={(e) => setCreateForm({ ...createForm, categorie: e.target.value })}
-                placeholder="Ex: Légumes"
-                list="categories-list"
-                className="w-full px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-white placeholder-slate-500 focus:border-teal-500/50 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-              />
-              <datalist id="categories-list">
-                {categories.map(cat => (
-                  <option key={cat} value={cat} />
-                ))}
-              </datalist>
-            </div>
-
-            <div>
-              <label className="block text-xs text-slate-400 uppercase mb-1 font-medium">
-                Fournisseur
-              </label>
-              <input
-                type="text"
-                value={createForm.fournisseur}
-                onChange={(e) => setCreateForm({ ...createForm, fournisseur: e.target.value })}
-                placeholder="Ex: Metro"
-                list="suppliers-list"
-                className="w-full px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-white placeholder-slate-500 focus:border-teal-500/50 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-              />
-              <datalist id="suppliers-list">
-                {suppliers.map(sup => (
-                  <option key={sup} value={sup} />
-                ))}
-              </datalist>
-            </div>
-          </div>
-
-          {/* Info box */}
-          <div className="p-4 rounded-xl bg-teal-500/10 border border-teal-500/30">
-            <div className="flex items-start gap-3">
-              <Package className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-slate-300">
-                <p className="font-medium text-white mb-1">Lier à un produit épicerie</p>
-                <p className="text-slate-400">
-                  Après création, vous pourrez lier cet ingrédient à un produit épicerie via la page "Liens Epicerie"
-                  pour synchroniser automatiquement les prix et catégories.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-            <Button
-              variant="ghost"
-              onClick={handleCloseCreateModal}
-              className="text-slate-400 hover:text-white"
-            >
-              <X className="w-4 h-4 mr-2" />
-              Annuler
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleCreateIngredient}
-              loading={createMutation.isPending}
-              className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Créer l'ingrédient
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* Drawer aperçu rapide */}
+      <IngredientDetailDrawer
+        open={!!drawerIngredient}
+        onClose={() => setDrawerIngredient(null)}
+        ingredient={drawerIngredient}
+        onEdit={(ing) => {
+          setDrawerIngredient(null);
+          handleOpenDetail(ing);
+        }}
+        onHistory={(ing) => {
+          console.log('Historique ingrédient:', ing);
+        }}
+        onLinkEpicerie={(ing) => {
+          navigate('/restaurant/liens');
+        }}
+        onViewPlat={(plat) => {
+          console.log('Voir plat:', plat);
+        }}
+      />
       </div>
     </PullToRefresh>
   );

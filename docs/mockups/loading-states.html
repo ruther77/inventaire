@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design System - Loading States</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 40px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .subtitle { color: var(--text-muted); margin-bottom: 40px; }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 40px 0 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+        .example-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .example-header {
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .example-content { padding: 24px; }
+
+        /* Spinner */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: var(--accent-emerald);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .spinner-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 40px;
+        }
+        .spinner-text {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        /* Skeleton */
+        .skeleton {
+            background: linear-gradient(90deg,
+                rgba(255,255,255,0.06) 25%,
+                rgba(255,255,255,0.12) 50%,
+                rgba(255,255,255,0.06) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .skeleton-card {
+            padding: 16px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+        .skeleton-row {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .skeleton-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+        }
+        .skeleton-lines { flex: 1; }
+        .skeleton-line {
+            height: 12px;
+            margin-bottom: 8px;
+        }
+        .skeleton-line:last-child { margin-bottom: 0; width: 60%; }
+
+        /* Progress bar */
+        .progress-container {
+            padding: 20px;
+        }
+        .progress-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-emerald);
+            border-radius: 4px;
+            animation: progress 2s ease-in-out infinite;
+        }
+        @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Pulse dots */
+        .pulse-dots {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            padding: 40px;
+        }
+        .pulse-dot {
+            width: 12px;
+            height: 12px;
+            background: var(--accent-emerald);
+            border-radius: 50%;
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+        .pulse-dot:nth-child(2) { animation-delay: 0.2s; }
+        .pulse-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+
+        /* Table skeleton */
+        .table-skeleton {
+            width: 100%;
+        }
+        .table-skeleton-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 16px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+        .table-skeleton-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 16px;
+            padding: 12px 0;
+        }
+        .table-skeleton-cell {
+            height: 16px;
+        }
+
+        /* Overlay loading */
+        .overlay-demo {
+            position: relative;
+            height: 200px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .overlay-content {
+            padding: 20px;
+            opacity: 0.3;
+        }
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⏳ Loading States</h1>
+        <p class="subtitle">Indicateurs de chargement pour améliorer l'expérience utilisateur</p>
+
+        <div class="section-title">Spinners</div>
+        <div class="examples-grid">
+            <div class="example-card">
+                <div class="example-header">Spinner simple</div>
+                <div class="example-content">
+                    <div class="spinner-center">
+                        <div class="spinner"></div>
+                        <span class="spinner-text">Chargement...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header">Dots animés</div>
+                <div class="example-content">
+                    <div class="pulse-dots">
+                        <div class="pulse-dot"></div>
+                        <div class="pulse-dot"></div>
+                        <div class="pulse-dot"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">Skeleton Loading</div>
+        <div class="examples-grid">
+            <div class="example-card">
+                <div class="example-header">Card skeleton</div>
+                <div class="example-content">
+                    <div class="skeleton-card">
+                        <div class="skeleton-row">
+                            <div class="skeleton skeleton-avatar"></div>
+                            <div class="skeleton-lines">
+                                <div class="skeleton skeleton-line"></div>
+                                <div class="skeleton skeleton-line"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton-row">
+                            <div class="skeleton skeleton-avatar"></div>
+                            <div class="skeleton-lines">
+                                <div class="skeleton skeleton-line"></div>
+                                <div class="skeleton skeleton-line"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header">Table skeleton</div>
+                <div class="example-content">
+                    <div class="table-skeleton">
+                        <div class="table-skeleton-header">
+                            <div class="skeleton" style="height: 12px;"></div>
+                            <div class="skeleton" style="height: 12px;"></div>
+                            <div class="skeleton" style="height: 12px;"></div>
+                            <div class="skeleton" style="height: 12px;"></div>
+                        </div>
+                        <div class="table-skeleton-row">
+                            <div class="skeleton table-skeleton-cell"></div>
+                            <div class="skeleton table-skeleton-cell"></div>
+                            <div class="skeleton table-skeleton-cell"></div>
+                            <div class="skeleton table-skeleton-cell"></div>
+                        </div>
+                        <div class="table-skeleton-row">
+                            <div class="skeleton table-skeleton-cell"></div>
+                            <div class="skeleton table-skeleton-cell"></div>
+                            <div class="skeleton table-skeleton-cell"></div>
+                            <div class="skeleton table-skeleton-cell"></div>
+                        </div>
+                        <div class="table-skeleton-row">
+                            <div class="skeleton table-skeleton-cell"></div>
+                            <div class="skeleton table-skeleton-cell"></div>
+                            <div class="skeleton table-skeleton-cell"></div>
+                            <div class="skeleton table-skeleton-cell"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">Progress</div>
+        <div class="examples-grid">
+            <div class="example-card">
+                <div class="example-header">Barre de progression</div>
+                <div class="example-content">
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span>Import en cours...</span>
+                            <span>67%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header">Overlay de chargement</div>
+                <div class="example-content">
+                    <div class="overlay-demo">
+                        <div class="overlay-content">
+                            <p>Contenu de la carte...</p>
+                            <p>Données...</p>
+                        </div>
+                        <div class="loading-overlay">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

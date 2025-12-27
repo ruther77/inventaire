@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opérations - Gestion Stock</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-teal: #06b6d4;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(16, 185, 129, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .stock-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .summary-item {
+            background: rgba(255,255,255,0.04);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+        .summary-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .summary-label { font-size: 12px; color: var(--text-muted); }
+        .movement-list { display: flex; flex-direction: column; gap: 12px; }
+        .movement-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .movement-item:hover { background: rgba(255,255,255,0.08); }
+        .movement-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .movement-icon.in { background: rgba(16,185,129,0.2); }
+        .movement-icon.out { background: rgba(244,63,94,0.2); }
+        .movement-icon.adjust { background: rgba(245,158,11,0.2); }
+        .movement-content { flex: 1; }
+        .movement-title { font-size: 14px; font-weight: 500; }
+        .movement-meta { font-size: 12px; color: var(--text-muted); }
+        .movement-qty { font-size: 14px; font-weight: 600; }
+        .movement-qty.positive { color: var(--accent-emerald); }
+        .movement-qty.negative { color: var(--accent-rose); }
+        .alert-list { display: flex; flex-direction: column; gap: 12px; }
+        .alert-item {
+            padding: 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .alert-item:hover { transform: translateX(4px); }
+        .alert-item.critical {
+            background: rgba(244,63,94,0.1);
+            border-left: 3px solid var(--accent-rose);
+        }
+        .alert-item.warning {
+            background: rgba(245,158,11,0.1);
+            border-left: 3px solid var(--accent-amber);
+        }
+        .alert-title {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        .alert-desc { font-size: 13px; color: var(--text-muted); }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            background: rgba(255,255,255,0.03);
+            padding: 4px;
+            border-radius: 10px;
+            width: fit-content;
+        }
+        .tab {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            border: none;
+            background: transparent;
+        }
+        .tab:hover { color: var(--text-primary); }
+        .tab.active {
+            background: rgba(16,185,129,0.2);
+            color: var(--accent-emerald);
+            font-weight: 500;
+        }
+        .products-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .products-table th {
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        .products-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 14px;
+        }
+        .products-table tr:hover { background: rgba(255,255,255,0.03); }
+        .stock-level {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stock-bar {
+            width: 60px;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .stock-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+        .stock-bar-fill.low { background: var(--accent-rose); }
+        .stock-bar-fill.medium { background: var(--accent-amber); }
+        .stock-bar-fill.good { background: var(--accent-emerald); }
+        .btn-sm {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+        }
+        .btn-sm:hover { background: rgba(255,255,255,0.1); }
+        @media (max-width: 1024px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .stock-summary { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="operations-pilotage.html">Opérations</a>
+            <span>/</span>
+            <span>Stock</span>
+        </div>
+
+        <h1>Gestion du Stock</h1>
+        <p class="subtitle">Mouvements, alertes et niveaux de stock en temps réel</p>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">
+                    <span>Vue d'ensemble</span>
+                    <button class="btn-sm" onclick="alert('Export du stock')">📥 Exporter</button>
+                </div>
+                <div class="stock-summary">
+                    <div class="summary-item">
+                        <div class="summary-value" style="color: var(--accent-emerald);">€48,240</div>
+                        <div class="summary-label">Valeur totale stock</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value">1,247</div>
+                        <div class="summary-label">Références actives</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" style="color: var(--accent-amber);">7</div>
+                        <div class="summary-label">Alertes stock</div>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active">Tous</button>
+                    <button class="tab">Rupture</button>
+                    <button class="tab">Stock bas</button>
+                    <button class="tab">Surstock</button>
+                </div>
+
+                <table class="products-table">
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th>Stock actuel</th>
+                            <th>Niveau</th>
+                            <th>Rotation</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr onclick="alert('Ouvre le détail du produit Tomates')">
+                            <td><strong>Tomates grappe</strong></td>
+                            <td>2 kg</td>
+                            <td>
+                                <div class="stock-level">
+                                    <div class="stock-bar"><div class="stock-bar-fill low" style="width: 15%;"></div></div>
+                                    <span style="color: var(--accent-rose);">Critique</span>
+                                </div>
+                            </td>
+                            <td>5kg/jour</td>
+                            <td><button class="btn-sm" onclick="event.stopPropagation(); alert('Commander')">Commander</button></td>
+                        </tr>
+                        <tr onclick="alert('Ouvre le détail du produit Farine')">
+                            <td><strong>Farine T55</strong></td>
+                            <td>8 kg</td>
+                            <td>
+                                <div class="stock-level">
+                                    <div class="stock-bar"><div class="stock-bar-fill medium" style="width: 35%;"></div></div>
+                                    <span style="color: var(--accent-amber);">Bas</span>
+                                </div>
+                            </td>
+                            <td>3kg/jour</td>
+                            <td><button class="btn-sm" onclick="event.stopPropagation(); alert('Commander')">Commander</button></td>
+                        </tr>
+                        <tr onclick="alert('Ouvre le détail du produit Huile')">
+                            <td><strong>Huile olive</strong></td>
+                            <td>12 L</td>
+                            <td>
+                                <div class="stock-level">
+                                    <div class="stock-bar"><div class="stock-bar-fill good" style="width: 70%;"></div></div>
+                                    <span style="color: var(--accent-emerald);">OK</span>
+                                </div>
+                            </td>
+                            <td>2L/jour</td>
+                            <td><button class="btn-sm" onclick="event.stopPropagation(); alert('Détails')">Détails</button></td>
+                        </tr>
+                        <tr onclick="alert('Ouvre le détail du produit Poulet')">
+                            <td><strong>Poulet fermier</strong></td>
+                            <td>25 kg</td>
+                            <td>
+                                <div class="stock-level">
+                                    <div class="stock-bar"><div class="stock-bar-fill good" style="width: 85%;"></div></div>
+                                    <span style="color: var(--accent-emerald);">OK</span>
+                                </div>
+                            </td>
+                            <td>4kg/jour</td>
+                            <td><button class="btn-sm" onclick="event.stopPropagation(); alert('Détails')">Détails</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+                <div class="card">
+                    <div class="card-title">Alertes Stock</div>
+                    <div class="alert-list">
+                        <div class="alert-item critical" onclick="alert('Détail alerte Tomates')">
+                            <div class="alert-title">⚠️ Rupture imminente - Tomates</div>
+                            <div class="alert-desc">Stock: 2kg • Besoin: 5kg/jour</div>
+                        </div>
+                        <div class="alert-item critical" onclick="alert('Détail alerte Farine')">
+                            <div class="alert-title">⚠️ Stock critique - Farine</div>
+                            <div class="alert-desc">Stock: 8kg • Seuil min: 15kg</div>
+                        </div>
+                        <div class="alert-item warning" onclick="alert('Détail alerte Oignons')">
+                            <div class="alert-title">📦 Stock bas - Oignons</div>
+                            <div class="alert-desc">Stock: 5kg • Seuil min: 10kg</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Mouvements récents</div>
+                    <div class="movement-list">
+                        <div class="movement-item" onclick="alert('Détail mouvement')">
+                            <div class="movement-icon in">📥</div>
+                            <div class="movement-content">
+                                <div class="movement-title">Réception Metro</div>
+                                <div class="movement-meta">Il y a 2h</div>
+                            </div>
+                            <div class="movement-qty positive">+45 articles</div>
+                        </div>
+                        <div class="movement-item" onclick="alert('Détail mouvement')">
+                            <div class="movement-icon out">📤</div>
+                            <div class="movement-content">
+                                <div class="movement-title">Sortie production</div>
+                                <div class="movement-meta">Il y a 4h</div>
+                            </div>
+                            <div class="movement-qty negative">-12 articles</div>
+                        </div>
+                        <div class="movement-item" onclick="alert('Détail mouvement')">
+                            <div class="movement-icon adjust">🔄</div>
+                            <div class="movement-content">
+                                <div class="movement-title">Ajustement inventaire</div>
+                                <div class="movement-meta">Hier</div>
+                            </div>
+                            <div class="movement-qty">±3 articles</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -484,10 +484,10 @@ class MarginCalculator:
             # Récupérer l'historique des achats
             result = conn.execute(
                 text("""
-                    SELECT hp.prix, hp.quantite, hp.date
-                    FROM historique_prix hp
-                    WHERE hp.product_id = :product_id
-                    ORDER BY hp.date DESC
+                    SELECT hp.prix_achat as prix, hp.quantite, hp.facture_date as date
+                    FROM produits_price_history hp
+                    WHERE hp.produit_id = :product_id
+                    ORDER BY hp.facture_date DESC
                     LIMIT 20
                 """),
                 {"product_id": product_id}

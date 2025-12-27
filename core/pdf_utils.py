@@ -3,6 +3,7 @@ from __future__ import annotations  # Active les annotations différées
 from io import BytesIO  # Flux mémoire pour manipuler les PDF en bytes
 from typing import List  # Typage optionnel (non utilisé mais importé)
 import unicodedata
+import re
 from decimal import Decimal, ROUND_HALF_UP
 
 try:  # Tente d'utiliser pypdf (plus léger) en priorité
@@ -12,9 +13,41 @@ except ImportError:  # pragma: no cover - fallback PyPDF2
 
 from .invoice_extractor import DATE_FACTURE_PATTERN, FINAL_INVOICE_PATTERN  # Regex pour détecter dates/fin de facture
 
+# Patterns de détection de factures par fournisseur
+# METRO: "date facture : DD-MM-YYYY"
+# TAIYAT: "FACTURE N° XXXXXX" avec "Date :DD/MM/YYYY"
+# EUROCIEL: "FA2029XXXX" avec "Date DD/MM/YY"
 
-def split_pdf_into_invoices(pdf_bytes: bytes) -> list[dict[str, object]]:
-    """Découpe un PDF en sous-documents par facture (détectée via Date facture)."""  # Docstring de la fonction
+TAIYAT_INVOICE_PATTERN = re.compile(
+    r"FACTURE\s+N[°o]\s*(?P<invoice_id>\d{5,8})",
+    re.IGNORECASE,
+)
+TAIYAT_DATE_PATTERN = re.compile(
+    r"Date\s*:\s*(?P<facture_date>\d{2}/\d{2}/\d{4})",
+    re.IGNORECASE,
+)
+
+EUROCIEL_INVOICE_PATTERN = re.compile(
+    r"(?P<invoice_id>FA\d{8})",
+    re.IGNORECASE,
+)
+EUROCIEL_DATE_PATTERN = re.compile(
+    r"Date\s*(?P<facture_date>\d{2}/\d{2}/\d{2,4})",
+    re.IGNORECASE,
+)
+
+# Pattern générique pour "NET A PAYER" qui marque souvent la fin d'une facture
+GENERIC_END_PATTERN = re.compile(r"NET\s+[AÀ]\s*PAYER", re.IGNORECASE)
+
+
+def split_pdf_into_invoices(pdf_bytes: bytes, supplier_hint: str | None = None) -> list[dict[str, object]]:
+    """Découpe un PDF en sous-documents par facture.
+
+    Supporte différents fournisseurs via supplier_hint:
+    - metro: détecte "date facture : DD-MM-YYYY"
+    - taiyat: détecte "FACTURE N° XXXXXX" avec "Date :DD/MM/YYYY"
+    - eurociel: détecte "FA2029XXXX" avec "Date DD/MM/YY"
+    """
 
     if not pdf_bytes:  # Si aucun contenu fourni
         return []  # Retourne une liste vide
@@ -23,10 +56,13 @@ def split_pdf_into_invoices(pdf_bytes: bytes) -> list[dict[str, object]]:
     reader = PdfReader(stream)  # Lit le PDF
     documents: list[dict[str, object]] = []  # Liste des factures extraites
 
-    invoice_counter = 0  # Compteur pour nommer les factures
+    invoice_counter = 0  # Compteur pour nommer les factures (pour METRO)
     current_pages: list[int] = []  # Pages en cours d'agrégation
     current_invoice_id: str | None = None  # Identifiant de la facture en cours
     current_facture_date: str | None = None  # Date détectée de la facture
+
+    # Normalise le supplier_hint
+    supplier = (supplier_hint or "").strip().lower()
 
     def _finalize_current() -> None:
         nonlocal current_pages, current_invoice_id, current_facture_date  # Utilise les variables extérieures
@@ -52,26 +88,75 @@ def split_pdf_into_invoices(pdf_bytes: bytes) -> list[dict[str, object]]:
         current_invoice_id = None  # Réinitialise l'ID
         current_facture_date = None  # Réinitialise la date
 
+    def _detect_new_invoice(page_text: str) -> tuple[str | None, str | None]:
+        """Détecte une nouvelle facture selon le fournisseur. Retourne (invoice_id, date)."""
+        nonlocal invoice_counter
+
+        if supplier == "taiyat":
+            # TAIYAT: cherche "FACTURE N° XXXXXX"
+            inv_match = TAIYAT_INVOICE_PATTERN.search(page_text)
+            if inv_match:
+                inv_id = f"TAIYAT-{inv_match.group('invoice_id')}"
+                date_match = TAIYAT_DATE_PATTERN.search(page_text)
+                inv_date = date_match.group("facture_date") if date_match else None
+                return inv_id, inv_date
+            return None, None
+
+        elif supplier == "eurociel":
+            # EUROCIEL: cherche "FA2029XXXX"
+            inv_match = EUROCIEL_INVOICE_PATTERN.search(page_text)
+            if inv_match:
+                inv_id = inv_match.group("invoice_id").upper()
+                date_match = EUROCIEL_DATE_PATTERN.search(page_text)
+                inv_date = date_match.group("facture_date") if date_match else None
+                return inv_id, inv_date
+            return None, None
+
+        else:
+            # METRO ou générique: cherche "date facture : DD-MM-YYYY"
+            date_match = DATE_FACTURE_PATTERN.search(page_text)
+            if date_match:
+                invoice_counter += 1
+                inv_id = f"INV-{invoice_counter:03d}"
+                inv_date = date_match.group("facture_date").strip()
+                return inv_id, inv_date
+            return None, None
+
+    def _is_end_of_invoice(page_text: str) -> bool:
+        """Détecte si la page marque la fin d'une facture."""
+        # METRO: "FIN DE LA FACTURE"
+        if FINAL_INVOICE_PATTERN.search(page_text):
+            return True
+        # Tous: "NET A PAYER" marque souvent la fin
+        if supplier in ("taiyat", "eurociel") and GENERIC_END_PATTERN.search(page_text):
+            return True
+        return False
+
     for page_index, page in enumerate(reader.pages):  # Parcourt toutes les pages
         page_text = page.extract_text() or ""  # Extrait le texte de la page
-        date_match = DATE_FACTURE_PATTERN.search(page_text)  # Cherche une date de facture
-        if date_match:  # Si une date est détectée
-            # nouvelle facture détectée -> finalise la précédente
-            _finalize_current()  # Finalise l'éventuelle facture courante
-            invoice_counter += 1  # Incrémente le compteur
-            current_invoice_id = f"INV-{invoice_counter:03d}"  # Crée un ID formaté
-            current_facture_date = date_match.group("facture_date").strip()  # Stocke la date détectée
-            current_pages = [page_index]  # Démarre la nouvelle facture avec cette page
-        else:  # Aucune date détectée sur la page
-            if not current_pages:  # Si aucune facture en cours
-                invoice_counter += 1  # Incrémente le compteur
-                current_invoice_id = f"INV-{invoice_counter:03d}"  # Crée un nouvel ID
-                current_pages = [page_index]  # Commence une nouvelle facture
-            else:  # Une facture est déjà en cours
-                current_pages.append(page_index)  # Ajoute la page à la facture courante
 
-        if FINAL_INVOICE_PATTERN.search(page_text):  # Si motif de fin de facture détecté
-            _finalize_current()  # Finalise immédiatement la facture en cours
+        # Cherche une nouvelle facture sur cette page
+        new_invoice_id, new_invoice_date = _detect_new_invoice(page_text)
+
+        if new_invoice_id:  # Nouvelle facture détectée
+            # Finalise la facture précédente
+            _finalize_current()
+            # Démarre la nouvelle facture
+            current_invoice_id = new_invoice_id
+            current_facture_date = new_invoice_date
+            current_pages = [page_index]
+        else:  # Aucune nouvelle facture détectée
+            if not current_pages:  # Si aucune facture en cours
+                # Pour les cas où le PDF ne commence pas par un header de facture
+                invoice_counter += 1
+                current_invoice_id = f"INV-{invoice_counter:03d}"
+                current_pages = [page_index]
+            else:  # Ajoute la page à la facture courante
+                current_pages.append(page_index)
+
+        # Vérifie si c'est la fin de la facture
+        if _is_end_of_invoice(page_text):
+            _finalize_current()
 
     _finalize_current()  # Finalise la dernière facture après la boucle
     return documents  # Retourne la liste des factures extraites

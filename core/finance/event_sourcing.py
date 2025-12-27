@@ -71,6 +71,14 @@ class EventType(str, Enum):
     # Rapprochement
     RECONCILIATION_MATCHED = "reconciliation.matched"
     RECONCILIATION_FAILED = "reconciliation.failed"
+    RECONCILIATION_COMPLETED = "reconciliation.completed"
+
+    # Corrections de stock
+    STOCK_CORRECTION = "stock.correction"
+
+    # Imports de documents
+    INVOICE_IMPORTED_FULL = "invoice.imported_full"
+    BANK_STATEMENT_IMPORTED = "bank_statement.imported"
 
 
 @dataclass
@@ -428,7 +436,12 @@ def emit_price_updated(
 ) -> Event:
     """Émet un événement de mise à jour de prix."""
     dispatcher = EventDispatcher(tenant_id, user_id)
-    variation_pct = ((new_price - old_price) / old_price * 100) if old_price > 0 else 0
+    # Protection contre division par zéro
+    if old_price != 0:
+        variation_pct = ((new_price - old_price) / old_price * 100)
+    else:
+        # Si old_price est 0, considérer comme variation infinie si new_price > 0
+        variation_pct = 100.0 if new_price > 0 else 0.0
 
     return dispatcher.emit(
         EventType.PRICE_UPDATED,
@@ -537,3 +550,82 @@ def get_recent_events(
                 "payload": row.payload if isinstance(row.payload, dict) else json.loads(row.payload),
             })
         return events
+
+
+# Fonctions utilitaires pour les nouveaux événements
+def emit_stock_correction(
+    tenant_id: int,
+    product_id: int,
+    old_quantity: float,
+    new_quantity: float,
+    reason: str,
+    user_id: Optional[int] = None
+) -> Event:
+    """Émet un événement de correction de stock."""
+    dispatcher = EventDispatcher(tenant_id, user_id)
+    delta = new_quantity - old_quantity
+
+    return dispatcher.emit(
+        EventType.STOCK_CORRECTION,
+        "product",
+        str(product_id),
+        {
+            "old_quantity": old_quantity,
+            "new_quantity": new_quantity,
+            "delta": delta,
+            "reason": reason,
+        }
+    )
+
+
+def emit_bank_statement_imported(
+    tenant_id: int,
+    statement_id: str,
+    bank_name: str,
+    transactions_count: int,
+    date_start: str,
+    date_end: str,
+    total_credits: float,
+    total_debits: float,
+    user_id: Optional[int] = None
+) -> Event:
+    """Émet un événement d'import de relevé bancaire."""
+    dispatcher = EventDispatcher(tenant_id, user_id)
+    return dispatcher.emit(
+        EventType.BANK_STATEMENT_IMPORTED,
+        "bank_statement",
+        statement_id,
+        {
+            "bank_name": bank_name,
+            "transactions_count": transactions_count,
+            "date_start": date_start,
+            "date_end": date_end,
+            "total_credits": total_credits,
+            "total_debits": total_debits,
+        }
+    )
+
+
+def emit_reconciliation_completed(
+    tenant_id: int,
+    run_id: int,
+    matches_created: int,
+    auto_matches: int,
+    statements_scanned: int,
+    documents_available: int,
+    user_id: Optional[int] = None
+) -> Event:
+    """Émet un événement de rapprochement complété."""
+    dispatcher = EventDispatcher(tenant_id, user_id)
+    return dispatcher.emit(
+        EventType.RECONCILIATION_COMPLETED,
+        "reconciliation",
+        str(run_id),
+        {
+            "matches_created": matches_created,
+            "auto_matches": auto_matches,
+            "statements_scanned": statements_scanned,
+            "documents_available": documents_available,
+            "success_rate": round((matches_created / statements_scanned * 100) if statements_scanned > 0 else 0, 2),
+        }
+    )

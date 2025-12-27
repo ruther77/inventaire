@@ -19,6 +19,8 @@ import {
   RefreshCw,
   Download,
   Eye,
+  Plus,
+  Pencil,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useSuppliersPaginated } from '@/hooks/useSupplierScoring.js';
@@ -26,6 +28,7 @@ import Card, { CardHeader, CardContent } from '@/components/ui/Card.jsx';
 import Button from '@/components/ui/Button.jsx';
 import Badge from '@/components/ui/Badge.jsx';
 import { Skeleton } from '@/components/ui/Skeleton.jsx';
+import { SupplierModal, AddSupplierModal } from '@/components/modals/index.js';
 
 // ============================================================================
 // GRADE CONFIG
@@ -258,6 +261,14 @@ function Pagination({ page, totalPages, totalCount, perPage, onPageChange }) {
 export default function SuppliersListPage() {
   const navigate = useNavigate();
 
+  // Modal state for supplier preview
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [supplierModalOpen, setSupplierModalOpen] = useState(false);
+
+  // Modal state for add/edit supplier
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState(null);
+
   // Filters state
   const [filters, setFilters] = useState({
     page: 1,
@@ -279,13 +290,35 @@ export default function SuppliersListPage() {
     sortOrder: filters.sortOrder,
   });
 
-  const data = suppliersQuery.data?.data || suppliersQuery.data || {};
+  // L'intercepteur axios désenveloppe déjà la réponse, donc data contient directement { suppliers, total_count, ... }
+  const data = suppliersQuery.data || {};
   const suppliers = data.suppliers || [];
-  const totalCount = data.total_count || data.total || 0;
+  const totalCount = data.total_count || 0;
   const totalPages = data.total_pages || Math.ceil(totalCount / filters.perPage) || 1;
 
   const handleSupplierClick = (supplier) => {
-    const id = supplier.supplier_id ?? supplier.id;
+    // Ouvrir la modal de prévisualisation
+    setSelectedSupplier({
+      id: supplier.supplier_id ?? supplier.id,
+      name: supplier.supplier_name,
+      type: 'Fournisseur',
+      score: Math.round(supplier.score || 0),
+      contactName: supplier.contact_name,
+      phone: supplier.phone,
+      email: supplier.email,
+      address: supplier.address,
+      paymentTerms: supplier.payment_terms || '30 jours',
+      totalPurchases: supplier.total_purchases,
+      orderCount: supplier.order_count,
+      deliveryDelay: supplier.avg_delivery_days,
+      partnerSince: supplier.partner_since,
+      products: supplier.products || [],
+    });
+    setSupplierModalOpen(true);
+  };
+
+  const handleViewDetails = (supplier) => {
+    const id = supplier.id;
     if (id) {
       navigate(`/intelligence/scoring/suppliers/${id}`);
     }
@@ -356,6 +389,18 @@ export default function SuppliersListPage() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/intelligence/scoring')}>
             Retour à l'overview
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setEditingSupplier(null);
+              setAddModalOpen(true);
+            }}
+            className="bg-cyan-500 hover:bg-cyan-600"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Ajouter
           </Button>
         </div>
       </div>
@@ -435,6 +480,32 @@ export default function SuppliersListPage() {
           </>
         )}
       </Card>
+
+      {/* Supplier Preview Modal */}
+      <SupplierModal
+        open={supplierModalOpen}
+        onClose={() => setSupplierModalOpen(false)}
+        supplier={selectedSupplier}
+        onContact={(s) => {
+          window.location.href = `mailto:${s.email || ''}`;
+        }}
+        onNewOrder={(s) => {
+          handleViewDetails(s);
+        }}
+      />
+
+      {/* Add/Edit Supplier Modal */}
+      <AddSupplierModal
+        open={addModalOpen}
+        onClose={() => {
+          setAddModalOpen(false);
+          setEditingSupplier(null);
+        }}
+        onSuccess={() => {
+          suppliersQuery.refetch();
+        }}
+        supplier={editingSupplier}
+      />
     </div>
   );
 }

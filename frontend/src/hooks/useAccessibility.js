@@ -1,19 +1,36 @@
 /**
- * useAccessibility - Hooks d'accessibilité avancés.
+ * Module de hooks pour l'accessibilité avancée (a11y).
+ *
+ * Fournit des utilitaires pour rendre l'application accessible aux utilisateurs
+ * en situation de handicap : gestion du focus, navigation clavier, lecteurs d'écran,
+ * détection des préférences système (mouvement réduit, contraste élevé).
+ *
+ * @module hooks/useAccessibility
  *
  * Fonctionnalités:
  * - Focus trap pour modales/dialogs
  * - Focus restoration
- * - Keyboard navigation
- * - Screen reader announcements
+ * - Keyboard navigation (roving tabindex)
+ * - Screen reader announcements (live regions)
  * - Reduced motion detection
+ * - High contrast detection
+ * - Skip links
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 /**
- * Hook pour détecter la préférence de mouvement réduit.
- * Utilisé pour désactiver les animations si nécessaire.
+ * Hook pour détecter la préférence système de mouvement réduit.
+ *
+ * Écoute la media query (prefers-reduced-motion: reduce) et retourne true
+ * si l'utilisateur a activé cette option dans son système d'exploitation.
+ * Permet de désactiver ou réduire les animations pour plus de confort.
+ *
+ * @returns {boolean} True si mouvement réduit préféré
+ *
+ * @example
+ * const prefersReducedMotion = useReducedMotion();
+ * const animationDuration = prefersReducedMotion ? 0 : 300;
  */
 export function useReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(
@@ -33,7 +50,26 @@ export function useReducedMotion() {
 }
 
 /**
- * Hook pour trap le focus dans un conteneur (modales, dialogs).
+ * Hook pour piéger le focus dans un conteneur (focus trap).
+ *
+ * Empêche le focus de sortir d'une zone définie (modale, dialog, menu)
+ * en bouclant automatiquement entre le premier et le dernier élément focusable.
+ * Restaure automatiquement le focus précédent à la désactivation.
+ *
+ * Essentiel pour l'accessibilité des modales conformes aux standards WCAG.
+ *
+ * @param {boolean} [isActive=true] - Activer ou désactiver le trap
+ *
+ * @returns {RefObject} Ref à attacher au conteneur
+ *
+ * @example
+ * const trapRef = useFocusTrap(isModalOpen);
+ * return (
+ *   <div ref={trapRef} role="dialog">
+ *     <button>Premier élément</button>
+ *     <button>Dernier élément</button>
+ *   </div>
+ * );
  */
 export function useFocusTrap(isActive = true) {
   const containerRef = useRef(null);
@@ -109,7 +145,20 @@ export function useFocusTrap(isActive = true) {
 }
 
 /**
- * Hook pour gérer les annonces aux lecteurs d'écran.
+ * Hook pour créer des annonces aux lecteurs d'écran (screen readers).
+ *
+ * Crée une région ARIA live invisible qui annonce des messages aux utilisateurs
+ * de lecteurs d'écran sans interrompre leur navigation.
+ * Supporte deux niveaux de priorité : polite (par défaut) et assertive.
+ *
+ * @returns {Object} Fonctions d'annonce
+ * @property {Function} announce - Annonce un message (priorité polite)
+ * @property {Function} announceAssertive - Annonce urgente (priorité assertive)
+ *
+ * @example
+ * const { announce, announceAssertive } = useAnnounce();
+ * announce('Produit ajouté au panier');
+ * announceAssertive('Erreur critique détectée');
  */
 export function useAnnounce() {
   const announceRef = useRef(null);

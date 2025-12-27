@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paramètres - Règles Métier</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(100, 116, 139, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .rules-section {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .section-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+        .rule-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            margin-bottom: 12px;
+        }
+        .rule-info { flex: 1; }
+        .rule-name { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+        .rule-desc { font-size: 13px; color: var(--text-muted); }
+        .rule-value {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .input-field {
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            width: 100px;
+            text-align: center;
+        }
+        .toggle {
+            width: 48px;
+            height: 26px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .toggle.active { background: var(--accent-emerald); }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: all 0.2s;
+        }
+        .toggle.active::after { left: 25px; }
+        .btn-save {
+            padding: 12px 24px;
+            background: var(--accent-emerald);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <span>Paramètres</span>
+            <span>/</span>
+            <span>Règles Métier</span>
+        </div>
+
+        <h1>⚙️ Règles Métier</h1>
+        <p class="subtitle">Configuration des seuils et règles de gestion de l'application</p>
+
+        <div class="rules-section">
+            <div class="section-title">📦 Gestion du stock</div>
+            <div class="rule-item">
+                <div class="rule-info">
+                    <div class="rule-name">Seuil alerte stock bas</div>
+                    <div class="rule-desc">Pourcentage du stock max pour déclencher une alerte</div>
+                </div>
+                <div class="rule-value">
+                    <input type="number" class="input-field" value="20">
+                    <span>%</span>
+                </div>
+            </div>
+            <div class="rule-item">
+                <div class="rule-info">
+                    <div class="rule-name">Seuil stock critique</div>
+                    <div class="rule-desc">Jours de stock avant rupture pour alerte critique</div>
+                </div>
+                <div class="rule-value">
+                    <input type="number" class="input-field" value="3">
+                    <span>jours</span>
+                </div>
+            </div>
+            <div class="rule-item">
+                <div class="rule-info">
+                    <div class="rule-name">Auto-commande activée</div>
+                    <div class="rule-desc">Générer automatiquement des commandes si stock critique</div>
+                </div>
+                <div class="rule-value">
+                    <div class="toggle" onclick="this.classList.toggle('active')"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="rules-section">
+            <div class="section-title">🍴 Restaurant</div>
+            <div class="rule-item">
+                <div class="rule-info">
+                    <div class="rule-name">Objectif Food Cost</div>
+                    <div class="rule-desc">Pourcentage cible du coût matière</div>
+                </div>
+                <div class="rule-value">
+                    <input type="number" class="input-field" value="30">
+                    <span>%</span>
+                </div>
+            </div>
+            <div class="rule-item">
+                <div class="rule-info">
+                    <div class="rule-name">Alerte Food Cost élevé</div>
+                    <div class="rule-desc">Seuil pour badge rouge sur les plats</div>
+                </div>
+                <div class="rule-value">
+                    <input type="number" class="input-field" value="40">
+                    <span>%</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="rules-section">
+            <div class="section-title">💰 Finances</div>
+            <div class="rule-item">
+                <div class="rule-info">
+                    <div class="rule-name">Variation prix anormale</div>
+                    <div class="rule-desc">Écart % pour déclencher une alerte anomalie prix</div>
+                </div>
+                <div class="rule-value">
+                    <input type="number" class="input-field" value="20">
+                    <span>%</span>
+                </div>
+            </div>
+            <div class="rule-item">
+                <div class="rule-info">
+                    <div class="rule-name">Délai rapprochement</div>
+                    <div class="rule-desc">Jours avant alerte facture non rapprochée</div>
+                </div>
+                <div class="rule-value">
+                    <input type="number" class="input-field" value="7">
+                    <span>jours</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-save" onclick="alert('Paramètres sauvegardés')">Enregistrer les modifications</button>
+    </div>
+</body>
+</html>

@@ -1,3 +1,28 @@
+/**
+ * Page Rapprochement Bancaire.
+ *
+ * Cette page permet de rapprocher automatiquement et manuellement les transactions bancaires avec les factures.
+ * Elle affiche:
+ * - Les KPIs de rapprochement (à rapprocher, factures non associées, taux de rapprochement)
+ * - Des suggestions IA de rapprochement automatique avec niveau de confiance
+ * - Deux modes d'affichage: split (côte à côte) ou liste (onglets)
+ * - Les transactions et factures non rapprochées
+ * - Un système de rapprochement manuel avec modal de confirmation
+ *
+ * Fonctionnalités principales:
+ * - Rapprochement automatique basé sur l'IA (montant, date, fournisseur)
+ * - Rapprochement manuel avec sélection de transaction et facture
+ * - Filtrage par période et montant minimum
+ * - Vue split pour rapprochement facilité
+ * - Calcul automatique des différences entre montants
+ * - Badges de statut pour chaque transaction/facture
+ *
+ * @component
+ *
+ * @example
+ * <BankReconciliationPage />
+ */
+
 import React, { useState, useMemo } from 'react';
 import { Link2, AlertTriangle, CheckCircle, Clock, RefreshCw, Filter, LayoutGrid, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -83,6 +108,8 @@ export default function BankReconciliationPage() {
 
   const unmatchedTransactions = transactions.data || [];
   const unmatchedInvoices = invoices.data || [];
+  // Génération des suggestions de rapprochement basées sur l'IA
+  // Compare les transactions et factures non rapprochées pour proposer des associations
   const suggestions = useMemo(() => {
     if (!unmatchedTransactions.length || !unmatchedInvoices.length) return [];
     return unmatchedTransactions.slice(0, 3).map((tx, idx) => {
@@ -287,31 +314,32 @@ export default function BankReconciliationPage() {
         animate="visible"
       >
         <Stat
-          label="Transactions"
-          value={summary.data?.total_transactions || 0}
-          hint="Total période"
-          icon={Activity}
+          label="À rapprocher"
+          value={unmatchedTransactions.length}
+          hint="Transactions bancaires"
+          icon={Clock}
+          accent="text-amber-400"
+        />
+        <Stat
+          label="Factures"
+          value={unmatchedInvoices.length}
+          hint="Non associées"
+          icon={AlertTriangle}
+          accent="text-rose-400"
         />
         <Stat
           label="Rapprochées"
           value={summary.data?.matched_count || 0}
-          hint={`${summary.data?.match_rate ? (summary.data.match_rate * 100).toFixed(0) : 0}%`}
+          hint="Ce mois"
           icon={CheckCircle}
-          accent="text-emerald-600"
+          accent="text-emerald-400"
         />
         <Stat
-          label="En attente"
-          value={unmatchedTransactions.length}
-          hint="À rapprocher"
-          icon={Clock}
-          accent="text-amber-600"
-        />
-        <Stat
-          label="Écart total"
-          value={`${(summary.data?.total_unmatched_amount || 0).toFixed(2)} €`}
-          hint="Non rapproché"
-          icon={AlertTriangle}
-          accent="text-rose-600"
+          label="Taux"
+          value={`${summary.data?.match_rate ? (summary.data.match_rate * 100).toFixed(0) : 0}%`}
+          hint="Rapprochement"
+          icon={Activity}
+          accent="text-white"
         />
       </motion.div>
 

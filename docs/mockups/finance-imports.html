@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finances - Imports</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+            --accent-blue: #3b82f6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(245, 158, 11, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-amber), #fbbf24);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .upload-zone {
+            background: rgba(255,255,255,0.03);
+            border: 2px dashed var(--border);
+            border-radius: 20px;
+            padding: 64px;
+            text-align: center;
+            margin-bottom: 32px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .upload-zone:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: var(--accent-amber);
+        }
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .upload-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .upload-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+        .upload-formats {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+        .format-badge {
+            padding: 4px 12px;
+            background: rgba(59,130,246,0.2);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--accent-blue);
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .imports-list {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 32px;
+        }
+        .import-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .import-item:hover { background: rgba(255,255,255,0.03); }
+        .import-item:last-child { border-bottom: none; }
+        .import-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .import-icon.csv { background: rgba(16,185,129,0.2); }
+        .import-icon.pdf { background: rgba(244,63,94,0.2); }
+        .import-icon.ofx { background: rgba(59,130,246,0.2); }
+        .import-content { flex: 1; }
+        .import-name { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+        .import-meta { font-size: 12px; color: var(--text-muted); }
+        .import-status {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-success { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .status-pending { background: rgba(245,158,11,0.2); color: var(--accent-amber); }
+        .status-error { background: rgba(244,63,94,0.2); color: var(--accent-rose); }
+        .import-stats { text-align: right; }
+        .import-count { font-size: 14px; font-weight: 600; }
+        .import-detail { font-size: 12px; color: var(--text-muted); }
+        .quick-imports {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .quick-import-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .quick-import-card:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-2px);
+        }
+        .quick-icon { font-size: 24px; margin-bottom: 12px; }
+        .quick-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .quick-desc { font-size: 13px; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="finances.html">Finances</a>
+            <span>/</span>
+            <span>Imports</span>
+        </div>
+
+        <h1>📥 Imports financiers</h1>
+        <p class="subtitle">Importez vos relevés bancaires, factures et données comptables</p>
+
+        <div class="upload-zone" onclick="alert('Ouvre le sélecteur de fichier')">
+            <div class="upload-icon">📄</div>
+            <div class="upload-title">Déposez vos fichiers ici</div>
+            <div class="upload-desc">ou cliquez pour sélectionner</div>
+            <div class="upload-formats">
+                <span class="format-badge">CSV</span>
+                <span class="format-badge">OFX</span>
+                <span class="format-badge">QIF</span>
+                <span class="format-badge">PDF</span>
+                <span class="format-badge">Excel</span>
+            </div>
+        </div>
+
+        <div class="section-title">⚡ Imports rapides</div>
+        <div class="quick-imports" style="margin-bottom: 32px;">
+            <div class="quick-import-card" onclick="alert('Import relevé BNP')">
+                <div class="quick-icon">🏦</div>
+                <div class="quick-title">Relevé BNP Paribas</div>
+                <div class="quick-desc">Import automatique via connexion bancaire</div>
+            </div>
+            <div class="quick-import-card" onclick="alert('Import factures fournisseurs')">
+                <div class="quick-icon">📄</div>
+                <div class="quick-title">Factures fournisseurs</div>
+                <div class="quick-desc">OCR automatique des PDF</div>
+            </div>
+            <div class="quick-import-card" onclick="alert('Import ticket Z')">
+                <div class="quick-icon">🧾</div>
+                <div class="quick-title">Tickets Z (caisse)</div>
+                <div class="quick-desc">Depuis votre logiciel de caisse</div>
+            </div>
+        </div>
+
+        <div class="section-title">📋 Historique des imports</div>
+        <div class="imports-list">
+            <div class="import-item" onclick="alert('Détail import #1')">
+                <div class="import-icon csv">📊</div>
+                <div class="import-content">
+                    <div class="import-name">Relevé BNP - Décembre 2025.csv</div>
+                    <div class="import-meta">Importé il y a 2 heures par admin</div>
+                </div>
+                <span class="import-status status-success">✓ Terminé</span>
+                <div class="import-stats">
+                    <div class="import-count">156 lignes</div>
+                    <div class="import-detail">152 traitées, 4 doublons</div>
+                </div>
+            </div>
+            <div class="import-item" onclick="alert('Détail import #2')">
+                <div class="import-icon pdf">📄</div>
+                <div class="import-content">
+                    <div class="import-name">Facture_Metro_1820.pdf</div>
+                    <div class="import-meta">Importé hier par admin</div>
+                </div>
+                <span class="import-status status-success">✓ Terminé</span>
+                <div class="import-stats">
+                    <div class="import-count">1 facture</div>
+                    <div class="import-detail">€847.50</div>
+                </div>
+            </div>
+            <div class="import-item" onclick="alert('Détail import #3')">
+                <div class="import-icon ofx">🏦</div>
+                <div class="import-content">
+                    <div class="import-name">Export_Caisse_Nov2025.ofx</div>
+                    <div class="import-meta">Importé le 01/12/2025</div>
+                </div>
+                <span class="import-status status-pending">⏳ En cours</span>
+                <div class="import-stats">
+                    <div class="import-count">89 lignes</div>
+                    <div class="import-detail">45 traitées...</div>
+                </div>
+            </div>
+            <div class="import-item" onclick="alert('Détail import #4 - erreur')">
+                <div class="import-icon csv">📊</div>
+                <div class="import-content">
+                    <div class="import-name">transactions_export.csv</div>
+                    <div class="import-meta">Importé le 28/11/2025</div>
+                </div>
+                <span class="import-status status-error">✕ Erreur</span>
+                <div class="import-stats">
+                    <div class="import-count">Format invalide</div>
+                    <div class="import-detail">Voir les détails</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

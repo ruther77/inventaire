@@ -1,15 +1,88 @@
 #!/usr/bin/env python3
 """
-Backfill product prices from EUROCIEL and TAIYAT invoice PDFs.
+Module de mise à jour des prix d'achat depuis les factures EUROCIEL et TAIYAT.
 
-This script:
-1. Reads PDFs from EUROCIEL/ and TAIYAT/ folders
-2. Parses each invoice to extract product lines
-3. Matches products by name using fuzzy matching
-4. Updates produits.prix_achat for matched products
+Ce script permet de:
+- Scanner les répertoires EUROCIEL/ et TAIYAT/ pour trouver les PDFs
+- Parser les factures et tarifs avec des parsers spécialisés par fournisseur
+- Extraire les lignes de produits avec leurs prix
+- Matcher les produits via fuzzy matching multi-passes intelligent
+- Mettre à jour les prix d'achat dans produits.prix_achat
+- Créer un historique des prix dans produits_price_history
+- Supporter le filtrage par fournisseur
+- Mode dry-run pour simulation
+
+Les parsers sont adaptés aux formats spécifiques de chaque fournisseur:
+- EUROCIEL: Format structuré avec code + nom + prix
+- TAIYAT: Format tarif avec variantes complexes (origine, conditionnement)
 
 Usage:
-    python scripts/backfill_eurociel_taiyat_prices.py [--dry-run] [--supplier EUROCIEL|TAIYAT]
+    # Traiter les deux fournisseurs
+    python scripts/backfill_eurociel_taiyat_prices.py
+
+    # Uniquement EUROCIEL
+    python scripts/backfill_eurociel_taiyat_prices.py --supplier EUROCIEL
+
+    # Uniquement TAIYAT
+    python scripts/backfill_eurociel_taiyat_prices.py --supplier TAIYAT
+
+    # Mode dry-run pour tester
+    python scripts/backfill_eurociel_taiyat_prices.py --dry-run
+
+    # Ajuster le seuil de similarité
+    python scripts/backfill_eurociel_taiyat_prices.py --min-similarity 0.6
+
+Arguments CLI:
+    --dry-run          : Mode simulation sans modification
+    --supplier NAME    : Fournisseur (EUROCIEL, TAIYAT, ou all) - défaut: all
+    --tenant ID        : ID du tenant (défaut: 1)
+    --min-similarity F : Seuil de similarité fuzzy (défaut: 0.5)
+
+Prérequis:
+    - Répertoires EUROCIEL/ et TAIYAT/ à la racine du projet
+    - PDFs de factures et tarifs dans ces répertoires
+    - pypdf ou PyPDF2 pour extraction
+    - Modules core.parsers et core.inventory_service
+
+Fichiers d'entrée:
+    - EUROCIEL/*.pdf : Factures Eurociel (sauf catalogue)
+    - TAIYAT/*.pdf : Factures et tarifs Taiyat
+
+Algorithme de matching multi-passes:
+    1. Normalisation complète (suppression origine, marque, détails)
+    2. Si échec: Extraction du nom "core" (premier mot significatif)
+    3. Si échec: Fallback sur nom original
+    4. Fuzzy matching avec seuil ajustable (50% par défaut)
+
+Normalisation:
+    - Suppression: SENEGAL, VIETNAM, MAROC, PORTUGAL, etc.
+    - Suppression: G&V, ENTIER, FILET, IKAGEL, RING, PROMO
+    - Standardisation: "10 KG" -> "10KG"
+    - Nettoyage: accents, espaces multiples
+
+Exemple de sortie:
+    PROCESSING EUROCIEL
+    Found 15 EUROCIEL PDFs
+    Processing: facture_2024_01_15.pdf
+      Updated BARRACUDA 700/1000: 45.00 -> 47.50
+      Updated CREVETTES 40/60: 22.00 -> 23.20
+
+    PROCESSING TAIYAT
+    Found 8 TAIYAT PDFs
+    Processing: tarif_2024.pdf
+      Updated BANKU MIX 24X1KG: 80.00 -> 82.50
+
+    BACKFILL SUMMARY
+    Files processed: 23
+    Lines parsed: 850
+    Lines matched: 720 (84.7%)
+    Prices updated: 145
+
+Notes:
+    - Le catalogue Eurociel est automatiquement exclu (trop volumineux)
+    - Les prix sont mis à jour seulement si différence > 0.01€
+    - L'historique permet de tracker l'évolution des prix
+    - Les erreurs de parsing sont loggées mais ne bloquent pas le traitement
 """
 
 import argparse

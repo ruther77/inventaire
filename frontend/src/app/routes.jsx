@@ -40,8 +40,11 @@ const IntelligenceUnifiedPage = lazy(() => import('@/features/intelligence/Intel
 // Operations (pages individuelles)
 const CatalogPage = lazy(() => import('@/features/catalog/CatalogPage.jsx'));
 const ImportPage = lazy(() => import('@/features/invoices/ImportPage.jsx'));
+const InvoicesListPage = lazy(() => import('@/features/invoices/InvoicesListPage.jsx'));
 const PricesPage = lazy(() => import('@/features/prices/PricesPage.jsx'));
+const StockPage = lazy(() => import('@/features/stock/StockPage.jsx'));
 const StockMovementsPage = lazy(() => import('@/features/stock/StockMovementsPage.jsx'));
+const SupplyPage = lazy(() => import('@/features/supply/SupplyPage.jsx'));
 
 // Inventory
 const ProductDetailPage = lazy(() => import('@/features/inventory/ProductDetailPage.jsx'));
@@ -54,7 +57,7 @@ const ForecastsPage = lazy(() => import('@/features/restaurant/ForecastsPage.jsx
 const PlatsCatalogPage = lazy(() => import('@/features/restaurant/PlatsCatalogPage.jsx'));
 const IngredientsPage = lazy(() => import('@/features/restaurant/IngredientsPage.jsx'));
 const FoodCostAnalysisPage = lazy(() => import('@/features/restaurant/FoodCostAnalysisPage.jsx'));
-const IngredientEpicerieLinkPage = lazy(() => import('@/features/restaurant/IngredientEpicerieLinkPage.jsx'));
+const LiensEpiceriePage = lazy(() => import('@/features/restaurant/LiensEpiceriePage.jsx'));
 
 // Finances (pages individuelles)
 const PortfolioPage = lazy(() => import('@/features/portfolio/PortfolioPage.jsx'));
@@ -65,6 +68,7 @@ const FinanceImportsPage = lazy(() => import('@/features/finance/FinanceImportsP
 const FinanceRulesPage = lazy(() => import('@/features/finance/FinanceRulesPage.jsx'));
 const FinanceAnomaliesPage = lazy(() => import('@/features/finance/FinanceAnomaliesPage.jsx'));
 const BankReconciliationPage = lazy(() => import('@/features/finance/BankReconciliationPage.jsx'));
+const FinanceSupplierPortfolioPage = lazy(() => import('@/features/finance/FinanceSupplierPortfolioPage.jsx'));
 
 // Intelligence (pages individuelles)
 const SupplierScoringOverviewPage = lazy(() => import('@/features/intelligence/SupplierScoringOverviewPage.jsx'));
@@ -144,6 +148,14 @@ export const operationsRoutes = [
   {
     path: '/operations/factures',
     label: 'Factures',
+    description: 'Liste des factures',
+    icon: FileText,
+    element: <LazyPage><InvoicesListPage /></LazyPage>,
+    hidden: true,
+  },
+  {
+    path: '/operations/factures/import',
+    label: 'Import Facture',
     description: 'Import → Stock',
     icon: FileText,
     element: <LazyPage><ImportPage /></LazyPage>,
@@ -159,6 +171,14 @@ export const operationsRoutes = [
   },
   {
     path: '/operations/stock',
+    label: 'Stock',
+    description: 'Gestion du stock',
+    icon: Activity,
+    element: <LazyPage><StockPage /></LazyPage>,
+    hidden: true,
+  },
+  {
+    path: '/operations/stock/mouvements',
     label: 'Mouvements',
     description: 'Entrées / Sorties',
     icon: Activity,
@@ -171,6 +191,14 @@ export const operationsRoutes = [
     description: 'Historique fournisseurs',
     icon: TrendingUp,
     element: <LazyPage><PricesPage /></LazyPage>,
+    hidden: true,
+  },
+  {
+    path: '/operations/approvisionnement',
+    label: 'Approvisionnement',
+    description: 'Plan de commandes',
+    icon: Package,
+    element: <LazyPage><SupplyPage /></LazyPage>,
     hidden: true,
   },
   {
@@ -244,6 +272,14 @@ export const financesRoutes = [
     element: <LazyPage><FinanceImportsPage /></LazyPage>,
     hidden: true,
   },
+  {
+    path: '/finances/fournisseurs',
+    label: 'Portefeuille Fournisseurs',
+    description: 'Encours & Échéances',
+    icon: Users,
+    element: <LazyPage><FinanceSupplierPortfolioPage /></LazyPage>,
+    hidden: true,
+  },
 ];
 
 // Section RESTAURANT (structure simplifiée - pages essentielles uniquement)
@@ -274,7 +310,7 @@ export const restaurantRoutes = [
     label: 'Liens Épicerie',
     description: 'Ingrédients ↔ Produits',
     icon: Link2,
-    element: <LazyPage><IngredientEpicerieLinkPage /></LazyPage>,
+    element: <LazyPage><LiensEpiceriePage /></LazyPage>,
   },
   {
     path: '/restaurant/charges',
@@ -474,6 +510,18 @@ export const navigationSections = [
         description: 'Historique fournisseurs',
         icon: TrendingUp,
       },
+      {
+        path: '/operations/approvisionnement',
+        label: 'Approvisionnement',
+        description: 'Plan de commandes',
+        icon: Package,
+      },
+      {
+        path: '/intelligence/scoring/suppliers',
+        label: 'Fournisseurs',
+        description: 'Gestion & Scoring',
+        icon: Users,
+      },
     ],
     gradient: 'from-emerald-500 to-teal-400',
     color: 'emerald',
@@ -513,6 +561,12 @@ export const navigationSections = [
         label: 'Imports',
         description: 'CSV / PDF',
         icon: Download,
+      },
+      {
+        path: '/finances/fournisseurs',
+        label: 'Fournisseurs',
+        description: 'Encours & Échéances',
+        icon: Users,
       },
     ],
     gradient: 'from-violet-500 to-purple-400',

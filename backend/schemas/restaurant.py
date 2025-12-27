@@ -17,6 +17,27 @@ class RestaurantCategoryCreate(BaseModel):
     nom: str = Field(..., min_length=1)
 
 
+class PlatCategory(BaseModel):
+    """Catégorie de plat avec seuil de food cost."""
+    id: int
+    tenant_id: int
+    nom: str
+    target_food_cost_percent: float = Field(..., description="Seuil de food cost cible en %")
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlatCategoryCreate(BaseModel):
+    """Création d'une catégorie de plat."""
+    nom: str = Field(..., min_length=1)
+    target_food_cost_percent: float = Field(30.0, ge=0, le=100, description="Seuil de food cost cible en %")
+
+
+class PlatCategoryUpdate(BaseModel):
+    """Mise à jour du seuil de food cost d'une catégorie."""
+    target_food_cost_percent: float = Field(..., ge=0, le=100, description="Nouveau seuil de food cost en %")
+
+
 class RestaurantCostCenter(BaseModel):
     id: int
     nom: str
@@ -278,6 +299,25 @@ class RestaurantConsumptionEntry(BaseModel):
     cost_spent: float
     stock_after_sales: float
     last_sale_at: Optional[datetime] = None
+
+
+class RestaurantSalesImportUnmatched(BaseModel):
+    product: str
+    count: int
+
+
+class RestaurantSalesImportSummary(BaseModel):
+    filename: Optional[str] = None
+    rows_total: int
+    rows_valid: int
+    rows_invalid: int
+    rows_mapped: int
+    rows_unmapped: int
+    rows_inserted: int
+    rows_duplicates: int
+    period_start: Optional[datetime] = None
+    period_end: Optional[datetime] = None
+    unmapped_examples: List[RestaurantSalesImportUnmatched] = Field(default_factory=list)
 
 
 class RestaurantPriceHistoryComparisonEntry(BaseModel):

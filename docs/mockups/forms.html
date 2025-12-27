@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design System - Forms</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+            --accent-blue: #3b82f6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 40px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .subtitle { color: var(--text-muted); margin-bottom: 40px; }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 40px 0 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 32px;
+        }
+        .form-section {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .form-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-muted);
+        }
+
+        /* Form elements */
+        .form-group { margin-bottom: 20px; }
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+        .form-label.required::after {
+            content: ' *';
+            color: var(--accent-rose);
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-emerald);
+            background: rgba(255,255,255,0.08);
+        }
+        .form-input::placeholder { color: var(--text-muted); }
+        .form-input.error {
+            border-color: var(--accent-rose);
+            background: rgba(244, 63, 94, 0.05);
+        }
+        .form-input.success {
+            border-color: var(--accent-emerald);
+        }
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+        .form-error {
+            font-size: 12px;
+            color: var(--accent-rose);
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Input with icon */
+        .input-with-icon {
+            position: relative;
+        }
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+        .input-with-icon .form-input {
+            padding-left: 42px;
+        }
+        .input-action {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        /* Select */
+        .form-select {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+        }
+
+        /* Textarea */
+        .form-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        /* Checkbox & Radio */
+        .checkbox-group, .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .checkbox-item, .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+        .checkbox-box {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: transparent;
+            transition: all 0.2s;
+        }
+        .checkbox-item.checked .checkbox-box {
+            background: var(--accent-emerald);
+            border-color: var(--accent-emerald);
+            color: white;
+        }
+        .radio-dot {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .radio-dot::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: transparent;
+            transition: all 0.2s;
+        }
+        .radio-item.selected .radio-dot {
+            border-color: var(--accent-emerald);
+        }
+        .radio-item.selected .radio-dot::after {
+            background: var(--accent-emerald);
+        }
+        .checkbox-label, .radio-label { font-size: 14px; }
+
+        /* Toggle */
+        .toggle-group { display: flex; flex-direction: column; gap: 16px; }
+        .toggle-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .toggle-info {}
+        .toggle-label { font-size: 14px; margin-bottom: 2px; }
+        .toggle-desc { font-size: 12px; color: var(--text-muted); }
+        .toggle {
+            width: 48px;
+            height: 26px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .toggle.active { background: var(--accent-emerald); }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: all 0.2s;
+        }
+        .toggle.active::after { left: 25px; }
+
+        /* Buttons */
+        .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--accent-emerald);
+            border: none;
+            color: white;
+        }
+        .btn-primary:hover { background: #0d9668; }
+        .btn-secondary {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--accent-emerald);
+            color: var(--accent-emerald);
+        }
+        .btn-danger {
+            background: var(--accent-rose);
+            border: none;
+            color: white;
+        }
+        .btn-icon {
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Form Components</h1>
+        <p class="subtitle">Éléments de formulaire avec différents états</p>
+
+        <div class="section-title">Champs de saisie</div>
+        <div class="form-grid">
+            <div class="form-section">
+                <div class="form-section-title">États des inputs</div>
+                <div class="form-group">
+                    <label class="form-label required">Nom du produit</label>
+                    <input type="text" class="form-input" placeholder="Ex: Tomates grappe bio">
+                    <div class="form-hint">Minimum 3 caractères</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Input avec icône</label>
+                    <div class="input-with-icon">
+                        <span class="input-icon">🔍</span>
+                        <input type="text" class="form-input" placeholder="Rechercher...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Input avec erreur</label>
+                    <input type="text" class="form-input error" value="valeur invalide">
+                    <div class="form-error">⚠ Ce champ est invalide</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Input validé</label>
+                    <input type="text" class="form-input success" value="email@example.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Input désactivé</label>
+                    <input type="text" class="form-input" value="Non modifiable" disabled style="opacity: 0.5;">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-section-title">Select & Textarea</div>
+                <div class="form-group">
+                    <label class="form-label">Catégorie</label>
+                    <select class="form-select">
+                        <option>Sélectionner une catégorie...</option>
+                        <option>Fruits & Légumes</option>
+                        <option>Viandes</option>
+                        <option>Poissons</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-textarea" placeholder="Décrivez le produit..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">Checkboxes, Radios & Toggles</div>
+        <div class="form-grid">
+            <div class="form-section">
+                <div class="form-section-title">Checkboxes</div>
+                <div class="checkbox-group">
+                    <div class="checkbox-item checked" onclick="this.classList.toggle('checked')">
+                        <div class="checkbox-box">✓</div>
+                        <span class="checkbox-label">Option sélectionnée</span>
+                    </div>
+                    <div class="checkbox-item" onclick="this.classList.toggle('checked')">
+                        <div class="checkbox-box">✓</div>
+                        <span class="checkbox-label">Option non sélectionnée</span>
+                    </div>
+                    <div class="checkbox-item" onclick="this.classList.toggle('checked')">
+                        <div class="checkbox-box">✓</div>
+                        <span class="checkbox-label">Autre option</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-section-title">Radio buttons</div>
+                <div class="radio-group">
+                    <div class="radio-item selected" onclick="selectRadio(this)">
+                        <div class="radio-dot"></div>
+                        <span class="radio-label">Option A</span>
+                    </div>
+                    <div class="radio-item" onclick="selectRadio(this)">
+                        <div class="radio-dot"></div>
+                        <span class="radio-label">Option B</span>
+                    </div>
+                    <div class="radio-item" onclick="selectRadio(this)">
+                        <div class="radio-dot"></div>
+                        <span class="radio-label">Option C</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section" style="grid-column: span 2;">
+                <div class="form-section-title">Toggles</div>
+                <div class="toggle-group">
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <div class="toggle-label">Notifications email</div>
+                            <div class="toggle-desc">Recevoir des alertes par email</div>
+                        </div>
+                        <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <div class="toggle-label">Auto-commande</div>
+                            <div class="toggle-desc">Générer automatiquement les commandes</div>
+                        </div>
+                        <div class="toggle" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">Boutons</div>
+        <div class="form-section">
+            <div class="btn-row">
+                <button class="btn btn-primary">Primaire</button>
+                <button class="btn btn-secondary">Secondaire</button>
+                <button class="btn btn-outline">Outline</button>
+                <button class="btn btn-danger">Danger</button>
+                <button class="btn btn-primary" disabled>Désactivé</button>
+                <button class="btn btn-secondary btn-icon">➕</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function selectRadio(el) {
+            el.parentElement.querySelectorAll('.radio-item').forEach(r => r.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+    </script>
+</body>
+</html>

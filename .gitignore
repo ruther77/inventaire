@@ -85,3 +85,4 @@ _archive/
 *.swp
 *.bak
 *.tmp
+ollama_data/

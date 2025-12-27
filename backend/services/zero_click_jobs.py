@@ -1,4 +1,32 @@
-"""Service pour gérer les jobs zero-click avec persistance en base de données."""
+"""
+Module de gestion des jobs zero-click (import automatisé).
+
+Ce module fournit les services pour:
+- Création de jobs d'import automatisé de factures
+- Suivi du statut des jobs (pending, processing, completed, failed)
+- Persistance en base de données avec tracking temporel
+- Gestion des erreurs et retry automatiques
+- Récupération de l'état et de l'historique des jobs
+
+Workflow zero-click:
+1. Client uploade une facture PDF
+2. Job créé avec statut 'pending'
+3. Worker Celery traite le job en arrière-plan
+4. Extraction OCR des données (supplier, items, amounts)
+5. Application des marges et règles métier
+6. Création automatique des produits/commandes si auto_confirm=True
+7. Job marqué 'completed' ou 'failed' avec résultat/erreur
+
+Statuts possibles:
+- pending: Job créé, en attente de traitement
+- processing: Job en cours de traitement par un worker
+- completed: Job terminé avec succès
+- failed: Job échoué avec message d'erreur
+
+Note:
+    Les jobs sont associés à un tenant_id pour isolation multi-tenant
+    et à un session_id optionnel pour le tracking utilisateur.
+"""
 
 from __future__ import annotations
 
@@ -49,11 +77,12 @@ def create_job(
         fetch=True,
     )
 
-    if result:
+    if result and len(result) > 0:
+        row = result[0]
         return {
-            "job_id": result[0][0],
-            "status": result[0][1],
-            "created_at": result[0][2],
+            "job_id": row[0] if len(row) > 0 else None,
+            "status": row[1] if len(row) > 1 else "pending",
+            "created_at": row[2] if len(row) > 2 else None,
         }
 
     raise RuntimeError("Échec de création du job")

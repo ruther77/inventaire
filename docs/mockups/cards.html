@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design System - Cards</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-teal: #06b6d4;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --accent-blue: #3b82f6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 40px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .subtitle { color: var(--text-muted); margin-bottom: 40px; }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 40px 0 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        /* Base card */
+        .card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+        .card:hover {
+            background: rgba(255,255,255,0.08);
+            transform: translateY(-2px);
+        }
+        .card-body { padding: 20px; }
+
+        /* KPI Card */
+        .kpi-card {
+            padding: 24px;
+        }
+        .kpi-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .kpi-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+        .kpi-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .kpi-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .kpi-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .kpi-trend {
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .trend-up { color: var(--accent-emerald); }
+        .trend-down { color: var(--accent-rose); }
+
+        /* Product Card */
+        .product-card { cursor: pointer; }
+        .product-image {
+            height: 140px;
+            background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(6,182,212,0.1));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 56px;
+        }
+        .product-body { padding: 16px; }
+        .product-category {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--accent-teal);
+            margin-bottom: 6px;
+        }
+        .product-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .product-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .product-price { font-size: 18px; font-weight: 700; color: var(--accent-emerald); }
+        .product-stock {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .stock-ok { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .stock-low { background: rgba(244,63,94,0.2); color: var(--accent-rose); }
+
+        /* Alert Card */
+        .alert-card {
+            border-left: 4px solid;
+            padding: 16px 20px;
+        }
+        .alert-card.warning { border-left-color: var(--accent-amber); }
+        .alert-card.danger { border-left-color: var(--accent-rose); }
+        .alert-card.info { border-left-color: var(--accent-blue); }
+        .alert-card.success { border-left-color: var(--accent-emerald); }
+        .alert-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .alert-icon { font-size: 20px; }
+        .alert-title { font-size: 15px; font-weight: 600; }
+        .alert-message { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+        /* Stat Card Compact */
+        .stat-card-compact {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+        }
+        .stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .stat-info { flex: 1; }
+        .stat-value { font-size: 20px; font-weight: 700; }
+        .stat-label { font-size: 13px; color: var(--text-muted); }
+
+        /* Action Card */
+        .action-card {
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .action-card:hover { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); }
+        .action-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: rgba(16,185,129,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin: 0 auto 12px;
+        }
+        .action-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .action-desc { font-size: 13px; color: var(--text-muted); }
+
+        /* List Card */
+        .list-card { padding: 0; }
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .list-title { font-size: 15px; font-weight: 600; }
+        .list-action {
+            font-size: 13px;
+            color: var(--accent-teal);
+            cursor: pointer;
+        }
+        .list-items { padding: 8px 0; }
+        .list-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            cursor: pointer;
+        }
+        .list-item:hover { background: rgba(255,255,255,0.03); }
+        .list-item-icon { font-size: 20px; }
+        .list-item-info { flex: 1; }
+        .list-item-title { font-size: 14px; }
+        .list-item-sub { font-size: 12px; color: var(--text-muted); }
+        .list-item-value { font-size: 14px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🃏 Card Components</h1>
+        <p class="subtitle">Différents types de cartes pour afficher les données</p>
+
+        <div class="section-title">KPI Cards</div>
+        <div class="cards-grid">
+            <div class="card kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon" style="background: rgba(16,185,129,0.2);">📈</div>
+                    <span class="kpi-badge" style="background: rgba(16,185,129,0.2); color: var(--accent-emerald);">+12%</span>
+                </div>
+                <div class="kpi-value" style="color: var(--accent-emerald);">€12,450</div>
+                <div class="kpi-label">Chiffre d'affaires du jour</div>
+                <div class="kpi-trend trend-up">↑ +€1,230 vs hier</div>
+            </div>
+
+            <div class="card kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon" style="background: rgba(244,63,94,0.2);">⚠️</div>
+                </div>
+                <div class="kpi-value" style="color: var(--accent-rose);">23</div>
+                <div class="kpi-label">Produits en stock bas</div>
+                <div class="kpi-trend trend-down">↓ +5 vs semaine dernière</div>
+            </div>
+
+            <div class="card kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon" style="background: rgba(245,158,11,0.2);">📦</div>
+                </div>
+                <div class="kpi-value">1,247</div>
+                <div class="kpi-label">Produits en stock</div>
+                <div class="kpi-trend">= Stable</div>
+            </div>
+        </div>
+
+        <div class="section-title">Product Cards</div>
+        <div class="cards-grid">
+            <div class="card product-card">
+                <div class="product-image">🍅</div>
+                <div class="product-body">
+                    <div class="product-category">Fruits & Légumes</div>
+                    <div class="product-name">Tomates grappe bio</div>
+                    <div class="product-row">
+                        <span class="product-price">€3.20/kg</span>
+                        <span class="product-stock stock-low">Stock bas</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card product-card">
+                <div class="product-image" style="background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(249,115,22,0.1));">🥩</div>
+                <div class="product-body">
+                    <div class="product-category" style="color: var(--accent-amber);">Viandes</div>
+                    <div class="product-name">Entrecôte bœuf Charolais</div>
+                    <div class="product-row">
+                        <span class="product-price">€22.50/kg</span>
+                        <span class="product-stock stock-ok">En stock</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">Alert Cards</div>
+        <div class="cards-grid">
+            <div class="card alert-card warning">
+                <div class="alert-header">
+                    <span class="alert-icon">⚠️</span>
+                    <span class="alert-title">Stock bas détecté</span>
+                </div>
+                <div class="alert-message">5 produits sont en dessous du seuil minimum. Une commande est recommandée.</div>
+            </div>
+
+            <div class="card alert-card danger">
+                <div class="alert-header">
+                    <span class="alert-icon">🔴</span>
+                    <span class="alert-title">Rupture imminente</span>
+                </div>
+                <div class="alert-message">Les tomates seront en rupture dans 2 jours au rythme actuel.</div>
+            </div>
+
+            <div class="card alert-card success">
+                <div class="alert-header">
+                    <span class="alert-icon">✅</span>
+                    <span class="alert-title">Import réussi</span>
+                </div>
+                <div class="alert-message">3 factures ont été importées et traitées avec succès.</div>
+            </div>
+        </div>
+
+        <div class="section-title">Compact & Action Cards</div>
+        <div class="cards-grid">
+            <div class="card stat-card-compact">
+                <div class="stat-icon" style="background: rgba(16,185,129,0.2);">💰</div>
+                <div class="stat-info">
+                    <div class="stat-value">€45,670</div>
+                    <div class="stat-label">Valeur stock total</div>
+                </div>
+            </div>
+
+            <div class="card stat-card-compact">
+                <div class="stat-icon" style="background: rgba(6,182,212,0.2);">📄</div>
+                <div class="stat-info">
+                    <div class="stat-value">156</div>
+                    <div class="stat-label">Factures ce mois</div>
+                </div>
+            </div>
+
+            <div class="card action-card">
+                <div class="action-icon">➕</div>
+                <div class="action-title">Ajouter un produit</div>
+                <div class="action-desc">Créer une nouvelle fiche produit</div>
+            </div>
+
+            <div class="card action-card">
+                <div class="action-icon">📥</div>
+                <div class="action-title">Importer factures</div>
+                <div class="action-desc">Importer des factures PDF</div>
+            </div>
+        </div>
+
+        <div class="section-title">List Card</div>
+        <div class="cards-grid">
+            <div class="card list-card">
+                <div class="list-header">
+                    <span class="list-title">Derniers mouvements</span>
+                    <span class="list-action">Voir tout →</span>
+                </div>
+                <div class="list-items">
+                    <div class="list-item">
+                        <span class="list-item-icon">📥</span>
+                        <div class="list-item-info">
+                            <div class="list-item-title">Réception Metro</div>
+                            <div class="list-item-sub">Il y a 2 heures</div>
+                        </div>
+                        <span class="list-item-value" style="color: var(--accent-emerald);">+€847</span>
+                    </div>
+                    <div class="list-item">
+                        <span class="list-item-icon">📤</span>
+                        <div class="list-item-info">
+                            <div class="list-item-title">Vente restaurant</div>
+                            <div class="list-item-sub">Il y a 4 heures</div>
+                        </div>
+                        <span class="list-item-value" style="color: var(--accent-rose);">-€156</span>
+                    </div>
+                    <div class="list-item">
+                        <span class="list-item-icon">📥</span>
+                        <div class="list-item-info">
+                            <div class="list-item-title">Livraison Brake</div>
+                            <div class="list-item-sub">Hier</div>
+                        </div>
+                        <span class="list-item-value" style="color: var(--accent-emerald);">+€312</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligence - Détection Anomalies</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-cyan: #06b6d4;
+            --accent-blue: #3b82f6;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(6, 182, 212, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .stat-value { font-size: 24px; font-weight: 700; }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            background: rgba(255,255,255,0.03);
+            padding: 4px;
+            border-radius: 10px;
+            width: fit-content;
+        }
+        .tab {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            border: none;
+            background: transparent;
+        }
+        .tab.active {
+            background: rgba(6,182,212,0.2);
+            color: var(--accent-cyan);
+        }
+        .anomalies-list { display: flex; flex-direction: column; gap: 16px; }
+        .anomaly-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .anomaly-card:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateX(4px);
+        }
+        .anomaly-card.critical { border-left: 4px solid var(--accent-rose); }
+        .anomaly-card.warning { border-left: 4px solid var(--accent-amber); }
+        .anomaly-card.info { border-left: 4px solid var(--accent-cyan); }
+        .anomaly-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .anomaly-title-section { display: flex; align-items: center; gap: 12px; }
+        .anomaly-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .anomaly-icon.price { background: rgba(244,63,94,0.2); }
+        .anomaly-icon.quantity { background: rgba(245,158,11,0.2); }
+        .anomaly-icon.pattern { background: rgba(6,182,212,0.2); }
+        .anomaly-title { font-size: 16px; font-weight: 600; }
+        .anomaly-type { font-size: 12px; color: var(--text-muted); }
+        .confidence-badge {
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .confidence-badge.high { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .confidence-badge.medium { background: rgba(245,158,11,0.2); color: var(--accent-amber); }
+        .anomaly-body { margin-bottom: 16px; }
+        .anomaly-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+        .anomaly-details {
+            display: flex;
+            gap: 24px;
+            margin-top: 12px;
+        }
+        .detail-item { font-size: 13px; }
+        .detail-label { color: var(--text-muted); }
+        .detail-value { font-weight: 600; margin-left: 8px; }
+        .anomaly-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .anomaly-time { font-size: 12px; color: var(--text-muted); }
+        .action-btn {
+            padding: 8px 16px;
+            background: rgba(6,182,212,0.1);
+            border: 1px solid rgba(6,182,212,0.3);
+            border-radius: 8px;
+            color: var(--accent-cyan);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        @media (max-width: 1024px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="intelligence.html">Intelligence</a>
+            <span>/</span>
+            <span>Détection Anomalies</span>
+        </div>
+
+        <h1>🔍 Détection Anomalies</h1>
+        <p class="subtitle">L'IA surveille vos données en continu pour détecter les anomalies et comportements inhabituels</p>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-label">Anomalies détectées (30j)</div>
+                <div class="stat-value" style="color: var(--accent-rose);">12</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Critiques</div>
+                <div class="stat-value" style="color: var(--accent-rose);">3</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Résolues</div>
+                <div class="stat-value" style="color: var(--accent-emerald);">8</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Impact estimé</div>
+                <div class="stat-value">€1,240</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active">Toutes (12)</button>
+            <button class="tab">Critiques (3)</button>
+            <button class="tab">Prix (5)</button>
+            <button class="tab">Quantités (4)</button>
+            <button class="tab">Patterns (3)</button>
+        </div>
+
+        <div class="anomalies-list">
+            <div class="anomaly-card critical" onclick="alert('Détail anomalie prix Poulet')">
+                <div class="anomaly-header">
+                    <div class="anomaly-title-section">
+                        <div class="anomaly-icon price">💰</div>
+                        <div>
+                            <div class="anomaly-title">Prix anormal - Poulet fermier</div>
+                            <div class="anomaly-type">Anomalie de prix</div>
+                        </div>
+                    </div>
+                    <span class="confidence-badge high">88% confiance</span>
+                </div>
+                <div class="anomaly-body">
+                    <p class="anomaly-desc">
+                        Le prix d'achat du Poulet fermier sur la facture Brake #1820 est de €11.48/kg, soit +35%
+                        au-dessus de la moyenne des 6 derniers mois (€8.50/kg). Cette variation est statistiquement
+                        significative et nécessite une vérification.
+                    </p>
+                    <div class="anomaly-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Prix détecté:</span>
+                            <span class="detail-value" style="color: var(--accent-rose);">€11.48/kg</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Prix moyen:</span>
+                            <span class="detail-value">€8.50/kg</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Impact:</span>
+                            <span class="detail-value" style="color: var(--accent-rose);">+€89.40</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="anomaly-footer">
+                    <span class="anomaly-time">Détecté il y a 2 heures • Facture #1820</span>
+                    <button class="action-btn">Voir la facture</button>
+                </div>
+            </div>
+
+            <div class="anomaly-card warning" onclick="alert('Détail anomalie consommation')">
+                <div class="anomaly-header">
+                    <div class="anomaly-title-section">
+                        <div class="anomaly-icon quantity">📦</div>
+                        <div>
+                            <div class="anomaly-title">Consommation anormale - Tomates</div>
+                            <div class="anomaly-type">Anomalie de quantité</div>
+                        </div>
+                    </div>
+                    <span class="confidence-badge medium">75% confiance</span>
+                </div>
+                <div class="anomaly-body">
+                    <p class="anomaly-desc">
+                        La consommation de tomates hier (15kg) est 2.5x supérieure à la moyenne journalière (6kg).
+                        Aucun événement spécial n'est enregistré. Possible erreur de saisie ou perte non déclarée.
+                    </p>
+                    <div class="anomaly-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Consommation:</span>
+                            <span class="detail-value" style="color: var(--accent-amber);">15 kg</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Moyenne:</span>
+                            <span class="detail-value">6 kg/jour</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="anomaly-footer">
+                    <span class="anomaly-time">Détecté hier • Service du soir</span>
+                    <button class="action-btn">Vérifier</button>
+                </div>
+            </div>
+
+            <div class="anomaly-card info" onclick="alert('Détail pattern ventes')">
+                <div class="anomaly-header">
+                    <div class="anomaly-title-section">
+                        <div class="anomaly-icon pattern">📊</div>
+                        <div>
+                            <div class="anomaly-title">Pattern inhabituel - Ventes week-end</div>
+                            <div class="anomaly-type">Anomalie de pattern</div>
+                        </div>
+                    </div>
+                    <span class="confidence-badge high">82% confiance</span>
+                </div>
+                <div class="anomaly-body">
+                    <p class="anomaly-desc">
+                        Les ventes du week-end dernier sont 25% inférieures à la moyenne des 8 dernières semaines.
+                        Vérifier s'il y avait un événement concurrent ou conditions météo défavorables.
+                    </p>
+                </div>
+                <div class="anomaly-footer">
+                    <span class="anomaly-time">Détecté lundi • Analyse hebdomadaire</span>
+                    <button class="action-btn">Analyser</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

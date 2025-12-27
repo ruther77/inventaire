@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant - Détail Plat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-orange: #f97316;
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(249, 115, 22, 0.12), transparent),
+                        radial-gradient(ellipse at 100% 0%, rgba(245, 158, 11, 0.08), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .plat-header {
+            display: flex;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+        .plat-image {
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(135deg, rgba(249,115,22,0.2), rgba(245,158,11,0.2));
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 80px;
+        }
+        .plat-info { flex: 1; }
+        .plat-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .plat-category { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; }
+        .plat-badges { display: flex; gap: 8px; margin-bottom: 24px; }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-active { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .badge-food-cost { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .badge-food-cost.warning { background: rgba(245,158,11,0.2); color: var(--accent-amber); }
+        .badge-food-cost.danger { background: rgba(244,63,94,0.2); color: var(--accent-rose); }
+        .plat-actions { display: flex; gap: 12px; }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-amber));
+            color: white;
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .price-hero {
+            text-align: center;
+            padding: 24px;
+            background: linear-gradient(135deg, rgba(249,115,22,0.1), rgba(245,158,11,0.05));
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .price-value {
+            font-family: 'Sora', sans-serif;
+            font-size: 42px;
+            font-weight: 700;
+            color: var(--accent-orange);
+        }
+        .price-label { font-size: 13px; color: var(--text-muted); }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .stat-item {
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+        }
+        .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .stat-value { font-size: 18px; font-weight: 600; }
+        .ingredients-list { display: flex; flex-direction: column; gap: 8px; }
+        .ingredient-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ingredient-item:hover { background: rgba(255,255,255,0.08); }
+        .ingredient-name { font-size: 14px; font-weight: 500; }
+        .ingredient-qty { font-size: 13px; color: var(--text-muted); }
+        .ingredient-cost { font-size: 14px; font-weight: 600; color: var(--accent-amber); }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 16px 12px;
+            border-top: 1px solid var(--border);
+            margin-top: 12px;
+            font-weight: 600;
+        }
+        .food-cost-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 16px;
+        }
+        .food-cost-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-emerald), var(--accent-amber));
+            border-radius: 4px;
+        }
+        @media (max-width: 768px) {
+            .plat-header { flex-direction: column; }
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="restaurant.html">Restaurant</a>
+            <span>/</span>
+            <a href="#">Plats</a>
+            <span>/</span>
+            <span>Entrecôte grillée</span>
+        </div>
+
+        <div class="plat-header">
+            <div class="plat-image">🥩</div>
+            <div class="plat-info">
+                <h1 class="plat-title">Entrecôte grillée</h1>
+                <p class="plat-category">Catégorie: Viandes • Référence: PLT-042</p>
+                <div class="plat-badges">
+                    <span class="badge badge-active">Actif</span>
+                    <span class="badge badge-food-cost">Food Cost: 28%</span>
+                    <span class="badge" style="background: rgba(59,130,246,0.2); color: #3b82f6;">Top vente</span>
+                </div>
+                <div class="plat-actions">
+                    <button class="btn btn-primary" onclick="alert('Modifier le plat')">Modifier</button>
+                    <button class="btn btn-secondary" onclick="alert('Historique des prix')">Historique</button>
+                    <button class="btn btn-secondary" onclick="alert('Simuler food cost')">Simuler</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">💰 Rentabilité</div>
+                <div class="price-hero">
+                    <div class="price-label">Prix de vente TTC</div>
+                    <div class="price-value">€24.90</div>
+                </div>
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <div class="stat-label">Coût matière</div>
+                        <div class="stat-value">€6.97</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Food Cost</div>
+                        <div class="stat-value" style="color: var(--accent-emerald);">28%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Marge brute</div>
+                        <div class="stat-value" style="color: var(--accent-emerald);">€17.93</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Objectif FC</div>
+                        <div class="stat-value">&lt;30%</div>
+                    </div>
+                </div>
+                <div class="food-cost-bar">
+                    <div class="food-cost-fill" style="width: 28%;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                    <span>0%</span>
+                    <span>Objectif: 30%</span>
+                    <span>50%</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 Statistiques ventes</div>
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <div class="stat-label">Ventes (30j)</div>
+                        <div class="stat-value">127</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">CA généré</div>
+                        <div class="stat-value">€3,162</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Tendance</div>
+                        <div class="stat-value" style="color: var(--accent-emerald);">+8%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Ranking</div>
+                        <div class="stat-value">#3</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                🥗 Composition (5 ingrédients)
+                <button style="margin-left: auto; padding: 6px 12px; background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.3); border-radius: 6px; color: var(--accent-orange); font-size: 12px; cursor: pointer;">
+                    + Ajouter ingrédient
+                </button>
+            </div>
+            <div class="ingredients-list">
+                <div class="ingredient-item" onclick="alert('Détail ingrédient Entrecôte')">
+                    <div>
+                        <div class="ingredient-name">🥩 Entrecôte de boeuf</div>
+                        <div class="ingredient-qty">250g par portion</div>
+                    </div>
+                    <div class="ingredient-cost">€5.50</div>
+                </div>
+                <div class="ingredient-item" onclick="alert('Détail ingrédient Beurre')">
+                    <div>
+                        <div class="ingredient-name">🧈 Beurre maître d'hôtel</div>
+                        <div class="ingredient-qty">30g par portion</div>
+                    </div>
+                    <div class="ingredient-cost">€0.45</div>
+                </div>
+                <div class="ingredient-item" onclick="alert('Détail ingrédient Frites')">
+                    <div>
+                        <div class="ingredient-name">🍟 Frites maison</div>
+                        <div class="ingredient-qty">150g par portion</div>
+                    </div>
+                    <div class="ingredient-cost">€0.60</div>
+                </div>
+                <div class="ingredient-item" onclick="alert('Détail ingrédient Salade')">
+                    <div>
+                        <div class="ingredient-name">🥗 Salade verte</div>
+                        <div class="ingredient-qty">50g par portion</div>
+                    </div>
+                    <div class="ingredient-cost">€0.25</div>
+                </div>
+                <div class="ingredient-item" onclick="alert('Détail ingrédient Assaisonnement')">
+                    <div>
+                        <div class="ingredient-name">🧂 Assaisonnement</div>
+                        <div class="ingredient-qty">Sel, poivre, huile</div>
+                    </div>
+                    <div class="ingredient-cost">€0.17</div>
+                </div>
+            </div>
+            <div class="total-row">
+                <span>Coût total matière</span>
+                <span style="color: var(--accent-amber);">€6.97</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

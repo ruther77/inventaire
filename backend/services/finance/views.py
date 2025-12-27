@@ -1,12 +1,47 @@
-"""Service pour la gestion des vues matérialisées.
+"""
+Module de gestion des vues matérialisées PostgreSQL.
 
-Ce module fournit des fonctions pour rafraîchir les vues matérialisées
-utilisées pour les statistiques et le reporting.
+Ce module fournit les services pour:
+- Rafraîchissement des vues matérialisées (concurrent ou bloquant)
+- Validation sécurisée des identifiants SQL
+- Tracking du statut et des performances de rafraîchissement
+- Gestion d'erreurs avec fallback gracieux
+
+Vues matérialisées gérées:
+1. mv_daily_balance: Soldes journaliers par compte
+   - Utilisée pour les graphiques d'évolution de trésorerie
+   - Rafraîchissement recommandé: quotidien
+
+2. mv_category_monthly: Agrégations mensuelles par catégorie
+   - Utilisée pour les tableaux de bord et reporting
+   - Rafraîchissement recommandé: quotidien
+
+3. mv_reconciliation_status: État des rapprochements par compte
+   - Utilisée pour le monitoring du rapprochement bancaire
+   - Rafraîchissement recommandé: après chaque import
+
+4. mv_top_vendors: Classement des fournisseurs par montant
+   - Utilisée pour l'analyse fournisseurs
+   - Rafraîchissement recommandé: hebdomadaire
+
+5. mv_import_summary: Résumé des imports de relevés
+   - Utilisée pour le monitoring des imports
+   - Rafraîchissement recommandé: après chaque import
+
+Mode concurrent:
+Le rafraîchissement concurrent (CONCURRENTLY) permet de maintenir l'accès
+en lecture pendant la mise à jour, mais nécessite un index unique sur
+chaque vue et prend plus de temps.
+
+Sécurité:
+Tous les identifiants SQL sont validés via regex strict pour prévenir
+les injections SQL, même si les noms de vues sont contrôlés.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List
@@ -15,6 +50,24 @@ from sqlalchemy import text
 from core.data_repository import get_engine
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_identifier(name: str) -> str:
+    """Valide et sécurise un identifiant SQL.
+
+    Args:
+        name: Nom de l'identifiant à valider
+
+    Returns:
+        Le nom validé
+
+    Raises:
+        ValueError: Si le nom contient des caractères non autorisés
+    """
+    # Accepte uniquement les caractères alphanumériques et underscores
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name):
+        raise ValueError(f"Nom d'identifiant invalide: {name}")
+    return name
 
 
 @dataclass
@@ -54,7 +107,11 @@ def refresh_materialized_views(concurrent: bool = True) -> List[RefreshResult]:
         for view_name in MATERIALIZED_VIEWS:
             start = datetime.now()
             try:
-                conn.execute(text(f"REFRESH MATERIALIZED VIEW {keyword} {view_name}"))
+                # Sécurité : validation stricte du nom de vue
+                safe_view_name = _validate_identifier(view_name)
+                # Construction sécurisée de la requête SQL
+                refresh_sql = text(f"REFRESH MATERIALIZED VIEW {keyword} {safe_view_name}")
+                conn.execute(refresh_sql)
                 duration_ms = (datetime.now() - start).total_seconds() * 1000
                 results.append(RefreshResult(
                     view_name=view_name,
@@ -101,7 +158,10 @@ def refresh_single_view(view_name: str, concurrent: bool = True) -> RefreshResul
 
     try:
         with engine.begin() as conn:
-            conn.execute(text(f"REFRESH MATERIALIZED VIEW {keyword} {view_name}"))
+            # Sécurité : validation stricte du nom de vue
+            safe_view_name = _validate_identifier(view_name)
+            # Construction sécurisée de la requête SQL
+            conn.execute(text(f"REFRESH MATERIALIZED VIEW {keyword} {safe_view_name}"))
         duration_ms = (datetime.now() - start).total_seconds() * 1000
         logger.info(f"Vue {view_name} rafraîchie en {duration_ms:.0f}ms")
         return RefreshResult(
@@ -144,8 +204,10 @@ def get_view_status() -> dict:
                     continue
 
                 # Compter les lignes
+                # Sécurité : validation stricte du nom de vue
+                safe_view_name = _validate_identifier(view_name)
                 row_count = conn.execute(text(
-                    f"SELECT COUNT(*) FROM {view_name}"
+                    f"SELECT COUNT(*) FROM {safe_view_name}"
                 )).scalar()
 
                 results[view_name] = {

@@ -107,7 +107,8 @@ const SmartTable = forwardRef(function SmartTable(
 
   // Process data: filter, sort
   const processedData = useMemo(() => {
-    let result = [...data];
+    // Filtrer les valeurs undefined/null dès le départ
+    let result = data.filter(Boolean);
 
     // Apply filters
     Object.entries(filters).forEach(([key, value]) => {
@@ -490,6 +491,7 @@ const SmartTable = forwardRef(function SmartTable(
               </tr>
             ) : (
               paginatedData.map((row, rowIndex) => {
+                if (!row) return null;
                 const rowKey = row[keyField];
                 const isSelected = selectedRows.has(rowKey);
 
@@ -531,11 +533,11 @@ const SmartTable = forwardRef(function SmartTable(
                       >
                         {editable && col.editable ? (
                           <EditableCell
-                            value={row[col.key]}
+                            value={row?.[col.key]}
                             displayValue={
                               col.render
-                                ? col.render(row[col.key], row)
-                                : row[col.key]
+                                ? col.render(row?.[col.key], row)
+                                : row?.[col.key]
                             }
                             type={col.type || 'text'}
                             options={col.options}
@@ -543,9 +545,9 @@ const SmartTable = forwardRef(function SmartTable(
                             formatDisplay={col.formatDisplay}
                           />
                         ) : col.render ? (
-                          col.render(row[col.key], row)
+                          col.render(row?.[col.key], row)
                         ) : (
-                          row[col.key] ?? '-'
+                          row?.[col.key] ?? '-'
                         )}
                       </td>
                     ))}
@@ -778,13 +780,14 @@ export const columnHelpers = {
   }),
 
   // Actions
-  actions: (render, options = {}) => ({
+  actions: (renderFn, options = {}) => ({
     key: '_actions',
     header: '',
     sortable: false,
     filterable: false,
     exportable: false,
-    render,
+    // Wrap to pass row as first argument (SmartTable calls render(value, row) where value is undefined for _actions)
+    render: (_value, row) => renderFn(row),
     ...options,
   }),
 };

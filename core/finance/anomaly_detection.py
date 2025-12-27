@@ -508,9 +508,9 @@ class AnomalyDetector:
             with engine.connect() as conn:
                 result = conn.execute(
                     text("""
-                        SELECT prix FROM historique_prix
-                        WHERE product_id = :product_id
-                        ORDER BY date DESC
+                        SELECT prix_achat as prix FROM produits_price_history
+                        WHERE produit_id = :product_id
+                        ORDER BY facture_date DESC
                         LIMIT 1
                     """),
                     {"product_id": product_id}

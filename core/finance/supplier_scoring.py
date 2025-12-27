@@ -64,8 +64,8 @@ class PriceVolatilityMetrics:
 class SupplierScoreCalculator:
     """Calculateur de score fournisseur."""
 
-    # Poids par dimension
-    DIMENSION_WEIGHTS = {
+    # Poids par défaut (fallback si pas de profil)
+    DEFAULT_DIMENSION_WEIGHTS = {
         ScoreDimension.PRICE_STABILITY: 0.25,
         ScoreDimension.DELIVERY_RELIABILITY: 0.20,
         ScoreDimension.INVOICE_ACCURACY: 0.15,
@@ -124,6 +124,90 @@ class SupplierScoreCalculator:
                 );
             """))
 
+    def _load_profile_weights(
+        self,
+        supplier_id: Optional[int] = None,
+        supplier_name: Optional[str] = None
+    ) -> Dict[ScoreDimension, float]:
+        """Charge les poids du profil de scoring pour un fournisseur.
+
+        Args:
+            supplier_id: ID du fournisseur dans dim_supplier
+            supplier_name: Nom du fournisseur (fallback si pas d'ID)
+
+        Returns:
+            Dictionnaire des poids par dimension (somme = 1.0)
+        """
+        engine = get_engine()
+
+        with engine.connect() as conn:
+            # Try to load profile from dim_supplier if supplier_id provided
+            if supplier_id:
+                result = conn.execute(
+                    text("""
+                        SELECT
+                            sp.price_stability_weight,
+                            sp.delivery_reliability_weight,
+                            sp.invoice_accuracy_weight,
+                            sp.stock_accuracy_weight,
+                            sp.payment_terms_weight,
+                            sp.responsiveness_weight,
+                            sp.product_quality_weight
+                        FROM dim_supplier ds
+                        JOIN supplier_scoring_profiles sp ON ds.scoring_profile_id = sp.id
+                        WHERE ds.id = :supplier_id
+                    """),
+                    {"supplier_id": supplier_id}
+                )
+                row = result.fetchone()
+                if row:
+                    # Convert percentages to decimals (25.0 -> 0.25)
+                    return {
+                        ScoreDimension.PRICE_STABILITY: float(row[0]) / 100,
+                        ScoreDimension.DELIVERY_RELIABILITY: float(row[1]) / 100,
+                        ScoreDimension.INVOICE_ACCURACY: float(row[2]) / 100,
+                        ScoreDimension.STOCK_ACCURACY: float(row[3]) / 100,
+                        ScoreDimension.PAYMENT_TERMS: float(row[4]) / 100,
+                        ScoreDimension.RESPONSIVENESS: float(row[5]) / 100,
+                        ScoreDimension.PRODUCT_QUALITY: float(row[6]) / 100,
+                    }
+
+            # Fallback: Load default profile for tenant
+            result = conn.execute(
+                text("""
+                    SELECT
+                        price_stability_weight,
+                        delivery_reliability_weight,
+                        invoice_accuracy_weight,
+                        stock_accuracy_weight,
+                        payment_terms_weight,
+                        responsiveness_weight,
+                        product_quality_weight
+                    FROM supplier_scoring_profiles
+                    WHERE tenant_id = :tenant_id
+                      AND is_default = true
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """),
+                {"tenant_id": self.tenant_id}
+            )
+            row = result.fetchone()
+
+            if row:
+                # Convert percentages to decimals
+                return {
+                    ScoreDimension.PRICE_STABILITY: float(row[0]) / 100,
+                    ScoreDimension.DELIVERY_RELIABILITY: float(row[1]) / 100,
+                    ScoreDimension.INVOICE_ACCURACY: float(row[2]) / 100,
+                    ScoreDimension.STOCK_ACCURACY: float(row[3]) / 100,
+                    ScoreDimension.PAYMENT_TERMS: float(row[4]) / 100,
+                    ScoreDimension.RESPONSIVENESS: float(row[5]) / 100,
+                    ScoreDimension.PRODUCT_QUALITY: float(row[6]) / 100,
+                }
+
+        # Ultimate fallback: hardcoded defaults
+        return self.DEFAULT_DIMENSION_WEIGHTS
+
     def calculate_score(
         self,
         supplier_name: str,
@@ -132,6 +216,9 @@ class SupplierScoreCalculator:
     ) -> SupplierScore:
         """Calcule le score complet d'un fournisseur."""
         since = datetime.utcnow() - timedelta(days=period_days)
+
+        # Load dynamic weights for this supplier
+        weights = self._load_profile_weights(supplier_id, supplier_name)
 
         dimensions = {}
         metrics = {}
@@ -168,11 +255,14 @@ class SupplierScoreCalculator:
         dimensions[ScoreDimension.PRODUCT_QUALITY] = 80.0
         metrics["quality"] = {"score": 80.0, "note": "Données insuffisantes"}
 
-        # Calcul score global pondéré
+        # Calcul score global pondéré (using dynamic weights)
         overall_score = sum(
-            dimensions[dim] * weight
-            for dim, weight in self.DIMENSION_WEIGHTS.items()
+            dimensions[dim] * weights[dim]
+            for dim in weights.keys()
         )
+
+        # Store weights used in metrics for transparency
+        metrics["weights_used"] = {dim.value: round(weights[dim] * 100, 1) for dim in weights.keys()}
 
         # Grade
         grade = self._calculate_grade(overall_score)
@@ -214,15 +304,15 @@ class SupplierScoreCalculator:
                     SELECT
                         p.id as product_id,
                         p.nom as product_name,
-                        ph.prix,
-                        ph.date,
-                        LAG(ph.prix) OVER (PARTITION BY p.id ORDER BY ph.date) as prev_prix
+                        ph.prix_achat as prix,
+                        ph.facture_date as date,
+                        LAG(ph.prix_achat) OVER (PARTITION BY p.id ORDER BY ph.facture_date) as prev_prix
                     FROM produits p
-                    JOIN historique_prix ph ON p.id = ph.product_id
+                    JOIN produits_price_history ph ON p.id = ph.produit_id
                     WHERE p.tenant_id = :tenant_id
                       AND LOWER(ph.fournisseur) LIKE LOWER(:supplier)
-                      AND ph.date >= :since
-                    ORDER BY p.id, ph.date
+                      AND ph.facture_date >= :since
+                    ORDER BY p.id, ph.facture_date
                 """),
                 {
                     "tenant_id": self.tenant_id,
@@ -431,63 +521,89 @@ class SupplierScoreCalculator:
         since: datetime
     ) -> Dict[str, Any]:
         """Calcule le score d'exactitude du stock."""
-        engine = get_engine()
-        with engine.connect() as conn:
-            # Comparer stock théorique vs réel lors des inventaires
-            result = conn.execute(
-                text("""
-                    SELECT
-                        COUNT(*) as total_checks,
-                        AVG(ABS(ecart_pct)) as avg_deviation_pct,
-                        MAX(ABS(ecart_pct)) as max_deviation_pct,
-                        SUM(CASE WHEN ABS(ecart_pct) <= 2 THEN 1 ELSE 0 END) as accurate
-                    FROM (
+        try:
+            engine = get_engine()
+            with engine.connect() as conn:
+                # Vérifier si la table existe
+                table_check = conn.execute(
+                    text("""
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.tables
+                            WHERE table_name = 'inventaire_snapshots'
+                        )
+                    """)
+                )
+                if not table_check.fetchone()[0]:
+                    return {
+                        "score": 80.0,
+                        "total_checks": 0,
+                        "accuracy_rate": 0,
+                        "note": "Table inventaire_snapshots non disponible",
+                    }
+
+                # Comparer stock théorique vs réel lors des inventaires
+                result = conn.execute(
+                    text("""
                         SELECT
-                            i.product_id,
-                            CASE WHEN i.stock_theorique > 0
-                                THEN (i.stock_reel - i.stock_theorique) / i.stock_theorique * 100
-                                ELSE 0
-                            END as ecart_pct
-                        FROM inventaire_snapshots i
-                        JOIN produits p ON i.product_id = p.id
-                        WHERE p.tenant_id = :tenant_id
-                          AND i.date >= :since
-                          AND EXISTS (
-                              SELECT 1 FROM historique_prix hp
-                              WHERE hp.product_id = p.id
-                                AND LOWER(hp.fournisseur) LIKE LOWER(:supplier)
-                          )
-                    ) sub
-                """),
-                {
-                    "tenant_id": self.tenant_id,
-                    "supplier": f"%{supplier_name}%",
-                    "since": since,
-                }
-            )
+                            COUNT(*) as total_checks,
+                            AVG(ABS(ecart_pct)) as avg_deviation_pct,
+                            MAX(ABS(ecart_pct)) as max_deviation_pct,
+                            SUM(CASE WHEN ABS(ecart_pct) <= 2 THEN 1 ELSE 0 END) as accurate
+                        FROM (
+                            SELECT
+                                i.product_id,
+                                CASE WHEN i.stock_theorique > 0
+                                    THEN (i.stock_reel - i.stock_theorique) / i.stock_theorique * 100
+                                    ELSE 0
+                                END as ecart_pct
+                            FROM inventaire_snapshots i
+                            JOIN produits p ON i.product_id = p.id
+                            WHERE p.tenant_id = :tenant_id
+                              AND i.date >= :since
+                              AND EXISTS (
+                                  SELECT 1 FROM produits_price_history hp
+                                  WHERE hp.produit_id = p.id
+                                    AND LOWER(hp.fournisseur) LIKE LOWER(:supplier)
+                              )
+                        ) sub
+                    """),
+                    {
+                        "tenant_id": self.tenant_id,
+                        "supplier": f"%{supplier_name}%",
+                        "since": since,
+                    }
+                )
 
-            row = result.fetchone()
+                row = result.fetchone()
 
-            if not row or row.total_checks == 0:
+                if not row or row.total_checks == 0:
+                    return {
+                        "score": 80.0,
+                        "total_checks": 0,
+                        "accuracy_rate": 0,
+                        "note": "Données insuffisantes",
+                    }
+
+                accuracy_rate = (row.accurate or 0) / row.total_checks * 100
+                avg_deviation = row.avg_deviation_pct or 0
+
+                score = accuracy_rate * 0.7 + max(0, 100 - avg_deviation * 5) * 0.3
+
                 return {
-                    "score": 80.0,
-                    "total_checks": 0,
-                    "accuracy_rate": 0,
-                    "note": "Données insuffisantes",
+                    "score": round(score, 1),
+                    "total_checks": row.total_checks,
+                    "accurate_checks": row.accurate or 0,
+                    "accuracy_rate": round(accuracy_rate, 1),
+                    "avg_deviation_pct": round(avg_deviation, 2),
+                    "max_deviation_pct": round(row.max_deviation_pct or 0, 2),
                 }
-
-            accuracy_rate = (row.accurate or 0) / row.total_checks * 100
-            avg_deviation = row.avg_deviation_pct or 0
-
-            score = accuracy_rate * 0.7 + max(0, 100 - avg_deviation * 5) * 0.3
-
+        except Exception as e:
+            logger.warning(f"Stock accuracy calculation failed: {e}")
             return {
-                "score": round(score, 1),
-                "total_checks": row.total_checks,
-                "accurate_checks": row.accurate or 0,
-                "accuracy_rate": round(accuracy_rate, 1),
-                "avg_deviation_pct": round(avg_deviation, 2),
-                "max_deviation_pct": round(row.max_deviation_pct or 0, 2),
+                "score": 80.0,
+                "total_checks": 0,
+                "accuracy_rate": 0,
+                "note": "Calcul non disponible",
             }
 
     def _calculate_grade(self, score: float) -> str:
@@ -592,6 +708,23 @@ class SupplierScoreCalculator:
                 }
             )
 
+    def get_supplier_name_by_id(self, supplier_id: int) -> Optional[str]:
+        """Récupère le nom d'un fournisseur par son ID."""
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("""
+                    SELECT supplier_name
+                    FROM supplier_score_history
+                    WHERE tenant_id = :tenant_id AND supplier_id = :supplier_id
+                    ORDER BY calculated_at DESC
+                    LIMIT 1
+                """),
+                {"tenant_id": self.tenant_id, "supplier_id": supplier_id}
+            )
+            row = result.fetchone()
+            return row.supplier_name if row else None
+
     def get_all_suppliers_ranking(self) -> List[Dict[str, Any]]:
         """Retourne le classement de tous les fournisseurs."""
         engine = get_engine()
@@ -600,6 +733,7 @@ class SupplierScoreCalculator:
                 text("""
                     WITH latest_scores AS (
                         SELECT DISTINCT ON (supplier_name)
+                            supplier_id,
                             supplier_name,
                             overall_score,
                             grade,
@@ -617,6 +751,7 @@ class SupplierScoreCalculator:
 
             return [
                 {
+                    "supplier_id": row.supplier_id,
                     "supplier_name": row.supplier_name,
                     "score": row.overall_score,
                     "grade": row.grade,

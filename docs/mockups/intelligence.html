@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligence IA/ML - Insights & Prévisions</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-cyan: #06b6d4;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(6, 182, 212, 0.12), transparent),
+                        radial-gradient(ellipse at 100% 0%, rgba(59, 130, 246, 0.08), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            font-size: 18px;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+
+        /* AI Insights Cards */
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 48px;
+        }
+        .insight-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .insight-card:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(6,182,212,0.2);
+        }
+        .insight-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .insight-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .confidence-badge {
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(16,185,129,0.2);
+            color: var(--accent-emerald);
+            border: 1px solid rgba(16,185,129,0.3);
+        }
+        .confidence-badge.medium {
+            background: rgba(245,158,11,0.2);
+            color: var(--accent-amber);
+            border-color: rgba(245,158,11,0.3);
+        }
+        .insight-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .insight-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: rgba(6,182,212,0.1);
+            border: 1px solid rgba(6,182,212,0.3);
+            border-radius: 10px;
+            color: var(--accent-cyan);
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .insight-action:hover {
+            background: rgba(6,182,212,0.2);
+        }
+
+        /* Forecast Section */
+        .forecast-section {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
+            margin-bottom: 32px;
+        }
+        .forecast-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        /* Prediction Cards */
+        .predictions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .prediction-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 20px;
+        }
+        .prediction-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .prediction-value {
+            font-family: 'Sora', sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .prediction-confidence {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Help tooltip pour pédagogie IA */
+        .help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            background: rgba(59,130,246,0.2);
+            border-radius: 50%;
+            color: var(--accent-blue);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: help;
+            margin-left: 8px;
+        }
+        .help-icon:hover {
+            background: rgba(59,130,246,0.3);
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 36px; }
+            .insights-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Intelligence</h1>
+        <p class="subtitle">IA & Analytics - Insights prédictifs pour piloter votre activité</p>
+
+        <!-- AI Insights -->
+        <div class="insights-grid">
+            <div class="insight-card" onclick="alert('Drill-down : Liste des 7 produits avec détails (stock actuel, prévision demande, quantité suggérée)')">
+                <div class="insight-header">
+                    <div class="insight-title">⚠️ Alerte Stock Prédictive</div>
+                    <span class="confidence-badge">95% confiance</span>
+                </div>
+                <p class="insight-text">
+                    L'IA prévoit une rupture de stock sur 7 produits dans les 3 prochains jours
+                    (Tomates, Farine, Huile...) en se basant sur 180 jours d'historique.
+                    <span class="help-icon" title="L'IA analyse vos ventes passées, tendances saisonnières, et délais fournisseurs pour prédire les ruptures avant qu'elles n'arrivent">?</span>
+                </p>
+                <a href="#" class="insight-action" onclick="event.stopPropagation(); alert('Génère un bon de commande automatique')">
+                    Générer commande →
+                </a>
+            </div>
+
+            <div class="insight-card" onclick="alert('Drill-down : Détails de l'opportunité avec calcul ROI, fournisseurs concernés, impact sur marge')">
+                <div class="insight-header">
+                    <div class="insight-title">💰 Opportunité Négociation</div>
+                    <span class="confidence-badge medium">78% confiance</span>
+                </div>
+                <p class="insight-text">
+                    En regroupant vos commandes Metro et Brake, vous pourriez obtenir -12% sur 15 références
+                    (économie estimée : €420/mois).
+                    <span class="help-icon" title="L'IA détecte les opportunités de négociation en analysant vos volumes d'achat et les remises fournisseurs">?</span>
+                </p>
+                <a href="#" class="insight-action" onclick="event.stopPropagation()">
+                    Voir simulation →
+                </a>
+            </div>
+
+            <div class="insight-card" onclick="alert('Drill-down : Liste des produits avec faible rotation, suggestions d'actions')">
+                <div class="insight-header">
+                    <div class="insight-title">📊 Optimisation Rotation</div>
+                    <span class="confidence-badge">92% confiance</span>
+                </div>
+                <p class="insight-text">
+                    12 produits ont une rotation >30 jours (€2,400 de capital immobilisé).
+                    L'IA suggère de réduire les quantités commandées de 40%.
+                    <span class="help-icon" title="L'IA identifie les produits qui restent trop longtemps en stock et calcule la quantité optimale à commander">?</span>
+                </p>
+                <a href="#" class="insight-action" onclick="event.stopPropagation()">
+                    Ajuster EOQ →
+                </a>
+            </div>
+
+            <div class="insight-card" onclick="alert('Drill-down : Détails de l'anomalie avec transactions suspectes')">
+                <div class="insight-header">
+                    <div class="insight-title">🔍 Anomalie Détectée</div>
+                    <span class="confidence-badge">88% confiance</span>
+                </div>
+                <p class="insight-text">
+                    Prix d'achat anormal sur "Poulet fermier" : +35% vs moyenne des 6 derniers mois.
+                    Vérifier facture Brake #1820.
+                    <span class="help-icon" title="L'IA surveille vos prix d'achat et alerte en cas de variation anormale">?</span>
+                </p>
+                <a href="#" class="insight-action" onclick="event.stopPropagation()">
+                    Voir facture →
+                </a>
+            </div>
+        </div>
+
+        <!-- Prévisions -->
+        <div class="forecast-section">
+            <div class="forecast-header">
+                <h2>📈 Prévisions 7 prochains jours</h2>
+                <button style="padding: 10px 20px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); border-radius: 10px; color: #3b82f6; font-weight: 600; cursor: pointer;">
+                    Exporter prévisions CSV
+                </button>
+            </div>
+
+            <div class="predictions-grid">
+                <div class="prediction-card">
+                    <div class="prediction-label">Chiffre d'affaires prévu</div>
+                    <div class="prediction-value" style="color: var(--accent-emerald);">€8,420</div>
+                    <div class="prediction-confidence">
+                        <span class="confidence-badge">82% confiance</span>
+                        ±€840 (marge d'erreur)
+                    </div>
+                </div>
+
+                <div class="prediction-card">
+                    <div class="prediction-label">Sorties stock prévues</div>
+                    <div class="prediction-value" style="color: var(--accent-cyan);">€3,240</div>
+                    <div class="prediction-confidence">
+                        <span class="confidence-badge">87% confiance</span>
+                        Basé sur 90j historique
+                    </div>
+                </div>
+
+                <div class="prediction-card">
+                    <div class="prediction-label">Food cost restaurant</div>
+                    <div class="prediction-value" style="color: var(--accent-amber);">29.4%</div>
+                    <div class="prediction-confidence">
+                        <span class="confidence-badge medium">76% confiance</span>
+                        Objectif: <30%
+                    </div>
+                </div>
+
+                <div class="prediction-card">
+                    <div class="prediction-label">Ruptures stock prévues</div>
+                    <div class="prediction-value" style="color: var(--accent-rose);">7 produits</div>
+                    <div class="prediction-confidence">
+                        <span class="confidence-badge">93% confiance</span>
+                        Action requise
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comment ça marche -->
+        <div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); border-radius: 16px; padding: 24px; margin-top: 32px;">
+            <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 12px; color: var(--accent-blue);">
+                🤖 Comment fonctionne l'IA ?
+            </h3>
+            <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+                L'Intelligence Artificielle analyse en continu vos données historiques (factures, ventes, stock, prix)
+                pour détecter des patterns, anticiper les besoins, et vous alerter sur les opportunités ou anomalies.
+                <br><br>
+                <strong>Modèles utilisés :</strong> Régression linéaire (prévisions ventes), ARIMA (séries temporelles),
+                Isolation Forest (détection anomalies), K-means (classification ABC-XYZ).
+                <br><br>
+                <strong>Données utilisées :</strong> 180 derniers jours minimum pour prévisions fiables.
+                Plus vous utilisez le système, plus les prédictions sont précises.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

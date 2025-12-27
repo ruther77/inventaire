@@ -1,8 +1,36 @@
-"""Schémas finance pour les endpoints de rapprochement."""
+"""
+Module des schémas Pydantic pour le domaine finance.
+
+Ce module définit tous les modèles de données (request/response) pour:
+- Rapprochement bancaire automatique (matching)
+- Comptes financiers et transactions
+- Factures et paiements fournisseurs
+- Catégories et centres de coûts
+- Détection d'anomalies et dépenses récurrentes
+- Relevés bancaires et imports
+- Règles de catégorisation
+- Statistiques et tableaux de bord
+
+Organisation:
+Les schémas sont organisés par fonctionnalité:
+1. Comptes et transactions (FinanceAccount*, FinanceTransaction*)
+2. Factures et paiements (FinanceInvoice*, FinancePayment*)
+3. Rapprochement (FinanceMatch*, FinanceRun*)
+4. Anomalies et récurrence (FinanceAnomaly*, FinanceRecurring*)
+5. Catégories et analytique (FinanceCategory*, FinanceCostCenter*)
+6. Recherche et pagination (*SearchResponse)
+
+Validation:
+Tous les schémas incluent:
+- Validation de types avec Pydantic v2
+- Contraintes métier (montants >= 0, dates cohérentes, etc.)
+- Validators personnalisés pour logique complexe
+- Documentation inline des champs (Field(..., description="..."))
+"""
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -204,7 +232,7 @@ class FinanceInvoiceCreate(BaseModel):
 
 
 class FinanceTransactionSearchResponse(BaseModel):
-    items: list[dict]
+    items: list["FinanceTransactionSearchItem"]
     page: int
     size: int
     total: int
@@ -216,6 +244,32 @@ class FinanceAutreSuggestion(BaseModel):
     key: str
     count: int
     examples: List[str] = Field(default_factory=list)
+
+
+class FinanceTransactionSearchItem(BaseModel):
+    id: int
+    transaction_id: int
+    line_id: Optional[int] = None
+    entity_id: Optional[int] = None
+    account_id: Optional[int] = None
+    account_label: Optional[str] = None
+    direction: Optional[str] = None
+    source: Optional[str] = None
+    date_operation: Optional[date] = None
+    date_value: Optional[date] = None
+    transaction_amount: Optional[float] = None
+    amount: Optional[float] = None
+    category_id: Optional[int] = None
+    category_code: Optional[str] = None
+    category_name: Optional[str] = None
+    cost_center_id: Optional[int] = None
+    cost_center_name: Optional[str] = None
+    label: Optional[str] = None
+    currency: Optional[str] = None
+    status: Optional[str] = None
+    ai_confidence: Optional[float] = None
+    classification_source: Optional[str] = None
+    locked_at: Optional[datetime] = None
 
 
 class FinanceBatchCategorizeRule(BaseModel):

@@ -1,18 +1,110 @@
 #!/usr/bin/env python3
 """
-Import complet des données restaurant depuis les fichiers CSV.
+Module d'import complet et structuré des données du restaurant depuis CSV.
 
-Ce script:
-1. Ajoute les plats manquants avec catégories et prix
-2. Importe les ventes depuis le rapport de commandes
-3. Crée et remplit la table TVA journal
-4. Génère les mouvements de stock depuis les ventes (optionnel)
+Ce script permet de:
+- Importer des plats manquants avec catégories, prix et types
+- Créer un historique des prix pour suivre l'évolution
+- Importer les ventes historiques depuis les rapports de commandes
+- Créer et remplir le journal TVA quotidien par taux
+- Générer automatiquement les mouvements de stock à partir des ventes
+- Gérer les synonymes de noms de produits pour le matching
+- Supporter le mode dry-run pour simulation
+
+Le script traite des données CSV exportées du système de caisse du restaurant
+et les importe dans la base de données de manière structurée et sécurisée.
 
 Usage:
+    # Import complet (tout en une fois)
     python scripts/import_restaurant_data.py --all
+
+    # Import sélectif par étape
     python scripts/import_restaurant_data.py --plats
+    python scripts/import_restaurant_data.py --prix
     python scripts/import_restaurant_data.py --ventes
     python scripts/import_restaurant_data.py --tva
+    python scripts/import_restaurant_data.py --stock
+
+    # Mode simulation sans modification
+    python scripts/import_restaurant_data.py --all --dry-run
+
+Arguments CLI:
+    --all        : Exécute toutes les étapes d'import
+    --plats      : Importe uniquement les plats manquants
+    --prix       : Importe l'historique des prix
+    --ventes     : Importe les ventes depuis les CSV
+    --tva        : Importe le journal TVA
+    --stock      : Génère les mouvements de stock
+    --dry-run    : Mode simulation sans commit en base
+
+Configuration:
+    - TENANT_ID = 2 (Restaurant)
+    - DATA_DIR = "Ventes & Mouvement Stock & Comptabilite Restaurant"
+    - Répertoires de commandes: 2023, 2024, 2025
+    - Répertoire comptable: rapport-comptable-detaille
+
+Variables d'environnement:
+    POSTGRES_HOST: Hôte PostgreSQL (défaut: db)
+    POSTGRES_PORT: Port (défaut: 5432)
+    POSTGRES_DB: Base de données (défaut: epicerie)
+    POSTGRES_USER: Utilisateur (défaut: postgres)
+    POSTGRES_PASSWORD: Mot de passe (défaut: postgres)
+
+Prérequis:
+    - PostgreSQL avec schéma restaurant configuré
+    - Fichiers CSV dans le répertoire de données
+    - psycopg2 pour la connexion
+    - Tables: restaurant_plats, restaurant_sales, restaurant_tva_journal
+
+Fichiers d'entrée:
+    - rapport-de-commandes-produits-YYYY-MM-DD.csv : Ventes détaillées
+      Colonnes: Produit, Quantité, Prix unitaire TTC, Date fermeture
+    - rapport-comptable-detailles-tva-YYYY-MM-DD.csv : Journal TVA
+      Colonnes: Date, Taux de TVA, CA HT, CA TTC, Montant TVA
+
+Fichiers de sortie:
+    - Logs détaillés dans la console
+    - Produits dans restaurant_plats
+    - Historique dans restaurant_plat_prix_history
+    - Ventes dans restaurant_sales
+    - TVA dans restaurant_tva_journal
+    - Mouvements dans restaurant_stock_movements
+
+Workflow complet (--all):
+    1. Import des plats manquants depuis la liste PLATS_A_AJOUTER
+    2. Analyse des CSV pour créer l'historique des prix
+    3. Import des ventes depuis tous les rapports de commandes
+    4. Import du journal TVA depuis le rapport comptable
+    5. Génération des mouvements de stock basés sur les ventes
+
+Mapping de synonymes:
+    Le script gère automatiquement les variantes de noms:
+    - "HEINEKEIN" -> "Heineken (petite)"
+    - "Supplements 3€" -> "SUPPLEMENTS 3€"
+    - "Rôti porc" -> "ROTI PORC"
+    - etc. (voir dictionnaire SYNONYMES)
+
+Exemple de sortie:
+    IMPORT DONNÉES RESTAURANT
+    Répertoire données: /data/restaurant
+    Base de données: epicerie@db
+
+    1. IMPORT DES PLATS MANQUANTS
+    Ajouté: CUISSES DE POULET (Viandes) - 10.00€
+    Ajouté: NDOLE ROYAL (Plats en sauce) - 20.00€
+    Résultat: 45 plats ajoutés, 12 déjà existants
+
+    3. IMPORT DES VENTES
+    267 ventes importées depuis 3 fichiers
+    12 produits non trouvés en DB
+
+    IMPORT TERMINÉ
+
+Notes:
+    - Les doublons sont gérés automatiquement (UPDATE au lieu de INSERT)
+    - Les prix sont trackés dans l'historique pour analyse
+    - Le matching utilise la normalisation des noms
+    - Le mode dry-run permet de tester sans risque
 """
 
 import os

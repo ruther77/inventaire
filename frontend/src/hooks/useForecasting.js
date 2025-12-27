@@ -1,3 +1,8 @@
+/**
+ * Module de hooks pour les prévisions et analyses prédictives (ventes, stock, trésorerie).
+ * @module hooks/useForecasting
+ */
+
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   forecastSales,
@@ -8,7 +13,18 @@ import {
 } from '../api/client.js';
 
 /**
- * Hook pour le résumé des prévisions.
+ * Hook pour récupérer le résumé des prévisions.
+ *
+ * Fournit une vue d'ensemble des prédictions actives : ventes attendues,
+ * risques de rupture, tendances de trésorerie, etc.
+ *
+ * @returns {Object} Query TanStack avec le résumé des prévisions
+ * @property {Object} data - Résumé des différentes prévisions
+ * @property {boolean} isLoading - État de chargement
+ *
+ * @example
+ * const { data: summary } = useForecastingSummary();
+ * console.log(summary.salesForecast, summary.stockAlerts);
  */
 export function useForecastingSummary() {
   return useQuery({
@@ -20,8 +36,23 @@ export function useForecastingSummary() {
 }
 
 /**
- * Hook pour les prévisions de dépletion de stock.
- * @param {Object} params - Paramètres (productId, horizonDays)
+ * Hook pour les prévisions de dépletion (épuisement) du stock.
+ *
+ * Estime la date à laquelle un produit sera en rupture de stock
+ * en fonction de la consommation actuelle et des tendances historiques.
+ *
+ * @param {Object} params - Paramètres de prévision
+ * @param {number} params.productId - ID du produit à analyser
+ * @param {number} [params.horizonDays=30] - Horizon de prévision en jours
+ *
+ * @returns {Object} Query TanStack avec la prévision de dépletion
+ * @property {Object} data - Date estimée de rupture et recommandations
+ *
+ * @example
+ * const { data: forecast } = useStockDepletionForecast({
+ *   productId: 42,
+ *   horizonDays: 60
+ * });
  */
 export function useStockDepletionForecast(params = {}) {
   const { productId, horizonDays = 30 } = params;
@@ -34,8 +65,19 @@ export function useStockDepletionForecast(params = {}) {
 }
 
 /**
- * Hook pour les prévisions de cash-flow.
- * @param {number} horizonDays - Horizon de prévision
+ * Hook pour les prévisions de trésorerie (cash-flow).
+ *
+ * Prédit l'évolution de la trésorerie en tenant compte des encaissements
+ * et décaissements attendus (ventes, achats, charges fixes).
+ *
+ * @param {number} [horizonDays=90] - Horizon de prévision en jours
+ *
+ * @returns {Object} Query TanStack avec la prévision de cash-flow
+ * @property {Array} data - Évolution journalière/hebdomadaire de la trésorerie
+ *
+ * @example
+ * const { data: cashFlow } = useCashFlowForecast(120);
+ * // Prévision sur 4 mois
  */
 export function useCashFlowForecast(horizonDays = 90) {
   return useQuery({

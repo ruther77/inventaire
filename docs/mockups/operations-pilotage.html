@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opérations - Pilotage</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-teal: #06b6d4;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(16, 185, 129, 0.12), transparent),
+                        radial-gradient(ellipse at 100% 0%, rgba(6, 182, 212, 0.08), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        .layout { display: flex; }
+        .sidebar {
+            width: 260px;
+            height: 100vh;
+            position: fixed;
+            background: rgba(255,255,255,0.03);
+            border-right: 1px solid var(--border);
+            padding: 24px 16px;
+        }
+        .logo {
+            font-family: 'Sora', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 32px;
+            background: linear-gradient(135deg, var(--accent-emerald), var(--accent-teal));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .nav-section { margin-bottom: 24px; }
+        .nav-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+            margin-bottom: 4px;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+        .nav-item.active {
+            background: rgba(16,185,129,0.15);
+            color: var(--accent-emerald);
+            font-weight: 500;
+        }
+        .main { margin-left: 260px; padding: 32px; flex: 1; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--text-primary); }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .kpi-card:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-2px);
+        }
+        .kpi-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .kpi-value {
+            font-family: 'Sora', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .kpi-trend {
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .trend-up { color: var(--accent-emerald); }
+        .trend-down { color: #f43f5e; }
+        .chart-section {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            margin-bottom: 32px;
+        }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        .chart-title { font-size: 18px; font-weight: 600; }
+        .period-selector {
+            display: flex;
+            gap: 8px;
+        }
+        .period-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .period-btn:hover { background: rgba(255,255,255,0.06); }
+        .period-btn.active {
+            background: rgba(16,185,129,0.15);
+            border-color: var(--accent-emerald);
+            color: var(--accent-emerald);
+        }
+        .chart-placeholder {
+            height: 280px;
+            background: linear-gradient(180deg, rgba(16,185,129,0.1) 0%, transparent 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            padding: 20px;
+        }
+        .bar {
+            width: 40px;
+            background: linear-gradient(180deg, var(--accent-emerald), var(--accent-teal));
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .bar:hover { opacity: 0.8; transform: scaleY(1.05); }
+        .alerts-section {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+        }
+        .alert-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.03);
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .alert-item:hover { background: rgba(255,255,255,0.08); }
+        .alert-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .alert-icon.warning { background: rgba(245,158,11,0.2); }
+        .alert-icon.critical { background: rgba(244,63,94,0.2); }
+        .alert-icon.info { background: rgba(59,130,246,0.2); }
+        .alert-content { flex: 1; }
+        .alert-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+        .alert-desc { font-size: 13px; color: var(--text-muted); }
+        .alert-action {
+            padding: 8px 16px;
+            background: rgba(16,185,129,0.1);
+            border: 1px solid rgba(16,185,129,0.3);
+            border-radius: 8px;
+            color: var(--accent-emerald);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .alert-action:hover { background: rgba(16,185,129,0.2); }
+        @media (max-width: 1200px) {
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+            .kpi-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="logo">Monprojet</div>
+            <nav>
+                <div class="nav-section">
+                    <div class="nav-label">Principal</div>
+                    <a href="cockpit.html" class="nav-item">🎯 Cockpit</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-label">Opérations</div>
+                    <a href="#" class="nav-item active">📊 Pilotage</a>
+                    <a href="operations-factures.html" class="nav-item">📄 Factures</a>
+                    <a href="operations-stock.html" class="nav-item">📦 Stock</a>
+                    <a href="operations-prix.html" class="nav-item">💰 Prix</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-label">Finances</div>
+                    <a href="finances.html" class="nav-item">💵 Trésorerie</a>
+                    <a href="finance-transactions.html" class="nav-item">📋 Transactions</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-label">Restaurant</div>
+                    <a href="restaurant.html" class="nav-item">🍴 Vue globale</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-label">Intelligence</div>
+                    <a href="intelligence.html" class="nav-item">🧠 IA & Analytics</a>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main">
+            <div class="breadcrumb">
+                <a href="cockpit.html">Accueil</a>
+                <span>/</span>
+                <span>Opérations</span>
+                <span>/</span>
+                <span>Pilotage</span>
+            </div>
+
+            <h1>Pilotage Opérations</h1>
+            <p class="subtitle">Vue d'ensemble de l'activité opérationnelle</p>
+
+            <div class="kpi-grid">
+                <div class="kpi-card" onclick="alert('Drill-down: Liste des 1,247 produits avec filtres')">
+                    <div class="kpi-label">Produits actifs</div>
+                    <div class="kpi-value">1,247</div>
+                    <div class="kpi-trend trend-up">+12 ce mois</div>
+                </div>
+                <div class="kpi-card" onclick="alert('Drill-down: Factures en attente de traitement')">
+                    <div class="kpi-label">Factures en attente</div>
+                    <div class="kpi-value">23</div>
+                    <div class="kpi-trend trend-down">€4,320 à traiter</div>
+                </div>
+                <div class="kpi-card" onclick="alert('Drill-down: Alertes stock détaillées')">
+                    <div class="kpi-label">Alertes stock</div>
+                    <div class="kpi-value" style="color: #f59e0b;">7</div>
+                    <div class="kpi-trend">3 critiques, 4 moyennes</div>
+                </div>
+                <div class="kpi-card" onclick="alert('Drill-down: Performance par catégorie')">
+                    <div class="kpi-label">Rotation moyenne</div>
+                    <div class="kpi-value">18j</div>
+                    <div class="kpi-trend trend-up">-2j vs mois dernier</div>
+                </div>
+            </div>
+
+            <div class="chart-section">
+                <div class="chart-header">
+                    <h2 class="chart-title">Évolution des ventes</h2>
+                    <div class="period-selector">
+                        <button class="period-btn">7j</button>
+                        <button class="period-btn active">30j</button>
+                        <button class="period-btn">90j</button>
+                        <button class="period-btn">12m</button>
+                    </div>
+                </div>
+                <div class="chart-placeholder">
+                    <div class="bar" style="height: 60%;" onclick="alert('Semaine 1: €2,340')"></div>
+                    <div class="bar" style="height: 75%;" onclick="alert('Semaine 2: €2,890')"></div>
+                    <div class="bar" style="height: 45%;" onclick="alert('Semaine 3: €1,780')"></div>
+                    <div class="bar" style="height: 90%;" onclick="alert('Semaine 4: €3,450')"></div>
+                    <div class="bar" style="height: 70%;" onclick="alert('Semaine 5: €2,680')"></div>
+                    <div class="bar" style="height: 85%;" onclick="alert('Semaine 6: €3,240')"></div>
+                    <div class="bar" style="height: 65%;" onclick="alert('Semaine 7: €2,510')"></div>
+                </div>
+            </div>
+
+            <div class="alerts-section">
+                <div class="chart-header">
+                    <h2 class="chart-title">Alertes actives</h2>
+                    <span style="color: var(--text-muted); font-size: 14px;">7 alertes</span>
+                </div>
+                <div class="alert-item" onclick="alert('Ouvre le détail du produit Tomates')">
+                    <div class="alert-icon critical">⚠️</div>
+                    <div class="alert-content">
+                        <div class="alert-title">Rupture imminente - Tomates</div>
+                        <div class="alert-desc">Stock actuel: 2kg • Consommation moyenne: 5kg/jour</div>
+                    </div>
+                    <button class="alert-action">Commander</button>
+                </div>
+                <div class="alert-item" onclick="alert('Ouvre la facture #1820')">
+                    <div class="alert-icon warning">📄</div>
+                    <div class="alert-content">
+                        <div class="alert-title">Facture non rapprochée</div>
+                        <div class="alert-desc">Facture Metro #1820 • €847.50 • Reçue il y a 5 jours</div>
+                    </div>
+                    <button class="alert-action">Traiter</button>
+                </div>
+                <div class="alert-item" onclick="alert('Ouvre le détail du prix anormal')">
+                    <div class="alert-icon info">💰</div>
+                    <div class="alert-content">
+                        <div class="alert-title">Variation prix anormale</div>
+                        <div class="alert-desc">Poulet fermier +35% vs moyenne • Vérifier fournisseur</div>
+                    </div>
+                    <button class="alert-action">Analyser</button>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

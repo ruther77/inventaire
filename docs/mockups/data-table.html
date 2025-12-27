@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design System - Data Tables</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --accent-blue: #3b82f6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 40px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .subtitle { color: var(--text-muted); margin-bottom: 40px; }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 40px 0 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Table container */
+        .table-container {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 32px;
+        }
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .table-title { font-size: 16px; font-weight: 600; }
+        .table-actions { display: flex; gap: 12px; }
+        .table-search {
+            padding: 8px 14px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            width: 240px;
+        }
+        .table-btn {
+            padding: 8px 14px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .table-btn.primary {
+            background: var(--accent-emerald);
+            border-color: var(--accent-emerald);
+            color: white;
+        }
+
+        /* Table styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            text-align: left;
+            padding: 14px 20px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+        }
+        th.sortable {
+            cursor: pointer;
+        }
+        th.sortable:hover { color: var(--text-primary); }
+        .sort-icon { margin-left: 4px; opacity: 0.5; }
+        th.sorted .sort-icon { opacity: 1; }
+        td {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 14px;
+        }
+        tr:hover { background: rgba(255,255,255,0.03); }
+        tr.selected { background: rgba(16, 185, 129, 0.1); }
+
+        /* Cell components */
+        .cell-product {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .cell-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .cell-info {}
+        .cell-title { font-weight: 500; }
+        .cell-sub { font-size: 12px; color: var(--text-muted); }
+        .cell-badge {
+            display: inline-flex;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-success { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .badge-warning { background: rgba(245,158,11,0.2); color: var(--accent-amber); }
+        .badge-danger { background: rgba(244,63,94,0.2); color: var(--accent-rose); }
+        .badge-info { background: rgba(59,130,246,0.2); color: var(--accent-blue); }
+        .cell-trend {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .trend-up { color: var(--accent-emerald); }
+        .trend-down { color: var(--accent-rose); }
+        .cell-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .action-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.06);
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .action-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+        .checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .checkbox.checked {
+            background: var(--accent-emerald);
+            border-color: var(--accent-emerald);
+        }
+
+        /* Pagination */
+        .table-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+        }
+        .pagination-info {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .pagination {
+            display: flex;
+            gap: 8px;
+        }
+        .page-btn {
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .page-btn:hover { background: rgba(255,255,255,0.1); }
+        .page-btn.active {
+            background: var(--accent-emerald);
+            border-color: var(--accent-emerald);
+            color: white;
+        }
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Data Tables</h1>
+        <p class="subtitle">Composants de tableau de données avec tri, pagination et actions</p>
+
+        <div class="section-title">Table complète avec actions</div>
+        <div class="table-container">
+            <div class="table-header">
+                <span class="table-title">Produits (156)</span>
+                <div class="table-actions">
+                    <input type="text" class="table-search" placeholder="Rechercher...">
+                    <button class="table-btn">🔽 Filtres</button>
+                    <button class="table-btn">📥 Exporter</button>
+                    <button class="table-btn primary">➕ Ajouter</button>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"><div class="checkbox"></div></th>
+                        <th class="sortable sorted">Produit <span class="sort-icon">↑</span></th>
+                        <th class="sortable">Stock <span class="sort-icon">↕</span></th>
+                        <th class="sortable">Prix <span class="sort-icon">↕</span></th>
+                        <th>Statut</th>
+                        <th class="sortable">Tendance <span class="sort-icon">↕</span></th>
+                        <th style="width: 100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><div class="checkbox"></div></td>
+                        <td>
+                            <div class="cell-product">
+                                <div class="cell-icon">🍅</div>
+                                <div class="cell-info">
+                                    <div class="cell-title">Tomates grappe</div>
+                                    <div class="cell-sub">REF: METRO-TOM-001</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>12 kg</td>
+                        <td>€3.20/kg</td>
+                        <td><span class="cell-badge badge-danger">Stock bas</span></td>
+                        <td>
+                            <div class="cell-trend trend-down">↓ -15%</div>
+                        </td>
+                        <td>
+                            <div class="cell-actions">
+                                <button class="action-btn">👁️</button>
+                                <button class="action-btn">✏️</button>
+                                <button class="action-btn">⋮</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="selected">
+                        <td><div class="checkbox checked"></div></td>
+                        <td>
+                            <div class="cell-product">
+                                <div class="cell-icon">🥩</div>
+                                <div class="cell-info">
+                                    <div class="cell-title">Entrecôte bœuf</div>
+                                    <div class="cell-sub">REF: METRO-VIA-045</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>8 kg</td>
+                        <td>€22.50/kg</td>
+                        <td><span class="cell-badge badge-success">En stock</span></td>
+                        <td>
+                            <div class="cell-trend trend-up">↑ +8%</div>
+                        </td>
+                        <td>
+                            <div class="cell-actions">
+                                <button class="action-btn">👁️</button>
+                                <button class="action-btn">✏️</button>
+                                <button class="action-btn">⋮</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><div class="checkbox"></div></td>
+                        <td>
+                            <div class="cell-product">
+                                <div class="cell-icon">🧀</div>
+                                <div class="cell-info">
+                                    <div class="cell-title">Comté 18 mois</div>
+                                    <div class="cell-sub">REF: METRO-FRO-012</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>15 kg</td>
+                        <td>€18.90/kg</td>
+                        <td><span class="cell-badge badge-success">En stock</span></td>
+                        <td>
+                            <div class="cell-trend">= 0%</div>
+                        </td>
+                        <td>
+                            <div class="cell-actions">
+                                <button class="action-btn">👁️</button>
+                                <button class="action-btn">✏️</button>
+                                <button class="action-btn">⋮</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><div class="checkbox"></div></td>
+                        <td>
+                            <div class="cell-product">
+                                <div class="cell-icon">🫒</div>
+                                <div class="cell-info">
+                                    <div class="cell-title">Huile olive extra vierge</div>
+                                    <div class="cell-sub">REF: METRO-HUI-003</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>24 L</td>
+                        <td>€10.80/L</td>
+                        <td><span class="cell-badge badge-warning">Stock moyen</span></td>
+                        <td>
+                            <div class="cell-trend trend-up">↑ +5%</div>
+                        </td>
+                        <td>
+                            <div class="cell-actions">
+                                <button class="action-btn">👁️</button>
+                                <button class="action-btn">✏️</button>
+                                <button class="action-btn">⋮</button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="table-footer">
+                <span class="pagination-info">Affichage 1-4 sur 156 produits</span>
+                <div class="pagination">
+                    <button class="page-btn" disabled>←</button>
+                    <button class="page-btn active">1</button>
+                    <button class="page-btn">2</button>
+                    <button class="page-btn">3</button>
+                    <button class="page-btn">...</button>
+                    <button class="page-btn">16</button>
+                    <button class="page-btn">→</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

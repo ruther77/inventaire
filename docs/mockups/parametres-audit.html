@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paramètres - Audit Trail</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-slate: #64748b;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(100, 116, 139, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .filters-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .filter-input {
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            min-width: 200px;
+        }
+        .filter-select {
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        .audit-table {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left;
+            padding: 14px 20px;
+            background: rgba(255,255,255,0.03);
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: 14px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 13px;
+        }
+        tr:hover { background: rgba(255,255,255,0.03); }
+        .action-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .action-create { background: rgba(16,185,129,0.2); color: #10b981; }
+        .action-update { background: rgba(59,130,246,0.2); color: #3b82f6; }
+        .action-delete { background: rgba(244,63,94,0.2); color: #f43f5e; }
+        .action-login { background: rgba(139,92,246,0.2); color: #8b5cf6; }
+        .user-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(59,130,246,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #3b82f6;
+        }
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <span>Paramètres</span>
+            <span>/</span>
+            <span>Audit Trail</span>
+        </div>
+
+        <h1>📋 Audit Trail</h1>
+        <p class="subtitle">Historique de toutes les actions effectuées dans l'application</p>
+
+        <div class="filters-bar">
+            <input type="text" class="filter-input" placeholder="Rechercher...">
+            <select class="filter-select">
+                <option>Toutes les actions</option>
+                <option>Création</option>
+                <option>Modification</option>
+                <option>Suppression</option>
+                <option>Connexion</option>
+            </select>
+            <select class="filter-select">
+                <option>Tous les utilisateurs</option>
+                <option>admin</option>
+                <option>manager</option>
+                <option>staff</option>
+            </select>
+            <select class="filter-select">
+                <option>Toutes les entités</option>
+                <option>Produits</option>
+                <option>Factures</option>
+                <option>Utilisateurs</option>
+            </select>
+            <input type="date" class="filter-input" style="min-width: 150px;">
+        </div>
+
+        <div class="audit-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date/Heure</th>
+                        <th>Utilisateur</th>
+                        <th>Action</th>
+                        <th>Entité</th>
+                        <th>Détails</th>
+                        <th>IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>24/12/2025 14:32:15</td>
+                        <td>
+                            <div class="user-cell">
+                                <div class="user-avatar">A</div>
+                                <span>admin</span>
+                            </div>
+                        </td>
+                        <td><span class="action-badge action-update">Modification</span></td>
+                        <td>Produit #1247</td>
+                        <td>Prix modifié: €3.20 → €3.50</td>
+                        <td style="color: var(--text-muted);">192.168.1.42</td>
+                    </tr>
+                    <tr>
+                        <td>24/12/2025 14:28:03</td>
+                        <td>
+                            <div class="user-cell">
+                                <div class="user-avatar">A</div>
+                                <span>admin</span>
+                            </div>
+                        </td>
+                        <td><span class="action-badge action-create">Création</span></td>
+                        <td>Facture #1820</td>
+                        <td>Import facture Metro €847.50</td>
+                        <td style="color: var(--text-muted);">192.168.1.42</td>
+                    </tr>
+                    <tr>
+                        <td>24/12/2025 14:15:22</td>
+                        <td>
+                            <div class="user-cell">
+                                <div class="user-avatar">M</div>
+                                <span>manager</span>
+                            </div>
+                        </td>
+                        <td><span class="action-badge action-login">Connexion</span></td>
+                        <td>Session</td>
+                        <td>Connexion réussie</td>
+                        <td style="color: var(--text-muted);">192.168.1.35</td>
+                    </tr>
+                    <tr>
+                        <td>24/12/2025 13:45:11</td>
+                        <td>
+                            <div class="user-cell">
+                                <div class="user-avatar">A</div>
+                                <span>admin</span>
+                            </div>
+                        </td>
+                        <td><span class="action-badge action-delete">Suppression</span></td>
+                        <td>Produit #892</td>
+                        <td>Produit archivé: "Ancien produit"</td>
+                        <td style="color: var(--text-muted);">192.168.1.42</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination">
+                <span style="font-size: 14px; color: var(--text-muted);">Affichage 1-4 sur 1,247 entrées</span>
+                <div style="display: flex; gap: 8px;">
+                    <button style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer;">←</button>
+                    <button style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: rgba(100,116,139,0.2); color: var(--text-primary); cursor: pointer;">1</button>
+                    <button style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer;">2</button>
+                    <button style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer;">→</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

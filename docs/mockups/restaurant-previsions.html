@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant - Prévisions</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-orange: #f97316;
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-cyan: #06b6d4;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(249, 115, 22, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .forecast-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .forecast-card:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+        .forecast-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        .forecast-value {
+            font-family: 'Sora', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .confidence-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(16,185,129,0.2);
+            color: var(--accent-emerald);
+        }
+        .card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chart-area {
+            height: 280px;
+            background: linear-gradient(180deg, rgba(249,115,22,0.08) 0%, transparent 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            padding: 20px;
+            position: relative;
+        }
+        .forecast-line {
+            position: absolute;
+            top: 30%;
+            left: 0;
+            right: 0;
+            border-top: 2px dashed rgba(6,182,212,0.5);
+        }
+        .bar-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .bar {
+            width: 40px;
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .bar:hover { opacity: 0.8; }
+        .bar.actual { background: linear-gradient(180deg, var(--accent-orange), var(--accent-amber)); }
+        .bar.forecast { background: linear-gradient(180deg, rgba(6,182,212,0.6), rgba(6,182,212,0.3)); border: 2px dashed var(--accent-cyan); }
+        .bar-label { font-size: 11px; color: var(--text-muted); }
+        .legend {
+            display: flex;
+            gap: 24px;
+            justify-content: center;
+            margin-top: 16px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+        .ingredients-forecast {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+        .ingredient-forecast-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ingredient-forecast-item:hover { background: rgba(255,255,255,0.08); }
+        .ingredient-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .ingredient-icon { font-size: 24px; }
+        .ingredient-name { font-size: 14px; font-weight: 500; }
+        .ingredient-stock { font-size: 12px; color: var(--text-muted); }
+        .forecast-need {
+            text-align: right;
+        }
+        .need-value { font-size: 16px; font-weight: 600; }
+        .need-status { font-size: 12px; }
+        .need-status.ok { color: var(--accent-emerald); }
+        .need-status.warning { color: var(--accent-amber); }
+        .need-status.critical { color: #f43f5e; }
+        @media (max-width: 1024px) {
+            .forecast-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="restaurant.html">Restaurant</a>
+            <span>/</span>
+            <span>Prévisions</span>
+        </div>
+
+        <h1>🔮 Prévisions Restaurant</h1>
+        <p class="subtitle">Prévisions IA des ventes et besoins en ingrédients pour les 7 prochains jours</p>
+
+        <div class="forecast-grid">
+            <div class="forecast-card" onclick="alert('Détail CA prévu')">
+                <div class="forecast-label">CA prévu (7j)</div>
+                <div class="forecast-value" style="color: var(--accent-emerald);">€12,450</div>
+                <span class="confidence-badge">85% confiance</span>
+            </div>
+            <div class="forecast-card" onclick="alert('Détail couverts prévus')">
+                <div class="forecast-label">Couverts prévus (7j)</div>
+                <div class="forecast-value">524</div>
+                <span class="confidence-badge">82% confiance</span>
+            </div>
+            <div class="forecast-card" onclick="alert('Détail food cost prévu')">
+                <div class="forecast-label">Food Cost prévu</div>
+                <div class="forecast-value" style="color: var(--accent-amber);">29.2%</div>
+                <span class="confidence-badge">78% confiance</span>
+            </div>
+            <div class="forecast-card" onclick="alert('Détail besoins ingrédients')">
+                <div class="forecast-label">Besoins ingrédients</div>
+                <div class="forecast-value">€3,640</div>
+                <span class="confidence-badge">88% confiance</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <span>📈 Prévision CA journalier</span>
+                <button style="padding: 8px 16px; background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3); border-radius: 8px; color: var(--accent-cyan); font-size: 12px; cursor: pointer;">
+                    📥 Exporter
+                </button>
+            </div>
+            <div class="chart-area">
+                <div class="bar-group">
+                    <div class="bar actual" style="height: 140px;" onclick="alert('Lundi (passé): €1,450')"></div>
+                    <span class="bar-label">Lun</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bar actual" style="height: 120px;" onclick="alert('Mardi (passé): €1,280')"></div>
+                    <span class="bar-label">Mar</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bar actual" style="height: 160px;" onclick="alert('Mercredi (aujourd hui): €1,680')"></div>
+                    <span class="bar-label">Mer</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bar forecast" style="height: 150px;" onclick="alert('Jeudi (prévu): €1,580')"></div>
+                    <span class="bar-label">Jeu</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bar forecast" style="height: 200px;" onclick="alert('Vendredi (prévu): €2,120')"></div>
+                    <span class="bar-label">Ven</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bar forecast" style="height: 220px;" onclick="alert('Samedi (prévu): €2,340')"></div>
+                    <span class="bar-label">Sam</span>
+                </div>
+                <div class="bar-group">
+                    <div class="bar forecast" style="height: 100px;" onclick="alert('Dimanche (prévu): €1,000')"></div>
+                    <span class="bar-label">Dim</span>
+                </div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--accent-orange);"></div>
+                    <span>Réalisé</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--accent-cyan); opacity: 0.6;"></div>
+                    <span>Prévision IA</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <span>🥗 Besoins ingrédients prévus (7j)</span>
+            </div>
+            <div class="ingredients-forecast">
+                <div class="ingredient-forecast-item" onclick="alert('Détail Entrecôte')">
+                    <div class="ingredient-info">
+                        <span class="ingredient-icon">🥩</span>
+                        <div>
+                            <div class="ingredient-name">Entrecôte de boeuf</div>
+                            <div class="ingredient-stock">Stock: 2.5 kg</div>
+                        </div>
+                    </div>
+                    <div class="forecast-need">
+                        <div class="need-value">35 kg</div>
+                        <div class="need-status critical">⚠️ Commander 32.5 kg</div>
+                    </div>
+                </div>
+                <div class="ingredient-forecast-item" onclick="alert('Détail Tomates')">
+                    <div class="ingredient-info">
+                        <span class="ingredient-icon">🍅</span>
+                        <div>
+                            <div class="ingredient-name">Tomates</div>
+                            <div class="ingredient-stock">Stock: 4 kg</div>
+                        </div>
+                    </div>
+                    <div class="forecast-need">
+                        <div class="need-value">18 kg</div>
+                        <div class="need-status critical">⚠️ Commander 14 kg</div>
+                    </div>
+                </div>
+                <div class="ingredient-forecast-item" onclick="alert('Détail Frites')">
+                    <div class="ingredient-info">
+                        <span class="ingredient-icon">🍟</span>
+                        <div>
+                            <div class="ingredient-name">Frites</div>
+                            <div class="ingredient-stock">Stock: 18 kg</div>
+                        </div>
+                    </div>
+                    <div class="forecast-need">
+                        <div class="need-value">45 kg</div>
+                        <div class="need-status warning">⏰ Commander 27 kg</div>
+                    </div>
+                </div>
+                <div class="ingredient-forecast-item" onclick="alert('Détail Parmesan')">
+                    <div class="ingredient-info">
+                        <span class="ingredient-icon">🧀</span>
+                        <div>
+                            <div class="ingredient-name">Parmesan</div>
+                            <div class="ingredient-stock">Stock: 1.2 kg</div>
+                        </div>
+                    </div>
+                    <div class="forecast-need">
+                        <div class="need-value">0.8 kg</div>
+                        <div class="need-status ok">✓ Stock suffisant</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

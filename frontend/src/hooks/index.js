@@ -59,6 +59,7 @@ export { default as usePersistedFilters } from './usePersistedFilters.js';
 // Re-export des hooks existants
 export { useProducts } from './useProducts.js';
 export { useDashboardMetrics } from './useDashboard.js';
+export { useCategories } from './useCategories.js';
 
 // Accessibility hooks
 export {
@@ -186,6 +187,15 @@ export {
   useRecordDelivery,
   useRecordInvoiceIssue,
 } from './useSupplierScoring.js';
+
+// Suppliers CRUD
+export {
+  useSuppliers,
+  useSupplier,
+  useCreateSupplier,
+  useUpdateSupplier,
+  useDeleteSupplier,
+} from './useSuppliers.js';
 
 // Intelligence - Margins
 export {

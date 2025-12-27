@@ -1,12 +1,19 @@
 /**
- * DashboardPage - Vue inventaire & stock
- * Design Next-Gen 2025 - Phase 3
+ * Page Dashboard - Vue d'ensemble de l'inventaire et du stock.
  *
- * Affiche :
- * - Hero avec statut plateforme
- * - KPIs principaux
- * - Graphiques flux hebdomadaires & répartition catégories
- * - Top listes (stock, ventes, fournisseurs)
+ * Cette page permet de visualiser en temps réel l'état complet de l'inventaire et du stock.
+ * Elle affiche:
+ * - Un hero avec le statut de la plateforme et les alertes actives
+ * - Les KPIs principaux (produits, valeur stock, alertes)
+ * - Un graphique des flux hebdomadaires (entrées/sorties)
+ * - Une répartition du stock par catégorie
+ * - Les top listes (stock par valeur, ventes, fournisseurs)
+ * - Les alertes de stock bas en temps réel
+ *
+ * @component
+ *
+ * @example
+ * <DashboardPage />
  */
 
 import { useMemo, useState } from 'react';
@@ -75,7 +82,8 @@ export default function DashboardPage() {
     };
   }, [products]);
 
-  // Série hebdomadaire
+  // Série hebdomadaire - Transforme les données brutes en format pour le graphique
+  // On limite l'affichage aux X dernières semaines selon weeklyWindow
   const weeklySeries = useMemo(() => {
     const series = dashboardData?.weekly_variation ?? [];
     return series
@@ -89,12 +97,14 @@ export default function DashboardPage() {
           label,
           entrees,
           sorties,
-          net: entrees - sorties,
+          net: entrees - sorties, // Calcul du flux net
         };
       });
   }, [dashboardData?.weekly_variation, weeklyWindow]);
 
-  // Données par catégorie
+  // Données par catégorie - Agrégation du stock par catégorie
+  // On regroupe tous les produits par catégorie et on somme leurs stocks
+  // Affiche uniquement les 6 catégories avec le plus de stock
   const categoryStockData = useMemo(() => {
     if (!products.length) return [];
     const totals = products.reduce((acc, product) => {
@@ -103,8 +113,8 @@ export default function DashboardPage() {
       return acc;
     }, {});
     return Object.entries(totals)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
+      .sort((a, b) => b[1] - a[1]) // Tri décroissant par quantité
+      .slice(0, 6) // Top 6 catégories
       .map(([label, qty]) => ({ label, qty }));
   }, [products]);
 

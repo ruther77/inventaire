@@ -27,6 +27,41 @@ const sizes = {
   xl: 'px-8 py-4 text-base min-h-[52px]',
 };
 
+/**
+ * Composant Button.
+ *
+ * Bouton réutilisable avec plusieurs variantes visuelles, tailles et états.
+ * Supporte les états de chargement, désactivé, et peut être rendu comme différents éléments HTML.
+ * Accessible WCAG 2.1 avec focus visible et minimum touch target 44px.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {React.ElementType} [props.as='button'] - Élément HTML à rendre ('button', 'a', etc.)
+ * @param {string} [props.type='button'] - Type HTML du bouton si as='button'
+ * @param {string} [props.variant='primary'] - Variante visuelle ('primary' | 'subtle' | 'ghost' | 'brand' | 'destructive' | 'outline')
+ * @param {string} [props.size='md'] - Taille du bouton ('xs' | 'sm' | 'md' | 'lg' | 'xl')
+ * @param {string} [props.className] - Classes CSS additionnelles
+ * @param {boolean} [props.iconOnly=false] - Active le mode icône seule (forme carrée)
+ * @param {boolean} [props.loading=false] - Affiche un spinner de chargement
+ * @param {boolean} [props.disabled=false] - Désactive le bouton
+ * @param {React.ReactNode} [props.children] - Contenu du bouton
+ *
+ * @example
+ * <Button variant="primary" onClick={handleClick}>
+ *   Valider
+ * </Button>
+ *
+ * @example
+ * <Button variant="destructive" size="sm" loading>
+ *   Suppression...
+ * </Button>
+ *
+ * @example
+ * <Button as="a" href="/dashboard" variant="ghost">
+ *   Retour au tableau de bord
+ * </Button>
+ */
 export default function Button({
   as: Component = 'button',
   type = 'button',

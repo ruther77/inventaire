@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paramètres - Alertes & Notifications</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-slate: #64748b;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --accent-blue: #3b82f6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(100, 116, 139, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .alert-section {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .section-title { font-size: 18px; font-weight: 600; }
+        .toggle-all {
+            font-size: 13px;
+            color: var(--accent-blue);
+            cursor: pointer;
+        }
+        .alert-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            margin-bottom: 12px;
+        }
+        .alert-info { flex: 1; }
+        .alert-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin-right: 16px;
+        }
+        .alert-icon.stock { background: rgba(16,185,129,0.2); }
+        .alert-icon.price { background: rgba(245,158,11,0.2); }
+        .alert-icon.finance { background: rgba(59,130,246,0.2); }
+        .alert-icon.system { background: rgba(244,63,94,0.2); }
+        .alert-name { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+        .alert-desc { font-size: 13px; color: var(--text-muted); }
+        .alert-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .channel-icons {
+            display: flex;
+            gap: 8px;
+        }
+        .channel-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .channel-icon.active {
+            background: rgba(16,185,129,0.2);
+            border-color: var(--accent-emerald);
+        }
+        .channel-icon:hover { background: rgba(255,255,255,0.1); }
+        .toggle {
+            width: 48px;
+            height: 26px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .toggle.active { background: var(--accent-emerald); }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: all 0.2s;
+        }
+        .toggle.active::after { left: 25px; }
+        .frequency-section {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .frequency-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .frequency-option {
+            padding: 16px;
+            background: rgba(255,255,255,0.03);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .frequency-option.selected {
+            border-color: var(--accent-emerald);
+            background: rgba(16,185,129,0.1);
+        }
+        .frequency-option:hover { background: rgba(255,255,255,0.06); }
+        .freq-icon { font-size: 24px; margin-bottom: 8px; }
+        .freq-name { font-size: 14px; font-weight: 500; }
+        .freq-desc { font-size: 12px; color: var(--text-muted); }
+        .btn-save {
+            padding: 12px 24px;
+            background: var(--accent-emerald);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <span>Paramètres</span>
+            <span>/</span>
+            <span>Alertes & Notifications</span>
+        </div>
+
+        <h1>🔔 Alertes & Notifications</h1>
+        <p class="subtitle">Configuration des alertes et canaux de notification</p>
+
+        <div class="alert-section">
+            <div class="section-header">
+                <div class="section-title">📦 Alertes Stock</div>
+                <span class="toggle-all" onclick="alert('Tout activer')">Tout activer</span>
+            </div>
+            <div class="alert-item">
+                <div class="alert-icon stock">📉</div>
+                <div class="alert-info">
+                    <div class="alert-name">Stock bas</div>
+                    <div class="alert-desc">Alerte quand le stock passe sous le seuil minimum</div>
+                </div>
+                <div class="alert-controls">
+                    <div class="channel-icons">
+                        <div class="channel-icon active" title="Email">📧</div>
+                        <div class="channel-icon active" title="Push">🔔</div>
+                        <div class="channel-icon" title="SMS">📱</div>
+                    </div>
+                    <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                </div>
+            </div>
+            <div class="alert-item">
+                <div class="alert-icon stock">🚨</div>
+                <div class="alert-info">
+                    <div class="alert-name">Rupture imminente</div>
+                    <div class="alert-desc">Alerte critique 3 jours avant rupture estimée</div>
+                </div>
+                <div class="alert-controls">
+                    <div class="channel-icons">
+                        <div class="channel-icon active" title="Email">📧</div>
+                        <div class="channel-icon active" title="Push">🔔</div>
+                        <div class="channel-icon active" title="SMS">📱</div>
+                    </div>
+                    <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                </div>
+            </div>
+            <div class="alert-item">
+                <div class="alert-icon stock">📈</div>
+                <div class="alert-info">
+                    <div class="alert-name">Surstock détecté</div>
+                    <div class="alert-desc">Alerte quand le stock dépasse le seuil maximum</div>
+                </div>
+                <div class="alert-controls">
+                    <div class="channel-icons">
+                        <div class="channel-icon active" title="Email">📧</div>
+                        <div class="channel-icon" title="Push">🔔</div>
+                        <div class="channel-icon" title="SMS">📱</div>
+                    </div>
+                    <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert-section">
+            <div class="section-header">
+                <div class="section-title">💰 Alertes Prix & Finances</div>
+                <span class="toggle-all" onclick="alert('Tout activer')">Tout activer</span>
+            </div>
+            <div class="alert-item">
+                <div class="alert-icon price">📊</div>
+                <div class="alert-info">
+                    <div class="alert-name">Variation prix anormale</div>
+                    <div class="alert-desc">Alerte si variation > 20% sur un produit</div>
+                </div>
+                <div class="alert-controls">
+                    <div class="channel-icons">
+                        <div class="channel-icon active" title="Email">📧</div>
+                        <div class="channel-icon active" title="Push">🔔</div>
+                        <div class="channel-icon" title="SMS">📱</div>
+                    </div>
+                    <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                </div>
+            </div>
+            <div class="alert-item">
+                <div class="alert-icon finance">🏦</div>
+                <div class="alert-info">
+                    <div class="alert-name">Facture non rapprochée</div>
+                    <div class="alert-desc">Rappel après 7 jours sans rapprochement</div>
+                </div>
+                <div class="alert-controls">
+                    <div class="channel-icons">
+                        <div class="channel-icon active" title="Email">📧</div>
+                        <div class="channel-icon" title="Push">🔔</div>
+                        <div class="channel-icon" title="SMS">📱</div>
+                    </div>
+                    <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert-section">
+            <div class="section-header">
+                <div class="section-title">🍴 Alertes Restaurant</div>
+                <span class="toggle-all" onclick="alert('Tout activer')">Tout activer</span>
+            </div>
+            <div class="alert-item">
+                <div class="alert-icon system">⚠️</div>
+                <div class="alert-info">
+                    <div class="alert-name">Food cost dépassé</div>
+                    <div class="alert-desc">Alerte si food cost > 40% sur un plat</div>
+                </div>
+                <div class="alert-controls">
+                    <div class="channel-icons">
+                        <div class="channel-icon active" title="Email">📧</div>
+                        <div class="channel-icon active" title="Push">🔔</div>
+                        <div class="channel-icon" title="SMS">📱</div>
+                    </div>
+                    <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                </div>
+            </div>
+            <div class="alert-item">
+                <div class="alert-icon price">📋</div>
+                <div class="alert-info">
+                    <div class="alert-name">Écart théorique/réel</div>
+                    <div class="alert-desc">Alerte si consommation réelle > 15% du théorique</div>
+                </div>
+                <div class="alert-controls">
+                    <div class="channel-icons">
+                        <div class="channel-icon active" title="Email">📧</div>
+                        <div class="channel-icon" title="Push">🔔</div>
+                        <div class="channel-icon" title="SMS">📱</div>
+                    </div>
+                    <div class="toggle" onclick="this.classList.toggle('active')"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="frequency-section">
+            <div class="section-title">⏰ Fréquence des rapports</div>
+            <div class="frequency-grid">
+                <div class="frequency-option" onclick="selectFrequency(this)">
+                    <div class="freq-icon">📅</div>
+                    <div class="freq-name">Quotidien</div>
+                    <div class="freq-desc">Rapport tous les matins à 8h</div>
+                </div>
+                <div class="frequency-option selected" onclick="selectFrequency(this)">
+                    <div class="freq-icon">📆</div>
+                    <div class="freq-name">Hebdomadaire</div>
+                    <div class="freq-desc">Rapport chaque lundi</div>
+                </div>
+                <div class="frequency-option" onclick="selectFrequency(this)">
+                    <div class="freq-icon">🗓️</div>
+                    <div class="freq-name">Mensuel</div>
+                    <div class="freq-desc">Rapport le 1er du mois</div>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-save" onclick="alert('Paramètres sauvegardés')">Enregistrer les modifications</button>
+    </div>
+
+    <script>
+        function selectFrequency(el) {
+            document.querySelectorAll('.frequency-option').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+    </script>
+</body>
+</html>

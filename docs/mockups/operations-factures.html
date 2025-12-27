@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opérations - Factures</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-teal: #06b6d4;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(16, 185, 129, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--text-primary); }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+        }
+        .header-actions { display: flex; gap: 12px; }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-emerald), var(--accent-teal));
+            color: white;
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-secondary {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .stat-value { font-size: 24px; font-weight: 700; }
+        .filters-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .filter-input {
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            min-width: 200px;
+        }
+        .filter-input::placeholder { color: var(--text-muted); }
+        .filter-select {
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .table-container {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left;
+            padding: 16px 20px;
+            background: rgba(255,255,255,0.03);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 14px;
+        }
+        tr:hover { background: rgba(255,255,255,0.03); }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-pending { background: rgba(245,158,11,0.2); color: #f59e0b; }
+        .status-processed { background: rgba(16,185,129,0.2); color: #10b981; }
+        .status-error { background: rgba(244,63,94,0.2); color: #f43f5e; }
+        .row-actions { display: flex; gap: 8px; }
+        .action-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+        .action-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-primary);
+        }
+        .action-btn.primary {
+            background: rgba(16,185,129,0.1);
+            border-color: rgba(16,185,129,0.3);
+            color: var(--accent-emerald);
+        }
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+        }
+        .page-info { font-size: 14px; color: var(--text-muted); }
+        .page-buttons { display: flex; gap: 8px; }
+        .page-btn {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        .page-btn:hover { background: rgba(255,255,255,0.06); }
+        .page-btn.active { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        @media (max-width: 1024px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .stats-row { grid-template-columns: 1fr; }
+            .page-header { flex-direction: column; gap: 16px; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="operations-pilotage.html">Opérations</a>
+            <span>/</span>
+            <span>Factures</span>
+        </div>
+
+        <div class="page-header">
+            <h1>Factures Fournisseurs</h1>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="alert('Export CSV des factures')">📥 Exporter</button>
+                <button class="btn btn-primary" onclick="alert('Ouvre la modale d\'import de facture')">+ Importer facture</button>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-label">Total ce mois</div>
+                <div class="stat-value">€24,847</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">En attente</div>
+                <div class="stat-value" style="color: #f59e0b;">23</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Traitées</div>
+                <div class="stat-value" style="color: var(--accent-emerald);">156</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">En erreur</div>
+                <div class="stat-value" style="color: #f43f5e;">3</div>
+            </div>
+        </div>
+
+        <div class="filters-bar">
+            <input type="text" class="filter-input" placeholder="Rechercher facture, fournisseur...">
+            <select class="filter-select">
+                <option>Tous les statuts</option>
+                <option>En attente</option>
+                <option>Traitées</option>
+                <option>En erreur</option>
+            </select>
+            <select class="filter-select">
+                <option>Tous les fournisseurs</option>
+                <option>Metro</option>
+                <option>Brake</option>
+                <option>Pomona</option>
+            </select>
+            <select class="filter-select">
+                <option>Ce mois</option>
+                <option>Mois dernier</option>
+                <option>3 derniers mois</option>
+                <option>Cette année</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Fournisseur</th>
+                        <th>Date</th>
+                        <th>Montant</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr onclick="alert('Ouvre le détail de la facture #1820')">
+                        <td><strong>#1820</strong></td>
+                        <td>Metro</td>
+                        <td>23/12/2025</td>
+                        <td>€847.50</td>
+                        <td><span class="status-badge status-pending">En attente</span></td>
+                        <td class="row-actions">
+                            <button class="action-btn primary" onclick="event.stopPropagation(); alert('Traiter la facture')">Traiter</button>
+                            <button class="action-btn" onclick="event.stopPropagation(); alert('Voir le PDF')">PDF</button>
+                        </td>
+                    </tr>
+                    <tr onclick="alert('Ouvre le détail de la facture #1819')">
+                        <td><strong>#1819</strong></td>
+                        <td>Brake</td>
+                        <td>22/12/2025</td>
+                        <td>€1,234.80</td>
+                        <td><span class="status-badge status-processed">Traitée</span></td>
+                        <td class="row-actions">
+                            <button class="action-btn" onclick="event.stopPropagation(); alert('Voir les détails')">Détails</button>
+                            <button class="action-btn" onclick="event.stopPropagation(); alert('Voir le PDF')">PDF</button>
+                        </td>
+                    </tr>
+                    <tr onclick="alert('Ouvre le détail de la facture #1818')">
+                        <td><strong>#1818</strong></td>
+                        <td>Pomona</td>
+                        <td>21/12/2025</td>
+                        <td>€456.20</td>
+                        <td><span class="status-badge status-error">Erreur</span></td>
+                        <td class="row-actions">
+                            <button class="action-btn primary" onclick="event.stopPropagation(); alert('Corriger l\'erreur')">Corriger</button>
+                            <button class="action-btn" onclick="event.stopPropagation(); alert('Voir le PDF')">PDF</button>
+                        </td>
+                    </tr>
+                    <tr onclick="alert('Ouvre le détail de la facture #1817')">
+                        <td><strong>#1817</strong></td>
+                        <td>Metro</td>
+                        <td>20/12/2025</td>
+                        <td>€2,156.90</td>
+                        <td><span class="status-badge status-processed">Traitée</span></td>
+                        <td class="row-actions">
+                            <button class="action-btn" onclick="event.stopPropagation(); alert('Voir les détails')">Détails</button>
+                            <button class="action-btn" onclick="event.stopPropagation(); alert('Voir le PDF')">PDF</button>
+                        </td>
+                    </tr>
+                    <tr onclick="alert('Ouvre le détail de la facture #1816')">
+                        <td><strong>#1816</strong></td>
+                        <td>Brake</td>
+                        <td>19/12/2025</td>
+                        <td>€678.30</td>
+                        <td><span class="status-badge status-pending">En attente</span></td>
+                        <td class="row-actions">
+                            <button class="action-btn primary" onclick="event.stopPropagation(); alert('Traiter la facture')">Traiter</button>
+                            <button class="action-btn" onclick="event.stopPropagation(); alert('Voir le PDF')">PDF</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination">
+                <div class="page-info">Affichage 1-5 sur 182 factures</div>
+                <div class="page-buttons">
+                    <button class="page-btn">←</button>
+                    <button class="page-btn active">1</button>
+                    <button class="page-btn">2</button>
+                    <button class="page-btn">3</button>
+                    <button class="page-btn">...</button>
+                    <button class="page-btn">37</button>
+                    <button class="page-btn">→</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,4 +1,24 @@
-"""Configuration applicative backend (API FastAPI) basée sur core.settings.AppSettings."""
+"""
+Module de configuration du backend FastAPI.
+
+Ce module étend les settings du core avec des paramètres spécifiques
+au backend API:
+
+Paramètres additionnels:
+- allow_insecure_jwt_default: Autorise le secret JWT par défaut en dev
+- log_level: Niveau de logging (DEBUG, INFO, WARNING, ERROR)
+
+Hérite de:
+- AppSettings (core): Configuration base incluant DB, CORS, JWT
+
+Configuration via variables d'environnement:
+- ALLOW_INSECURE_JWT_DEFAULT=true: Active le secret par défaut (dev uniquement)
+- LOG_LEVEL=DEBUG: Niveau de log détaillé
+
+Note:
+    En production, le secret JWT par défaut est toujours rejeté
+    même si ALLOW_INSECURE_JWT_DEFAULT=true. Utilisez JWT_SECRET_KEY.
+"""
 
 from __future__ import annotations
 

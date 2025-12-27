@@ -16,7 +16,9 @@ def fetch_kpis(tenant_id: int) -> dict[str, float | int]:
         SELECT
             COUNT(id) AS total_produits,
             COALESCE(SUM(CASE WHEN stock_actuel <= 5 AND stock_actuel > 0 THEN 1 ELSE 0 END), 0) AS alerte_stock_bas,
-            COALESCE(SUM(CASE WHEN stock_actuel = 0 THEN 1 ELSE 0 END), 0) AS stock_epuise
+            COALESCE(SUM(CASE WHEN stock_actuel = 0 THEN 1 ELSE 0 END), 0) AS stock_epuise,
+            COUNT(DISTINCT NULLIF(TRIM(categorie), '')) AS categories_count,
+            COALESCE(AVG(NULLIF(prix_achat, 0)), 0) AS avg_purchase_price
         FROM produits
         WHERE tenant_id = :tenant_id
     """
@@ -32,6 +34,47 @@ def fetch_kpis(tenant_id: int) -> dict[str, float | int]:
     """
     df_stock = query_df(sql_stock, params={"tenant_id": int(tenant_id)})
 
+    # Factures récentes (30 derniers jours) - pas de colonne status, on compte les récentes
+    sql_pending = """
+        SELECT
+            COUNT(*) AS pending_invoices,
+            COALESCE(SUM(total_ttc), 0) AS pending_amount
+        FROM processed_invoices
+        WHERE tenant_id = :tenant_id
+          AND created_at >= NOW() - INTERVAL '30 days'
+    """
+    df_pending = query_df(sql_pending, params={"tenant_id": int(tenant_id)})
+
+    # Rotation de stock moyenne (jours de couverture basée sur les sorties des 90 derniers jours)
+    sql_rotation = """
+        WITH sorties_90j AS (
+            SELECT
+                produit_id,
+                SUM(quantite) AS total_sorti
+            FROM mouvements_stock
+            WHERE type = 'SORTIE'
+              AND tenant_id = :tenant_id
+              AND date_mvt >= NOW() - INTERVAL '90 days'
+            GROUP BY produit_id
+        ),
+        stock_actuel AS (
+            SELECT id, stock_actuel
+            FROM produits
+            WHERE tenant_id = :tenant_id
+              AND stock_actuel > 0
+        )
+        SELECT
+            COALESCE(AVG(
+                CASE WHEN s.total_sorti > 0
+                     THEN (p.stock_actuel / (s.total_sorti / 90.0))
+                     ELSE NULL
+                END
+            ), 0) AS avg_rotation
+        FROM stock_actuel p
+        LEFT JOIN sorties_90j s ON s.produit_id = p.id
+    """
+    df_rotation = query_df(sql_rotation, params={"tenant_id": int(tenant_id)})
+
     if df_produits.empty:
         return {
             'total_produits': 0,
@@ -39,10 +82,17 @@ def fetch_kpis(tenant_id: int) -> dict[str, float | int]:
             'quantite_stock_total': 0.0,
             'alerte_stock_bas': 0,
             'stock_epuise': 0,
+            'categories_count': 0,
+            'avg_purchase_price': 0.0,
+            'pending_invoices': 0,
+            'pending_amount': 0.0,
+            'avg_rotation': 0.0,
         }
 
     row_produits = df_produits.iloc[0]
     row_stock = df_stock.iloc[0] if not df_stock.empty else {}
+    row_pending = df_pending.iloc[0] if not df_pending.empty else {}
+    row_rotation = df_rotation.iloc[0] if not df_rotation.empty else {}
 
     return {
         'total_produits': int(row_produits.get('total_produits', 0) or 0),
@@ -50,6 +100,11 @@ def fetch_kpis(tenant_id: int) -> dict[str, float | int]:
         'quantite_stock_total': float(row_stock.get('quantite_stock_total', 0) or 0),
         'alerte_stock_bas': int(row_produits.get('alerte_stock_bas', 0) or 0),
         'stock_epuise': int(row_produits.get('stock_epuise', 0) or 0),
+        'categories_count': int(row_produits.get('categories_count', 0) or 0),
+        'avg_purchase_price': round(float(row_produits.get('avg_purchase_price', 0) or 0), 2),
+        'pending_invoices': int(row_pending.get('pending_invoices', 0) or 0),
+        'pending_amount': round(float(row_pending.get('pending_amount', 0) or 0), 2),
+        'avg_rotation': round(float(row_rotation.get('avg_rotation', 0) or 0), 1),
     }
 
 

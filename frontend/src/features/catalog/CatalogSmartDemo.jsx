@@ -1,22 +1,35 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Package, Tag, AlertTriangle, TrendingUp, Calendar, Scan, Eye, Package2 } from 'lucide-react';
-import { SmartTable, SmartDrawer, SmartFilters, DrawerSection, DrawerField, DrawerActions } from '../../components/smart';
+import { Package, Tag, AlertTriangle, TrendingUp, Calendar, Scan, Eye, Package2, Plus } from 'lucide-react';
+import { SmartTable, SmartFilters } from '../../components/smart';
 import { useProducts } from '../../hooks/useProducts.js';
-import { useUpdateProduct } from '../../hooks/useCatalogMutations.js';
+import { useUpdateProduct, useDeleteProduct } from '../../hooks/useCatalogMutations.js';
 import Button from '../../components/ui/Button.jsx';
 import { PullToRefresh } from '../../components/ui/PullToRefresh.jsx';
 import { SwipeableRow, SwipeableRowProvider } from '../../components/ui/SwipeableRow.jsx';
 import { TableSkeleton } from '../../components/ui/Skeleton.jsx';
 import QueryErrorState from '../../components/feedback/QueryErrorState.jsx';
+import { AddProductModal, EditProductModal, StockAdjustmentModal, ProductDetailDrawer } from '../../components/modals/index.js';
+import { ConfirmDialog } from '../../components/ui/Modal.jsx';
 
 // ============================================================================
 // CATALOG SMART DEMO - Démonstration des composants Phase 3
 // ============================================================================
 
 /**
- * ProductCard - Carte produit pour mobile
+ * Carte produit pour affichage mobile.
+ *
+ * Affiche les informations essentielles d'un produit dans un format compact:
+ * - Nom et ID du produit
+ * - Statut du stock avec indicateur coloré
+ * - Catégorie
+ * - Prix d'achat, prix de vente et marge calculée
+ *
+ * @param {Object} product - Données du produit à afficher
+ * @param {Function} onViewDetails - Callback pour voir les détails
+ * @param {Function} onScanBarcode - Callback pour scanner le code-barres
+ * @param {Function} onQuickStock - Callback pour ajuster le stock rapidement
  */
 function ProductCard({ product, onViewDetails, onScanBarcode, onQuickStock }) {
   const stock = product.stock_actuel || 0;
@@ -78,45 +91,53 @@ function ProductCard({ product, onViewDetails, onScanBarcode, onQuickStock }) {
 }
 
 /**
- * CatalogSmartDemo - Page catalogue avec SmartTable, SmartDrawer et SmartFilters
+ * Page Catalogue Intelligent avec édition inline et filtres avancés.
  *
- * Démontre:
- * - Édition inline des prix et stocks
- * - Drawer de détail produit
- * - Filtres intelligents avec suggestions
- * - Mode mobile avec cartes et swipe actions
+ * Cette page permet de gérer l'ensemble du catalogue produit de manière interactive.
+ * Elle affiche:
+ * - Un tableau intelligent avec édition inline des prix et stocks
+ * - Des filtres avancés par catégorie, statut stock et marge
+ * - Un drawer de détails produit avec historique
+ * - Des suggestions IA pour optimiser la gestion
+ * - Mode mobile avec cartes swipables et actions rapides
+ * - Pull-to-refresh sur mobile
+ *
+ * Fonctionnalités principales:
+ * - Édition directe des prix (achat/vente) et quantités en stock
+ * - Mise à jour optimiste pour une réactivité immédiate
+ * - Filtrage intelligent avec presets et suggestions
+ * - Ajout, modification et suppression de produits
+ * - Ajustement rapide du stock via modal
+ *
+ * @component
+ *
+ * @param {boolean} [embedded=false] - Si true, masque le header de la page
+ *
+ * @example
+ * <CatalogSmartDemo />
+ * <CatalogSmartDemo embedded={true} />
  */
 export default function CatalogSmartDemo({ embedded = false }) {
+  // ==================== TOUS LES HOOKS EN PREMIER (Rules of Hooks) ====================
   const { data: products = [], isLoading, isError, error, refetch } = useProducts();
   const updateMutation = useUpdateProduct();
+  const deleteMutation = useDeleteProduct();
   const queryClient = useQueryClient();
 
-  // Skeleton pendant le chargement initial
-  if (isLoading && products.length === 0) {
-    return (
-      <div className="space-y-6">
-        {!embedded && (
-          <div>
-            <h1 className="text-2xl font-bold text-white">Catalogue Intelligent</h1>
-            <p className="text-sm text-slate-400 mt-1">Chargement...</p>
-          </div>
-        )}
-        <TableSkeleton rows={8} columns={5} />
-      </div>
-    );
-  }
+  // Modal states
+  const [addProductOpen, setAddProductOpen] = useState(false);
+  const [editProductOpen, setEditProductOpen] = useState(false);
+  const [stockAdjustOpen, setStockAdjustOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [productToAdjust, setProductToAdjust] = useState(null);
+  const [productToDelete, setProductToDelete] = useState(null);
 
-  // Erreur
-  if (isError && products.length === 0) {
-    return <QueryErrorState error={error} onRetry={refetch} variant="full" />;
-  }
-
-  // États
+  // États UI
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [filterValues, setFilterValues] = useState({});
   const [searchValue, setSearchValue] = useState('');
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
   // Détection mobile
   useEffect(() => {
@@ -248,36 +269,6 @@ export default function CatalogSmartDemo({ embedded = false }) {
     ];
   }, [products]);
 
-  // Suggestions de filtres
-  const suggestions = [
-    {
-      label: 'Ruptures de stock',
-      filters: { status: 'critical' },
-    },
-    {
-      label: 'Marges faibles',
-      filters: { marge: 'low' },
-    },
-    {
-      label: 'À surveiller',
-      filters: { status: 'warning' },
-    },
-  ];
-
-  // Presets de filtres
-  const presets = [
-    {
-      label: 'Produits critiques',
-      description: 'Ruptures et marges faibles',
-      filters: { status: 'critical', marge: 'low' },
-    },
-    {
-      label: 'Top performers',
-      description: 'Stock OK et bonnes marges',
-      filters: { status: 'ok', marge: 'high' },
-    },
-  ];
-
   // Filtrage des données
   const filteredProducts = useMemo(() => {
     let result = products;
@@ -347,12 +338,14 @@ export default function CatalogSmartDemo({ embedded = false }) {
     return [...lowStock, ...priceUnknown];
   }, [filteredProducts]);
 
-  // Handler mise à jour inline
+  // Handler mise à jour inline avec optimistic update
+  // Applique immédiatement la modification localement avant la réponse du serveur
+  // pour une meilleure expérience utilisateur
   const handleUpdate = useCallback(async (row, field, value) => {
     const parsedValue = Number.isFinite(parseFloat(value)) ? parseFloat(value) : value;
     const previousStates = queryClient.getQueriesData({ queryKey: ['products'] });
 
-    // Optimistic update : appliquer localement la modification
+    // Optimistic update : appliquer localement la modification avant la confirmation serveur
     previousStates.forEach(([queryKey, oldData]) => {
       if (!oldData) return;
       queryClient.setQueryData(queryKey, (current) => {
@@ -381,7 +374,7 @@ export default function CatalogSmartDemo({ embedded = false }) {
         payload: { [field]: parsedValue },
       });
     } catch (err) {
-      // Rollback
+      // Rollback en cas d'erreur: restaure les données précédentes
       previousStates.forEach(([queryKey, oldData]) => {
         queryClient.setQueryData(queryKey, oldData);
       });
@@ -394,27 +387,6 @@ export default function CatalogSmartDemo({ embedded = false }) {
   const handleRowClick = useCallback((row) => {
     setSelectedProduct(row);
     setDrawerOpen(true);
-  }, []);
-
-  // Handler actions ligne
-  const handleRowAction = useCallback((action, row) => {
-    switch (action) {
-      case 'view':
-        setSelectedProduct(row);
-        setDrawerOpen(true);
-        break;
-      case 'edit':
-        setSelectedProduct(row);
-        setDrawerOpen(true);
-        break;
-      case 'delete':
-        if (window.confirm(`Supprimer "${row.nom}" ?`)) {
-          // deleteMutation.mutate(row.id);
-        }
-        break;
-      default:
-        break;
-    }
   }, []);
 
   // Handler changement filtre
@@ -448,31 +420,122 @@ export default function CatalogSmartDemo({ embedded = false }) {
 
   // Handler pour l'ajustement rapide du stock
   const handleQuickStock = useCallback((product) => {
-    toast.info(`Ajustement stock pour ${product.nom}`, {
-      description: 'Cliquez pour ajuster le stock rapidement',
-      action: {
-        label: 'Ajuster',
-        onClick: () => {
-          // Logique d'ajustement de stock
-          const newStock = prompt(`Stock actuel: ${product.stock_actuel}. Nouveau stock:`, product.stock_actuel);
-          if (newStock !== null) {
-            handleUpdate(product, 'stock_actuel', parseFloat(newStock));
-          }
-        },
-      },
-    });
-  }, [handleUpdate]);
+    setProductToAdjust(product);
+    setStockAdjustOpen(true);
+  }, []);
 
+  // Handler pour commander un produit
+  const handleOrderProduct = useCallback((product) => {
+    toast.info(`Commander ${product.nom}`, {
+      description: 'Ouverture du formulaire de commande...',
+    });
+    // TODO: Open order modal
+  }, []);
+
+  // Handler pour voir l'historique d'un produit
+  const handleViewHistory = useCallback((product) => {
+    toast.info(`Historique de ${product.nom}`, {
+      description: 'Ouverture de l\'historique...',
+    });
+    // TODO: Navigate to product history
+  }, []);
+
+  // Handler pour éditer un produit depuis le drawer
+  const handleEditFromDrawer = useCallback((product) => {
+    setDrawerOpen(false);
+    setSelectedProduct(product);
+    setEditProductOpen(true);
+  }, []);
+
+  // Handler pour supprimer un produit
+  const handleDeleteProduct = useCallback((product) => {
+    setProductToDelete(product);
+    setDeleteConfirmOpen(true);
+  }, []);
+
+  // Handler actions ligne (doit être après handleQuickStock et handleDeleteProduct)
+  const handleRowAction = useCallback((action, row) => {
+    switch (action) {
+      case 'view':
+        setSelectedProduct(row);
+        setDrawerOpen(true);
+        break;
+      case 'edit':
+        setSelectedProduct(row);
+        setDrawerOpen(true);
+        break;
+      case 'stock':
+        handleQuickStock(row);
+        break;
+      case 'delete':
+        handleDeleteProduct(row);
+        break;
+      default:
+        break;
+    }
+  }, [handleQuickStock, handleDeleteProduct]);
+
+  // Confirmer la suppression
+  const confirmDelete = useCallback(() => {
+    if (productToDelete) {
+      deleteMutation.mutate(productToDelete.id);
+      setDeleteConfirmOpen(false);
+      setProductToDelete(null);
+    }
+  }, [productToDelete, deleteMutation]);
+
+  // Suggestions de filtres (constante, pas besoin de useMemo)
+  const suggestions = [
+    { label: 'Ruptures de stock', filters: { status: 'critical' } },
+    { label: 'Marges faibles', filters: { marge: 'low' } },
+    { label: 'À surveiller', filters: { status: 'warning' } },
+  ];
+
+  // Presets de filtres (constante, pas besoin de useMemo)
+  const presets = [
+    { label: 'Produits critiques', description: 'Ruptures et marges faibles', filters: { status: 'critical', marge: 'low' } },
+    { label: 'Top performers', description: 'Stock OK et bonnes marges', filters: { status: 'ok', marge: 'high' } },
+  ];
+
+  // ==================== FIN DES HOOKS ====================
+
+  // Affichage du skeleton pendant le chargement initial
+  if (isLoading && products.length === 0) {
+    return (
+      <div className="space-y-6">
+        {!embedded && (
+          <div>
+            <h1 className="text-2xl font-bold text-white">Catalogue Intelligent</h1>
+            <p className="text-sm text-slate-400 mt-1">Chargement...</p>
+          </div>
+        )}
+        <TableSkeleton rows={8} columns={5} />
+      </div>
+    );
+  }
+
+  // Affichage de l'erreur
+  if (isError && products.length === 0) {
+    return <QueryErrorState error={error} onRetry={refetch} variant="full" />;
+  }
+
+  // ==================== RENDU PRINCIPAL ====================
   return (
     <PullToRefresh onRefresh={handleRefresh}>
       <div className="space-y-6">
         {/* Header */}
         {!embedded && (
-          <div>
-            <h1 className="text-2xl font-bold text-white">Catalogue Intelligent</h1>
-            <p className="text-sm text-slate-400 mt-1">
-              Démonstration Phase 3 - SmartTable avec édition inline
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-white">Catalogue Intelligent</h1>
+              <p className="text-sm text-slate-400 mt-1">
+                {products.length} produits · Édition inline activée
+              </p>
+            </div>
+            <Button variant="primary" onClick={() => setAddProductOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Ajouter un produit
+            </Button>
           </div>
         )}
 
@@ -555,100 +618,89 @@ export default function CatalogSmartDemo({ embedded = false }) {
           />
         )}
 
-      {/* Suggestions IA inline */}
-      {aiSuggestions.length > 0 && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <p className="text-sm font-semibold text-white mb-3">Suggestions IA</p>
-          <div className="space-y-2">
-            {aiSuggestions.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2"
-              >
-                <span className="text-sm text-slate-200">{item.title}</span>
-                <Button size="sm" variant="brand">
-                  {item.action}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Smart Drawer */}
-      <SmartDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title={selectedProduct?.nom || 'Détail produit'}
-        subtitle={selectedProduct?.categorie || 'Sans catégorie'}
-        size="lg"
-        expandable
-        footer={
-          <DrawerActions align="between">
-            <Button variant="ghost" onClick={() => setDrawerOpen(false)}>
-              Fermer
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline">Modifier</Button>
-              <Button variant="brand">Commander</Button>
+        {/* Suggestions IA inline */}
+        {aiSuggestions.length > 0 && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="text-sm font-semibold text-white mb-3">Suggestions IA</p>
+            <div className="space-y-2">
+              {aiSuggestions.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                >
+                  <span className="text-sm text-slate-200">{item.title}</span>
+                  <Button size="sm" variant="brand">
+                    {item.action}
+                  </Button>
+                </div>
+              ))}
             </div>
-          </DrawerActions>
-        }
-      >
-        {selectedProduct && (
-          <div className="space-y-6">
-            <DrawerSection title="Informations générales">
-              <div className="grid grid-cols-2 gap-4">
-                <DrawerField label="ID" value={`#${selectedProduct.id}`} copyable />
-                <DrawerField label="Nom" value={selectedProduct.nom} />
-                <DrawerField label="Catégorie" value={selectedProduct.categorie || 'Non classé'} />
-                <DrawerField label="Codes-barres" value={selectedProduct.codes?.join(', ') || '—'} copyable />
-              </div>
-            </DrawerSection>
-
-            <DrawerSection title="Prix & Marges">
-              <div className="grid grid-cols-3 gap-4">
-                <DrawerField
-                  label="Prix d'achat"
-                  value={`${(selectedProduct.prix_achat || 0).toFixed(2)} €`}
-                  icon={Package}
-                />
-                <DrawerField
-                  label="Prix de vente"
-                  value={`${(selectedProduct.prix_vente || 0).toFixed(2)} €`}
-                  icon={Tag}
-                />
-                <DrawerField
-                  label="Marge"
-                  value={(() => {
-                    const achat = selectedProduct.prix_achat || 0;
-                    const vente = selectedProduct.prix_vente || 0;
-                    if (achat === 0) return '—';
-                    return `${((vente - achat) / achat * 100).toFixed(1)}%`;
-                  })()}
-                  icon={TrendingUp}
-                />
-              </div>
-            </DrawerSection>
-
-            <DrawerSection title="Stock" collapsible>
-              <div className="grid grid-cols-2 gap-4">
-                <DrawerField label="Stock actuel" value={`${selectedProduct.stock_actuel || 0} unités`} />
-                <DrawerField label="Seuil d'alerte" value={`${selectedProduct.seuil_alerte || 0} unités`} />
-              </div>
-              <div className="mt-4 p-4 rounded-lg bg-white/5 border border-white/10">
-                <p className="text-sm text-slate-400">
-                  {selectedProduct.stock_actuel === 0
-                    ? '🔴 Rupture de stock - Commander immédiatement'
-                    : selectedProduct.stock_actuel < (selectedProduct.seuil_alerte || 8)
-                      ? '🟡 Stock faible - À surveiller'
-                      : '🟢 Stock suffisant'}
-                </p>
-              </div>
-            </DrawerSection>
           </div>
         )}
-      </SmartDrawer>
+
+        {/* Product Detail Drawer */}
+        <ProductDetailDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          product={selectedProduct}
+          movements={[]}
+          onEdit={handleEditFromDrawer}
+          onHistory={handleViewHistory}
+          onOrder={handleOrderProduct}
+        />
+
+        {/* Add Product Modal */}
+        <AddProductModal
+          open={addProductOpen}
+          onClose={() => setAddProductOpen(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+          }}
+        />
+
+        {/* Edit Product Modal */}
+        <EditProductModal
+          open={editProductOpen}
+          onClose={() => {
+            setEditProductOpen(false);
+            setSelectedProduct(null);
+          }}
+          product={selectedProduct}
+          onSuccess={() => {
+            setEditProductOpen(false);
+            setSelectedProduct(null);
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+          }}
+        />
+
+        {/* Stock Adjustment Modal */}
+        <StockAdjustmentModal
+          open={stockAdjustOpen}
+          onClose={() => {
+            setStockAdjustOpen(false);
+            setProductToAdjust(null);
+          }}
+          product={productToAdjust}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+          }}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onClose={() => {
+            setDeleteConfirmOpen(false);
+            setProductToDelete(null);
+          }}
+          onConfirm={confirmDelete}
+          title="Supprimer ce produit ?"
+          description={`Êtes-vous sûr de vouloir supprimer "${productToDelete?.nom}" ? Cette action est irréversible.`}
+          confirmLabel="Supprimer"
+          cancelLabel="Annuler"
+          variant="destructive"
+          loading={deleteMutation.isPending}
+        />
       </div>
     </PullToRefresh>
   );

@@ -138,7 +138,7 @@ def update_catalog_entry(
     engine = get_engine()  # Récupère l'engine SQLAlchemy
     with engine.begin() as conn:  # Ouvre une transaction
         exists = conn.execute(
-            text("SELECT 1 FROM produits WHERE id = :pid AND tenant_id = :tenant_id"),
+            text("SELECT 1 FROM produits WHERE id = :pid AND tenant_id = :tenant_id AND deleted_at IS NULL"),
             {"pid": pid, "tenant_id": tenant_id},
         ).scalar()  # Vérifie l'existence du produit
         if not exists:  # Si le produit est absent

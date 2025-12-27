@@ -1,15 +1,41 @@
 /**
- * PageLayout - Layout wrapper unifié pour toutes les pages
+ * @file PageLayout - Layout wrapper unifié pour toutes les pages
  *
  * Applique le design system dark theme (2025 Next-Gen) de manière consistante.
  * Utilise les mêmes patterns que newCMS pour l'uniformité.
+ * Tous les composants utilisent Framer Motion pour des animations fluides.
  */
 
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 
 /**
- * Header de page avec icône, titre, description et actions
+ * PageHeader - En-tête de page avec icône, titre et actions.
+ *
+ * En-tête animé avec support des badges, actions multiples et design glass morphism.
+ * Optimisé pour le dark theme avec dégradés subtils.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {React.ComponentType} [props.icon] - Composant icône à afficher
+ * @param {string} props.title - Titre principal de la page
+ * @param {string} [props.description] - Description/sous-titre
+ * @param {Array} [props.actions=[]] - Tableau de boutons d'action avec {label, onClick, icon, primary, danger, disabled}
+ * @param {Object} [props.badge] - Badge de statut avec {label, variant}
+ * @param {string} [props.className] - Classes CSS additionnelles
+ *
+ * @example
+ * <PageHeader
+ *   icon={Users}
+ *   title="Gestion des utilisateurs"
+ *   description="Administrez les comptes et permissions"
+ *   badge={{ label: 'Beta', variant: 'info' }}
+ *   actions={[
+ *     { label: 'Exporter', onClick: handleExport, icon: Download },
+ *     { label: 'Ajouter', onClick: handleAdd, icon: Plus, primary: true }
+ *   ]}
+ * />
  */
 export function PageHeader({
   icon: Icon,
@@ -89,7 +115,32 @@ export function PageHeader({
 }
 
 /**
- * Section card avec titre optionnel
+ * PageSection - Section de contenu avec carte animée.
+ *
+ * Conteneur de section avec animations d'entrée, titre optionnel et actions.
+ * Propose plusieurs variantes visuelles (default, elevated, transparent).
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {string} [props.title] - Titre de la section
+ * @param {string} [props.description] - Description de la section
+ * @param {React.ComponentType} [props.icon] - Icône de la section
+ * @param {Array} [props.actions=[]] - Actions de la section
+ * @param {React.ReactNode} props.children - Contenu de la section
+ * @param {string} [props.className] - Classes CSS additionnelles
+ * @param {boolean} [props.noPadding=false] - Désactive le padding interne
+ * @param {string} [props.variant='default'] - Variante visuelle ('default' | 'elevated' | 'transparent')
+ *
+ * @example
+ * <PageSection
+ *   title="Statistiques"
+ *   icon={BarChart}
+ *   variant="elevated"
+ *   actions={[{ label: 'Rafraîchir', onClick: handleRefresh }]}
+ * >
+ *   {content}
+ * </PageSection>
  */
 export function PageSection({
   title,
@@ -157,7 +208,23 @@ export function PageSection({
 }
 
 /**
- * Grid layout pour KPIs/stats
+ * StatsGrid - Grille responsive pour KPIs et statistiques.
+ *
+ * Layout en grille adaptatif pour afficher des cartes de métriques.
+ * S'adapte automatiquement selon le nombre de colonnes et la taille d'écran.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {React.ReactNode} props.children - Cartes de statistiques
+ * @param {number} [props.columns=4] - Nombre de colonnes (2, 3, 4, ou 5)
+ * @param {string} [props.className] - Classes CSS additionnelles
+ *
+ * @example
+ * <StatsGrid columns={4}>
+ *   <StatCard label="Ventes" value="12,450" unit="€" />
+ *   <StatCard label="Commandes" value="89" trend={15} />
+ * </StatsGrid>
  */
 export function StatsGrid({ children, columns = 4, className }) {
   return (
@@ -177,7 +244,34 @@ export function StatsGrid({ children, columns = 4, className }) {
 }
 
 /**
- * Stat card individuel
+ * StatCard - Carte de statistique/métrique.
+ *
+ * Carte de KPI avec label, valeur, unité, tendance et code couleur de statut.
+ * Supporte les interactions (hover, click) avec animations Framer Motion.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {string} props.label - Label de la métrique
+ * @param {string|number} props.value - Valeur principale
+ * @param {string} [props.unit] - Unité de mesure
+ * @param {number} [props.trend] - Tendance en pourcentage (positif/négatif)
+ * @param {string} [props.trendLabel] - Label additionnel pour la tendance
+ * @param {React.ComponentType} [props.icon] - Icône
+ * @param {string} [props.status] - Statut visuel ('success' | 'warning' | 'error' | 'info' | 'neutral')
+ * @param {Function} [props.onClick] - Callback au clic (rend la carte cliquable)
+ * @param {string} [props.className] - Classes CSS additionnelles
+ *
+ * @example
+ * <StatCard
+ *   label="Chiffre d'affaires"
+ *   value="24,500"
+ *   unit="€"
+ *   trend={12.5}
+ *   trendLabel="vs mois dernier"
+ *   icon={TrendingUp}
+ *   status="success"
+ * />
  */
 export function StatCard({
   label,

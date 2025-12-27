@@ -1,3 +1,8 @@
+/**
+ * Module de hooks pour la gestion du restaurant (plats, ingrédients, prix, food cost).
+ * @module hooks/useRestaurant
+ */
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   useOfflineCreate,
@@ -30,6 +35,21 @@ import api, {
   fetchRestaurantMenusOverview,
 } from '../api/client.js';
 
+/**
+ * Hook pour récupérer les catégories de charges du restaurant.
+ *
+ * Permet de classifier les dépenses du restaurant (personnel, loyer, énergie, etc.).
+ * Les données sont mises en cache pendant 5 minutes pour optimiser les performances.
+ *
+ * @returns {Object} Query TanStack avec les catégories de charges
+ * @property {Array} data - Liste des catégories disponibles
+ * @property {boolean} isLoading - État de chargement
+ * @property {Error} error - Erreur éventuelle
+ *
+ * @example
+ * const { data: categories } = useRestaurantCategories();
+ * categories.forEach(cat => console.log(cat.nom));
+ */
 export const useRestaurantCategories = () =>
   useQuery({
     queryKey: ['restaurant', 'categories'],

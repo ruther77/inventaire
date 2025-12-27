@@ -1,17 +1,121 @@
 #!/usr/bin/env python3
 """
-Script pour analyser la performance du système de catégorisation.
+Module d'analyse de performance du système de catégorisation automatique des transactions.
 
-Ce script génère des statistiques et des graphiques pour évaluer:
-- La précision de la catégorisation automatique
-- L'évolution de la confiance au fil du temps
-- Les catégories les plus problématiques
-- Les patterns de correction fréquents
+Ce script permet de:
+- Analyser la précision de la catégorisation automatique des transactions financières
+- Mesurer l'évolution de la confiance des prédictions au fil du temps
+- Identifier les catégories les plus problématiques (faux positifs)
+- Détecter les patterns de correction fréquents
+- Générer des rapports détaillés (texte, JSON, CSV)
+- Créer des visualisations graphiques (timeline, distributions)
+- Calculer des métriques de précision et taux d'erreur
+
+Le système de catégorisation utilise du machine learning pour prédire automatiquement
+la catégorie financière d'une transaction bancaire. Ce script mesure l'efficacité
+en analysant les corrections manuelles apportées par les utilisateurs.
 
 Usage:
+    # Rapport textuel dans la console
     python scripts/analyze_categorization_performance.py
-    python scripts/analyze_categorization_performance.py --output-dir reports/
+
+    # Rapport JSON pour intégration
     python scripts/analyze_categorization_performance.py --format json
+
+    # Rapports CSV pour analyse Excel
+    python scripts/analyze_categorization_performance.py --format csv
+
+    # Tous les formats dans un répertoire
+    python scripts/analyze_categorization_performance.py --format all --output-dir reports/
+
+    # Avec graphiques (nécessite matplotlib)
+    python scripts/analyze_categorization_performance.py --plot --days 60
+
+Arguments CLI:
+    --format FORM    : Format de sortie (text, json, csv, all) - défaut: text
+    --output-dir DIR : Répertoire de sortie pour les rapports - défaut: reports/categorization
+    --plot           : Générer des graphiques (nécessite matplotlib)
+    --days N         : Nombre de jours pour l'analyse temporelle (défaut: 30)
+
+Prérequis:
+    - Base de données avec table finance_categorization_feedback
+    - Corrections de catégorisation enregistrées
+    - Module core.bank_import.categorizer configuré
+    - matplotlib (optionnel, pour graphiques)
+
+Métriques calculées:
+    1. STATISTIQUES GLOBALES:
+       - Total de corrections effectuées
+       - Nombre de transactions uniques corrigées
+       - Nombre de catégories source (prédictions incorrectes)
+       - Nombre de catégories cible (corrections)
+       - Confiance moyenne des erreurs
+       - Répartition par source (manuel, règle, bulk)
+
+    2. PRÉCISION:
+       - Taux de précision global (transactions correctes / total)
+       - Taux d'erreur (corrections / total)
+
+    3. CORRECTIONS FRÉQUENTES:
+       - Top 10 des paires (catégorie_prédite → catégorie_correcte)
+       - Confiance moyenne pour chaque paire
+       - Nombre d'occurrences
+
+    4. CATÉGORIES PROBLÉMATIQUES:
+       - Catégories source de faux positifs
+       - Confiance moyenne des mauvaises prédictions
+       - Nombre de transactions affectées
+
+    5. TIMELINE:
+       - Évolution quotidienne des corrections
+       - Tendance de la confiance au fil du temps
+
+Fichiers de sortie:
+    Format text:
+    - Rapport console avec sections structurées
+
+    Format JSON:
+    - reports/categorization/report_YYYYMMDD_HHMMSS.json
+      Structure complète avec toutes les métriques
+
+    Format CSV:
+    - reports/categorization/common_corrections.csv
+    - reports/categorization/error_prone_categories.csv
+    - reports/categorization/correction_targets.csv
+
+    Format plot:
+    - reports/categorization/timeline_YYYYMMDD.png
+      Graphiques d'évolution temporelle
+
+Exemple de sortie (format text):
+    RAPPORT DE PERFORMANCE - SYSTÈME DE CATÉGORISATION
+    Date: 2025-01-15 10:30:00
+
+    1. STATISTIQUES GLOBALES
+    Total corrections:              1,245
+    Transactions uniques corrigées: 1,180
+    Confiance moyenne (erreurs):    67.8%
+    Corrections manuelles:          1,120
+    Corrections via règles:         95
+    Corrections en masse:           30
+
+    2. MÉTRIQUES DE PRÉCISION
+    Total transactions catégorisées: 15,420
+    Total corrections:               1,245
+    Précision estimée:               91.9%
+    Taux d'erreur estimé:            8.1%
+
+    3. CORRECTIONS LES PLUS FRÉQUENTES
+    Prédite                  →  Correcte                 Count    Conf.
+    TRANSFERT_INTERNE        →  LOYER                    45       72.5%
+    ACHAT_ALIMENTAIRE        →  RESTAURANT               38       65.2%
+
+Notes:
+    - La précision est calculée de manière conservative
+    - Chaque correction = 1 erreur (peut sous-estimer si transaction corrigée plusieurs fois)
+    - Les graphiques nécessitent matplotlib (`pip install matplotlib`)
+    - Le mode --days permet d'analyser des périodes variables
+    - Utile pour monitoring continu et amélioration du modèle ML
 """
 
 import argparse

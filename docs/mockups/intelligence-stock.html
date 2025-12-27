@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligence - Optimisation Stock</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-cyan: #06b6d4;
+            --accent-blue: #3b82f6;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(6, 182, 212, 0.12), transparent),
+                        radial-gradient(ellipse at 100% 0%, rgba(59, 130, 246, 0.08), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .metric-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .metric-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        .metric-value { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+        .metric-badge {
+            display: inline-flex;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(16,185,129,0.2);
+            color: var(--accent-emerald);
+        }
+        .card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .help-icon {
+            width: 18px;
+            height: 18px;
+            background: rgba(59,130,246,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: var(--accent-blue);
+            cursor: help;
+        }
+        .optimization-list { display: flex; flex-direction: column; gap: 16px; }
+        .optimization-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .optimization-item:hover { background: rgba(255,255,255,0.08); transform: translateX(4px); }
+        .opt-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .opt-icon.reduce { background: rgba(244,63,94,0.2); }
+        .opt-icon.increase { background: rgba(16,185,129,0.2); }
+        .opt-icon.optimize { background: rgba(6,182,212,0.2); }
+        .opt-content { flex: 1; }
+        .opt-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .opt-desc { font-size: 13px; color: var(--text-muted); }
+        .opt-impact {
+            text-align: right;
+        }
+        .impact-value { font-size: 18px; font-weight: 700; color: var(--accent-emerald); }
+        .impact-label { font-size: 12px; color: var(--text-muted); }
+        .confidence {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 8px;
+            display: inline-block;
+        }
+        .confidence.high { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .confidence.medium { background: rgba(245,158,11,0.2); color: var(--accent-amber); }
+        .action-btn {
+            padding: 8px 16px;
+            background: rgba(6,182,212,0.1);
+            border: 1px solid rgba(6,182,212,0.3);
+            border-radius: 8px;
+            color: var(--accent-cyan);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .abc-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+        .abc-card {
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .abc-card.a { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); }
+        .abc-card.b { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); }
+        .abc-card.c { background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3); }
+        .abc-letter { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+        .abc-card.a .abc-letter { color: var(--accent-emerald); }
+        .abc-card.b .abc-letter { color: var(--accent-amber); }
+        .abc-card.c .abc-letter { color: #f43f5e; }
+        .abc-count { font-size: 24px; font-weight: 600; }
+        .abc-label { font-size: 12px; color: var(--text-muted); }
+        @media (max-width: 1024px) {
+            .metrics-row { grid-template-columns: repeat(2, 1fr); }
+            .abc-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="intelligence.html">Intelligence</a>
+            <span>/</span>
+            <span>Optimisation Stock</span>
+        </div>
+
+        <h1>🧠 Optimisation Stock</h1>
+        <p class="subtitle">Recommandations IA pour optimiser vos niveaux de stock et réduire le capital immobilisé</p>
+
+        <div class="metrics-row">
+            <div class="metric-card">
+                <div class="metric-label">Capital immobilisé</div>
+                <div class="metric-value">€48,240</div>
+                <span class="metric-badge">-€3,200 possible</span>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Rotation moyenne</div>
+                <div class="metric-value">18 jours</div>
+                <span class="metric-badge">Objectif: 14j</span>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Produits en surstock</div>
+                <div class="metric-value" style="color: var(--accent-amber);">23</div>
+                <span class="metric-badge">€4,800 bloqués</span>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Optimisations suggérées</div>
+                <div class="metric-value">12</div>
+                <span class="metric-badge">Actions disponibles</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                🎯 Classification ABC
+                <span class="help-icon" title="A: 80% du CA (20% des produits), B: 15% du CA, C: 5% du CA">?</span>
+            </div>
+            <div class="abc-grid">
+                <div class="abc-card a">
+                    <div class="abc-letter">A</div>
+                    <div class="abc-count">124</div>
+                    <div class="abc-label">produits • 80% du CA</div>
+                </div>
+                <div class="abc-card b">
+                    <div class="abc-letter">B</div>
+                    <div class="abc-count">312</div>
+                    <div class="abc-label">produits • 15% du CA</div>
+                </div>
+                <div class="abc-card c">
+                    <div class="abc-letter">C</div>
+                    <div class="abc-count">811</div>
+                    <div class="abc-label">produits • 5% du CA</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                💡 Recommandations IA
+                <span class="help-icon" title="L'IA analyse vos ventes, rotation et saisonnalité pour suggérer des optimisations">?</span>
+            </div>
+            <div class="optimization-list">
+                <div class="optimization-item" onclick="alert('Détail: Réduire stock conserves')">
+                    <div class="opt-icon reduce">📉</div>
+                    <div class="opt-content">
+                        <div class="opt-title">Réduire le stock de conserves</div>
+                        <div class="opt-desc">15 références avec rotation >45 jours. Réduire les quantités de commande de 30%.</div>
+                        <span class="confidence high">92% confiance</span>
+                    </div>
+                    <div class="opt-impact">
+                        <div class="impact-value">-€1,200</div>
+                        <div class="impact-label">capital libéré</div>
+                        <button class="action-btn">Appliquer</button>
+                    </div>
+                </div>
+                <div class="optimization-item" onclick="alert('Détail: Ajuster EOQ viandes')">
+                    <div class="opt-icon optimize">⚙️</div>
+                    <div class="opt-content">
+                        <div class="opt-title">Ajuster EOQ viandes</div>
+                        <div class="opt-desc">La quantité économique de commande actuelle est trop élevée pour 8 références viandes.</div>
+                        <span class="confidence high">88% confiance</span>
+                    </div>
+                    <div class="opt-impact">
+                        <div class="impact-value">-€850</div>
+                        <div class="impact-label">capital libéré</div>
+                        <button class="action-btn">Ajuster EOQ</button>
+                    </div>
+                </div>
+                <div class="optimization-item" onclick="alert('Détail: Augmenter stock huiles')">
+                    <div class="opt-icon increase">📈</div>
+                    <div class="opt-content">
+                        <div class="opt-title">Augmenter stock huiles</div>
+                        <div class="opt-desc">Prix bas actuel (-10%). Opportunité d'achat en volume avant hausse prévue.</div>
+                        <span class="confidence medium">75% confiance</span>
+                    </div>
+                    <div class="opt-impact">
+                        <div class="impact-value">+€320</div>
+                        <div class="impact-label">économies</div>
+                        <button class="action-btn">Voir détails</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

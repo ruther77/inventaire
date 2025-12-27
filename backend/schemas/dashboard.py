@@ -13,6 +13,11 @@ class DashboardKPIs(BaseModel):
     quantite_stock_total: float
     alerte_stock_bas: int
     stock_epuise: int
+    categories_count: int = 0
+    avg_purchase_price: float = 0.0
+    pending_invoices: int = 0
+    pending_amount: float = 0.0
+    avg_rotation: float = 0.0
 
 
 class TopEntry(BaseModel):

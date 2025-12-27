@@ -1,4 +1,18 @@
-"""Services pour la gestion des comptes financiers."""
+"""
+Module de gestion des comptes financiers.
+
+Ce module fournit les services pour:
+- Création et gestion de comptes bancaires par entité
+- Validation de cohérence devise/entité
+- Listing et filtrage des comptes
+- Mise à jour et suppression avec gestion du cache
+- Support multi-devises (EUR, USD, etc.)
+
+Les comptes sont liés à des entités (finance_entities) et peuvent être
+de différents types (COMPTE_COURANT, CAISSE, EPARGNE, etc.).
+Chaque compte suit une devise spécifique qui doit correspondre à celle
+de son entité.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +22,7 @@ from sqlalchemy import text
 
 from core.data_repository import exec_sql_return_id, query_df
 from backend.schemas.finance import FinanceAccountCreate
+from backend.cache import cached, CacheTTL, invalidate_on_mutation
 
 
 def _fetch_entity_currency(entity_id: int) -> Optional[str]:
@@ -21,9 +36,33 @@ def _fetch_entity_currency(entity_id: int) -> Optional[str]:
     return str(value) if value else None
 
 
+@invalidate_on_mutation(["finance_accounts"])
 def create_account(payload: FinanceAccountCreate) -> dict[str, Any]:
-    """Crée un compte financier en validant la cohérence devise/entité."""
+    """
+    Crée un nouveau compte financier avec validation.
 
+    Valide que la devise du compte correspond à celle de l'entité avant
+    la création. Invalide automatiquement le cache des comptes.
+
+    Args:
+        payload: Données du compte à créer incluant entity_id, type, label,
+                 currency, IBAN, BIC, etc.
+
+    Returns:
+        Dict contenant les informations du compte créé avec son ID
+
+    Raises:
+        ValueError: Si la devise ne correspond pas à celle de l'entité
+
+    Example:
+        >>> account = create_account(FinanceAccountCreate(
+        ...     entity_id=1,
+        ...     type="COMPTE_COURANT",
+        ...     label="Compte principal",
+        ...     currency="EUR",
+        ...     iban="FR7612345678901234567890123"
+        ... ))
+    """
     expected_currency = _fetch_entity_currency(payload.entity_id)
     if expected_currency and expected_currency.upper() != payload.currency.upper():
         raise ValueError(f"Devise incohérente avec l'entité (attendu {expected_currency}).")
@@ -66,6 +105,7 @@ def create_account(payload: FinanceAccountCreate) -> dict[str, Any]:
     }
 
 
+@cached(ttl=CacheTTL.MEDIUM, prefix="finance_accounts", tenant_aware=False)
 def list_accounts(entity_id: Optional[int] = None, is_active: Optional[bool] = None) -> list[dict[str, Any]]:
     """Liste les comptes avec filtres simples."""
 
@@ -115,6 +155,7 @@ def get_account(account_id: int) -> dict[str, Any] | None:
     return df.to_dict("records")[0]
 
 
+@invalidate_on_mutation(["finance_accounts"])
 def update_account(account_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     """Met à jour un compte financier."""
     from core.data_repository import get_engine
@@ -124,13 +165,16 @@ def update_account(account_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     if not existing:
         raise ValueError("Compte introuvable")
 
-    # Construire la requête dynamiquement
+    # Sécurité : Construire la requête dynamiquement avec liste blanche de champs
+    # Les noms de champs proviennent uniquement de allowed_fields (whitelist)
+    # Les valeurs sont passées via des paramètres nommés pour éviter les injections SQL
     allowed_fields = {"label", "iban", "bic", "type", "is_active", "metadata"}
     updates = []
     params: dict[str, Any] = {"account_id": int(account_id)}
 
     for field in allowed_fields:
         if field in payload:
+            # Sécurité : le nom du champ provient de la whitelist, pas de l'entrée utilisateur
             updates.append(f"{field} = :{field}")
             params[field] = payload[field]
 
@@ -140,6 +184,9 @@ def update_account(account_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     updates.append("updated_at = now()")
     update_sql = ", ".join(updates)
 
+    # Sécurité : Construction sécurisée de la requête
+    # Les noms de champs proviennent de allowed_fields (whitelist)
+    # Aucune donnée utilisateur n'est interpolée directement dans la requête SQL
     with get_engine().begin() as conn:
         conn.execute(
             text(f"UPDATE finance_accounts SET {update_sql} WHERE id = :account_id"),
@@ -149,6 +196,7 @@ def update_account(account_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     return get_account(account_id) or existing
 
 
+@invalidate_on_mutation(["finance_accounts"])
 def delete_account(account_id: int) -> bool:
     """Supprime un compte financier (soft delete via is_active=false, ou hard delete si pas de données)."""
     from core.data_repository import get_engine

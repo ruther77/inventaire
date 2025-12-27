@@ -681,9 +681,170 @@
   }
 
   /* ============================================
-     TOPBAR 2025
+     TOPBAR 2025 - Design System from mockups
      ============================================ */
 
+  .topbar-container {
+    @apply sticky top-0 z-40;
+    background: rgba(15, 15, 25, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .topbar-inner {
+    @apply flex items-center;
+    @apply px-6 py-4;
+  }
+
+  .topbar-left {
+    @apply flex items-center gap-4;
+  }
+
+  .topbar-center {
+    @apply flex-1 flex justify-center px-4;
+  }
+
+  .topbar-right {
+    @apply flex items-center gap-4;
+  }
+
+  /* Tenant Selector */
+  .tenant-selector {
+    @apply flex items-center gap-2;
+    @apply px-3 py-2 rounded-xl;
+    @apply bg-white/5 border border-white/15;
+    @apply cursor-pointer transition-all duration-200;
+  }
+
+  .tenant-selector:hover {
+    @apply bg-white/10 border-white/20;
+  }
+
+  .tenant-icon {
+    @apply w-6 h-6 rounded-md;
+    @apply flex items-center justify-center;
+    background: rgba(16, 185, 129, 0.2);
+  }
+
+  .tenant-name {
+    @apply text-sm font-medium text-white;
+  }
+
+  /* Breadcrumb */
+  .topbar-breadcrumb {
+    @apply flex items-center gap-2;
+    @apply text-sm;
+  }
+
+  .breadcrumb-separator {
+    @apply text-slate-600;
+  }
+
+  .breadcrumb-current {
+    @apply text-white font-medium;
+  }
+
+  /* Search Bar */
+  .topbar-search {
+    @apply hidden sm:flex items-center gap-3;
+    @apply w-full max-w-[400px];
+    @apply px-4 py-2.5 rounded-xl;
+    @apply bg-white/5 border border-white/15;
+    @apply cursor-pointer transition-all duration-200;
+  }
+
+  .topbar-search:hover {
+    @apply bg-white/10 border-white/20;
+  }
+
+  .search-icon {
+    @apply w-4 h-4 text-slate-500;
+  }
+
+  .search-placeholder {
+    @apply flex-1 text-left text-sm text-slate-500;
+  }
+
+  .search-shortcut {
+    @apply flex items-center gap-0.5;
+    @apply px-2 py-1 rounded-md;
+    @apply bg-white/10 text-slate-500;
+    @apply text-[11px] font-mono;
+  }
+
+  /* Icon Buttons */
+  .topbar-icon-btn {
+    @apply relative;
+    @apply w-10 h-10 rounded-xl;
+    @apply flex items-center justify-center;
+    @apply bg-white/5 border-none;
+    @apply text-slate-400 cursor-pointer;
+    @apply transition-all duration-200;
+  }
+
+  .topbar-icon-btn:hover {
+    @apply bg-white/10 text-white;
+  }
+
+  /* Notification Badge */
+  .notification-badge {
+    @apply absolute -top-1 -right-1;
+    @apply w-[18px] h-[18px] rounded-full;
+    @apply bg-rose-500;
+    @apply text-[10px] font-semibold text-white;
+    @apply flex items-center justify-center;
+  }
+
+  /* User Menu */
+  .topbar-user {
+    @apply flex items-center gap-3;
+    @apply px-3 py-2 rounded-xl;
+    @apply bg-white/5 cursor-pointer;
+    @apply transition-all duration-200;
+  }
+
+  .topbar-user:hover {
+    @apply bg-white/10;
+  }
+
+  .user-avatar {
+    @apply w-9 h-9 rounded-xl;
+    @apply flex items-center justify-center;
+    @apply text-sm font-semibold text-white;
+    background: linear-gradient(135deg, #10b981, #06b6d4);
+  }
+
+  .user-avatar-lg {
+    @apply w-12 h-12 rounded-xl;
+    @apply flex items-center justify-center;
+    @apply text-lg font-semibold text-white;
+    background: linear-gradient(135deg, #10b981, #06b6d4);
+  }
+
+  .user-info {
+    @apply text-left;
+  }
+
+  .user-name {
+    @apply text-sm font-medium text-white;
+  }
+
+  .user-role {
+    @apply text-xs text-slate-500;
+  }
+
+  /* Dropdown Menu */
+  .topbar-dropdown {
+    @apply rounded-2xl overflow-hidden;
+    background: rgba(15, 15, 25, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Legacy topbar class for backwards compatibility */
   .topbar {
     @apply sticky top-0 z-40;
     @apply px-6 py-4;
@@ -691,23 +852,6 @@
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .topbar-search {
-    @apply relative flex-1 max-w-md;
-  }
-
-  .topbar-search input {
-    @apply w-full pl-10 pr-4 py-2.5 rounded-xl;
-    @apply bg-white/5 border border-white/10 text-white;
-    @apply placeholder-slate-500 text-sm;
-    @apply transition-all duration-200;
-    @apply focus:outline-none focus:border-blue-500/50 focus:bg-white/10;
-  }
-
-  .topbar-search svg {
-    @apply absolute left-3 top-1/2 -translate-y-1/2;
-    @apply w-5 h-5 text-slate-500;
   }
 
   /* ============================================

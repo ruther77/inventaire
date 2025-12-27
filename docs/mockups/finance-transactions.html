@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finances - Transactions</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-amber: #f59e0b;
+            --accent-yellow: #fbbf24;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(245, 158, 11, 0.12), transparent),
+                        radial-gradient(ellipse at 100% 0%, rgba(251, 191, 36, 0.08), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-amber), var(--accent-yellow));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-actions { display: flex; gap: 12px; }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-amber), var(--accent-yellow));
+            color: #000;
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .stat-card:hover { background: rgba(255,255,255,0.1); }
+        .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .stat-value { font-size: 24px; font-weight: 700; }
+        .filters-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .filter-input {
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            min-width: 200px;
+        }
+        .filter-select {
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        .table-container {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left;
+            padding: 16px 20px;
+            background: rgba(255,255,255,0.03);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 14px;
+        }
+        tr:hover { background: rgba(255,255,255,0.03); cursor: pointer; }
+        .amount { font-weight: 600; font-family: 'Sora', sans-serif; }
+        .amount.credit { color: var(--accent-emerald); }
+        .amount.debit { color: var(--accent-rose); }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-matched { background: rgba(16,185,129,0.2); color: #10b981; }
+        .status-pending { background: rgba(245,158,11,0.2); color: #f59e0b; }
+        .status-unmatched { background: rgba(244,63,94,0.2); color: #f43f5e; }
+        .category-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: rgba(59,130,246,0.2);
+            color: #3b82f6;
+        }
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+        }
+        .page-info { font-size: 14px; color: var(--text-muted); }
+        .page-buttons { display: flex; gap: 8px; }
+        .page-btn {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        .page-btn.active { background: rgba(245,158,11,0.2); color: var(--accent-amber); }
+        @media (max-width: 1024px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="finances.html">Finances</a>
+            <span>/</span>
+            <span>Transactions</span>
+        </div>
+
+        <div class="page-header">
+            <h1>💰 Transactions</h1>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="alert('Export CSV')">📥 Exporter</button>
+                <button class="btn btn-primary" onclick="alert('Nouvelle transaction')">+ Nouvelle transaction</button>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card" onclick="alert('Détail entrées')">
+                <div class="stat-label">Entrées ce mois</div>
+                <div class="stat-value" style="color: var(--accent-emerald);">+€18,420</div>
+            </div>
+            <div class="stat-card" onclick="alert('Détail sorties')">
+                <div class="stat-label">Sorties ce mois</div>
+                <div class="stat-value" style="color: var(--accent-rose);">-€12,847</div>
+            </div>
+            <div class="stat-card" onclick="alert('Détail solde')">
+                <div class="stat-label">Solde net</div>
+                <div class="stat-value" style="color: var(--accent-amber);">+€5,573</div>
+            </div>
+            <div class="stat-card" onclick="alert('Transactions non rapprochées')">
+                <div class="stat-label">Non rapprochées</div>
+                <div class="stat-value">12</div>
+            </div>
+        </div>
+
+        <div class="filters-bar">
+            <input type="text" class="filter-input" placeholder="Rechercher transaction, libellé...">
+            <select class="filter-select">
+                <option>Tous les types</option>
+                <option>Entrées</option>
+                <option>Sorties</option>
+            </select>
+            <select class="filter-select">
+                <option>Toutes les catégories</option>
+                <option>Achats fournisseurs</option>
+                <option>Ventes</option>
+                <option>Salaires</option>
+                <option>Charges</option>
+            </select>
+            <select class="filter-select">
+                <option>Tous les statuts</option>
+                <option>Rapprochées</option>
+                <option>En attente</option>
+                <option>Non rapprochées</option>
+            </select>
+            <input type="date" class="filter-input" style="min-width: 150px;">
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Libellé</th>
+                        <th>Catégorie</th>
+                        <th>Montant</th>
+                        <th>Statut</th>
+                        <th>Compte</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr onclick="alert('Détail transaction #1')">
+                        <td>24/12/2025</td>
+                        <td><strong>Facture Metro #1820</strong></td>
+                        <td><span class="category-badge">Achats</span></td>
+                        <td><span class="amount debit">-€847.50</span></td>
+                        <td><span class="status-badge status-matched">Rapprochée</span></td>
+                        <td>Compte principal</td>
+                    </tr>
+                    <tr onclick="alert('Détail transaction #2')">
+                        <td>24/12/2025</td>
+                        <td><strong>Ventes carte bleue</strong></td>
+                        <td><span class="category-badge">Ventes</span></td>
+                        <td><span class="amount credit">+€1,234.80</span></td>
+                        <td><span class="status-badge status-matched">Rapprochée</span></td>
+                        <td>Compte principal</td>
+                    </tr>
+                    <tr onclick="alert('Détail transaction #3')">
+                        <td>23/12/2025</td>
+                        <td><strong>Facture Brake #4521</strong></td>
+                        <td><span class="category-badge">Achats</span></td>
+                        <td><span class="amount debit">-€1,567.20</span></td>
+                        <td><span class="status-badge status-pending">En attente</span></td>
+                        <td>Compte principal</td>
+                    </tr>
+                    <tr onclick="alert('Détail transaction #4')">
+                        <td>23/12/2025</td>
+                        <td><strong>Loyer décembre</strong></td>
+                        <td><span class="category-badge">Charges</span></td>
+                        <td><span class="amount debit">-€2,500.00</span></td>
+                        <td><span class="status-badge status-matched">Rapprochée</span></td>
+                        <td>Compte principal</td>
+                    </tr>
+                    <tr onclick="alert('Détail transaction #5')">
+                        <td>22/12/2025</td>
+                        <td><strong>Virement inconnu</strong></td>
+                        <td><span class="category-badge">Non catégorisé</span></td>
+                        <td><span class="amount credit">+€450.00</span></td>
+                        <td><span class="status-badge status-unmatched">Non rapprochée</span></td>
+                        <td>Compte principal</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination">
+                <div class="page-info">Affichage 1-5 sur 234 transactions</div>
+                <div class="page-buttons">
+                    <button class="page-btn">←</button>
+                    <button class="page-btn active">1</button>
+                    <button class="page-btn">2</button>
+                    <button class="page-btn">3</button>
+                    <button class="page-btn">...</button>
+                    <button class="page-btn">47</button>
+                    <button class="page-btn">→</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

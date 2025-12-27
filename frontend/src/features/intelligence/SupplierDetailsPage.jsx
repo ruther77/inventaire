@@ -21,6 +21,9 @@ import {
   RefreshCw,
   DollarSign,
   Star,
+  Package,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -35,6 +38,7 @@ import {
   ComposedChart,
 } from 'recharts';
 import { useSupplierDetails, useSupplierHistoryById } from '@/hooks/useSupplierScoring.js';
+import { useProducts } from '@/hooks/useProducts.js';
 import Card, { CardHeader, CardContent } from '@/components/ui/Card.jsx';
 import Button from '@/components/ui/Button.jsx';
 import Badge from '@/components/ui/Badge.jsx';
@@ -72,6 +76,7 @@ const DIMENSION_LABELS = {
 
 const TABS = [
   { id: 'overview', label: 'Vue d\'ensemble', icon: BarChart3 },
+  { id: 'products', label: 'Produits', icon: Package },
   { id: 'history', label: 'Historique', icon: Clock },
   { id: 'deliveries', label: 'Livraisons', icon: Truck },
   { id: 'issues', label: 'Incidents', icon: AlertTriangle },
@@ -395,6 +400,150 @@ function StatisticsPanel({ statistics = {} }) {
 }
 
 // ============================================================================
+// PRODUCTS LIST COMPONENT
+// ============================================================================
+
+function ProductsList({ supplierName }) {
+  const [page, setPage] = useState(1);
+  const perPage = 20;
+
+  const productsQuery = useProducts({
+    page,
+    per_page: perPage,
+    fournisseur: supplierName,
+  });
+
+  // Hook normalisé: data = tableau, meta = {total, page, per_page}
+  const products = productsQuery.data || [];
+  const total = productsQuery.meta?.total || products.length;
+  const totalPages = Math.ceil(total / perPage);
+
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'EUR',
+      minimumFractionDigits: 2,
+    }).format(value || 0);
+
+  const getStockStatus = (product) => {
+    if (!product.stock_actuel && product.stock_actuel !== 0) return 'unknown';
+    if (product.stock_actuel <= 0) return 'rupture';
+    if (product.stock_actuel <= (product.seuil_alerte || 5)) return 'low';
+    return 'ok';
+  };
+
+  const statusConfig = {
+    ok: { label: 'En stock', variant: 'success' },
+    low: { label: 'Stock bas', variant: 'warning' },
+    rupture: { label: 'Rupture', variant: 'danger' },
+    unknown: { label: '-', variant: 'neutral' },
+  };
+
+  if (productsQuery.isLoading) {
+    return (
+      <Card padding="lg">
+        <CardHeader title="Produits fournis" />
+        <CardContent>
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card padding="lg">
+      <CardHeader
+        title="Produits fournis"
+        description={`${total} produit${total > 1 ? 's' : ''} de ce fournisseur`}
+      />
+      <CardContent>
+        {products.length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-8">
+            Aucun produit trouvé pour ce fournisseur
+          </p>
+        ) : (
+          <>
+            <div className="space-y-3 max-h-[500px] overflow-y-auto">
+              {products.map((product, idx) => {
+                const status = getStockStatus(product);
+                const config = statusConfig[status];
+
+                return (
+                  <motion.div
+                    key={product.id || idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(idx * 0.03, 0.3) }}
+                    className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-white/5 hover:bg-slate-700/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-blue-500/20">
+                        <Package className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white truncate max-w-[300px]">
+                          {product.nom}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {product.categorie || 'Sans catégorie'}
+                          {product.codes?.length > 0 && ` • ${product.codes[0]}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-white">
+                          {formatCurrency(product.prix_achat)}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Stock: {product.stock_actuel ?? '-'}
+                        </p>
+                      </div>
+                      <Badge variant={config.variant}>{config.label}</Badge>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+                <span className="text-sm text-slate-400">
+                  Page {page} sur {totalPages}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
 // RECOMMENDATIONS COMPONENT
 // ============================================================================
 
@@ -507,6 +656,10 @@ export default function SupplierDetailsPage() {
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === 'products' && (
+            <ProductsList supplierName={details.supplier_name} />
           )}
 
           {activeTab === 'history' && (

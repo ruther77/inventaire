@@ -1,13 +1,23 @@
 import clsx from 'clsx';
 
 /**
- * Skeleton - Composant de chargement avec animations avancées
+ * Composant Skeleton.
  *
- * Version 2.0 - Avec support shimmer, stagger et variants
+ * Indicateur de chargement avec animations pulse ou shimmer pour améliorer l'expérience utilisateur.
+ * Supporte plusieurs variantes d'animation et peut être utilisé pour créer des layouts de chargement complexes.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {string} [props.className] - Classes CSS pour définir taille et forme (ex: "h-4 w-32")
+ * @param {string} [props.variant='pulse'] - Type d'animation ('pulse' | 'shimmer' | 'static')
+ * @param {boolean} [props.dark=false] - Active le mode sombre avec shimmer
  *
  * @example
  * <Skeleton className="h-4 w-32" />
- * <Skeleton variant="shimmer" className="h-4 w-32" />
+ *
+ * @example
+ * <Skeleton variant="shimmer" className="h-10 w-full rounded-xl" />
  */
 
 const baseClasses = 'rounded';
@@ -38,6 +48,23 @@ export function Skeleton({
   );
 }
 
+/**
+ * SkeletonText - Skeleton pour texte multiligne.
+ *
+ * Génère plusieurs lignes de skeleton pour simuler des paragraphes de texte.
+ * La dernière ligne est automatiquement plus courte (75%) pour un rendu réaliste.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {number} [props.lines=1] - Nombre de lignes à afficher
+ * @param {string} [props.className] - Classes CSS additionnelles
+ * @param {string} [props.variant='pulse'] - Type d'animation
+ * @param {boolean} [props.stagger=false] - Active l'animation stagger entre les lignes
+ *
+ * @example
+ * <SkeletonText lines={3} variant="shimmer" />
+ */
 export function SkeletonText({
   lines = 1,
   className,
@@ -62,6 +89,22 @@ export function SkeletonText({
   );
 }
 
+/**
+ * SkeletonCircle - Skeleton circulaire.
+ *
+ * Skeleton de forme circulaire pour les avatars, icônes ou badges ronds.
+ * Propose plusieurs tailles prédéfinies.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {string} [props.size='md'] - Taille du cercle ('xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl')
+ * @param {string} [props.className] - Classes CSS additionnelles
+ * @param {string} [props.variant='pulse'] - Type d'animation
+ *
+ * @example
+ * <SkeletonCircle size="lg" variant="shimmer" />
+ */
 export function SkeletonCircle({
   size = 'md',
   className,

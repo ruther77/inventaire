@@ -1,4 +1,20 @@
-"""Endpoints finance (rapprochements, anomalies, etc.)."""
+"""
+Module de gestion des endpoints de finance.
+
+Ce module fournit une API REST complète pour la gestion financière incluant:
+- Gestion des comptes bancaires et transactions
+- Import et traitement des relevés bancaires (CSV/PDF)
+- Gestion des factures fournisseurs et paiements
+- Rapprochement automatique entre transactions et factures
+- Détection d'anomalies et de dépenses récurrentes
+- Catégorisation des transactions avec règles automatiques
+- Tableaux de bord et statistiques financières
+- Centres de coûts et analytique
+- Feedback ML pour améliorer la catégorisation
+
+Les endpoints supportent le multi-tenant et incluent des fonctionnalités
+avancées de recherche, pagination et tri.
+"""
 
 from __future__ import annotations
 
@@ -66,6 +82,19 @@ def create_account(
     payload: FinanceAccountCreate,
     tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
+    """
+    Crée un nouveau compte bancaire.
+
+    Args:
+        payload: Données du compte (nom, type, numéro, entité, etc.)
+        tenant: Tenant actuel (injecté automatiquement)
+
+    Returns:
+        Dict contenant les informations du compte créé avec son ID
+
+    Raises:
+        HTTPException 400: Si les données sont invalides (nom dupliqué, etc.)
+    """
     try:
         return finance_accounts.create_account(payload)
     except ValueError as exc:
@@ -78,6 +107,17 @@ def list_accounts(
     is_active: bool | None = Query(default=None),
     tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> list[dict]:
+    """
+    Liste tous les comptes bancaires avec filtres optionnels.
+
+    Args:
+        entity_id: Filtrer par ID d'entité (optionnel)
+        is_active: Filtrer par statut actif/inactif (optionnel)
+        tenant: Tenant actuel (injecté automatiquement)
+
+    Returns:
+        Liste de dictionnaires contenant les comptes
+    """
     return finance_accounts.list_accounts(entity_id=entity_id, is_active=is_active)
 
 
@@ -133,6 +173,19 @@ def create_transaction(
     payload: FinanceTransactionCreate,
     tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
+    """
+    Crée une nouvelle transaction financière.
+
+    Args:
+        payload: Données de la transaction (date, montant, catégorie, compte, etc.)
+        tenant: Tenant actuel (injecté automatiquement)
+
+    Returns:
+        Dict contenant la transaction créée avec son ID
+
+    Raises:
+        HTTPException 400: Si les données sont invalides (compte inexistant, montant invalide, etc.)
+    """
     try:
         return finance_transactions.create_transaction(payload)
     except ValueError as exc:
@@ -555,6 +608,24 @@ async def import_bank_statements(
     file: UploadFile = File(...),
     tenant: Tenant = Depends(get_current_tenant_or_default),
 ) -> dict:
+    """
+    Importe un relevé bancaire au format CSV.
+
+    Le fichier CSV doit contenir les colonnes: date, libellé, montant, etc.
+    L'import détecte automatiquement les doublons et applique les règles
+    de catégorisation existantes.
+
+    Args:
+        account_id: ID du compte bancaire cible
+        file: Fichier CSV uploadé
+        tenant: Tenant actuel (injecté automatiquement)
+
+    Returns:
+        Dict avec le résumé de l'import (total, inserted, duplicates, errors)
+
+    Raises:
+        HTTPException 400: Si le format CSV est invalide ou le compte inexistant
+    """
     try:
         content = await file.read()
         summary = bank_statement_csv.import_csv(content, account_id=account_id, source=file.filename or "CSV")

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant - Charges</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-orange: #f97316;
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(249, 115, 22, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-amber));
+            color: white;
+        }
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .summary-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .summary-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .summary-value { font-size: 24px; font-weight: 700; }
+        .summary-trend { font-size: 12px; margin-top: 4px; }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .charge-list { display: flex; flex-direction: column; gap: 12px; }
+        .charge-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .charge-item:hover { background: rgba(255,255,255,0.08); }
+        .charge-info { display: flex; align-items: center; gap: 12px; }
+        .charge-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .charge-icon.rent { background: rgba(139,92,246,0.2); }
+        .charge-icon.staff { background: rgba(59,130,246,0.2); }
+        .charge-icon.energy { background: rgba(245,158,11,0.2); }
+        .charge-icon.other { background: rgba(107,114,128,0.2); }
+        .charge-name { font-size: 14px; font-weight: 500; }
+        .charge-category { font-size: 12px; color: var(--text-muted); }
+        .charge-amount { font-size: 16px; font-weight: 600; color: var(--accent-rose); }
+        .chart-placeholder {
+            height: 200px;
+            background: linear-gradient(180deg, rgba(249,115,22,0.1) 0%, transparent 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            padding: 16px;
+        }
+        .bar {
+            width: 40px;
+            background: linear-gradient(180deg, var(--accent-orange), var(--accent-amber));
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+        }
+        .category-breakdown { display: flex; flex-direction: column; gap: 12px; }
+        .category-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .category-bar {
+            flex: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .category-fill {
+            height: 100%;
+            border-radius: 4px;
+        }
+        .category-label { width: 100px; font-size: 13px; }
+        .category-value { width: 80px; text-align: right; font-size: 13px; font-weight: 600; }
+        @media (max-width: 1024px) {
+            .summary-cards { grid-template-columns: repeat(2, 1fr); }
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="restaurant.html">Restaurant</a>
+            <span>/</span>
+            <span>Charges</span>
+        </div>
+
+        <div class="page-header">
+            <h1>💸 Charges Restaurant</h1>
+            <button class="btn btn-primary" onclick="alert('Ajouter une charge')">+ Nouvelle charge</button>
+        </div>
+
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="summary-label">Total charges mois</div>
+                <div class="summary-value" style="color: var(--accent-rose);">€8,450</div>
+                <div class="summary-trend" style="color: var(--accent-emerald);">-3% vs mois dernier</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Charges fixes</div>
+                <div class="summary-value">€5,200</div>
+                <div class="summary-trend">62% du total</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Charges variables</div>
+                <div class="summary-value">€3,250</div>
+                <div class="summary-trend">38% du total</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Ratio charges/CA</div>
+                <div class="summary-value">24%</div>
+                <div class="summary-trend">Objectif: &lt;25%</div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">📊 Évolution mensuelle</div>
+                <div class="chart-placeholder">
+                    <div class="bar" style="height: 70%;" onclick="alert('Juillet: €7,890')"></div>
+                    <div class="bar" style="height: 75%;" onclick="alert('Août: €8,120')"></div>
+                    <div class="bar" style="height: 80%;" onclick="alert('Sept: €8,540')"></div>
+                    <div class="bar" style="height: 85%;" onclick="alert('Oct: €8,780')"></div>
+                    <div class="bar" style="height: 82%;" onclick="alert('Nov: €8,650')"></div>
+                    <div class="bar" style="height: 78%;" onclick="alert('Déc: €8,450')"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📈 Répartition par catégorie</div>
+                <div class="category-breakdown">
+                    <div class="category-item">
+                        <span class="category-label">Loyer</span>
+                        <div class="category-bar">
+                            <div class="category-fill" style="width: 30%; background: #8b5cf6;"></div>
+                        </div>
+                        <span class="category-value">€2,500</span>
+                    </div>
+                    <div class="category-item">
+                        <span class="category-label">Personnel</span>
+                        <div class="category-bar">
+                            <div class="category-fill" style="width: 35%; background: #3b82f6;"></div>
+                        </div>
+                        <span class="category-value">€2,950</span>
+                    </div>
+                    <div class="category-item">
+                        <span class="category-label">Énergie</span>
+                        <div class="category-bar">
+                            <div class="category-fill" style="width: 18%; background: #f59e0b;"></div>
+                        </div>
+                        <span class="category-value">€1,520</span>
+                    </div>
+                    <div class="category-item">
+                        <span class="category-label">Autres</span>
+                        <div class="category-bar">
+                            <div class="category-fill" style="width: 17%; background: #6b7280;"></div>
+                        </div>
+                        <span class="category-value">€1,480</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📋 Détail des charges</div>
+            <div class="charge-list">
+                <div class="charge-item" onclick="alert('Détail Loyer')">
+                    <div class="charge-info">
+                        <div class="charge-icon rent">🏠</div>
+                        <div>
+                            <div class="charge-name">Loyer local commercial</div>
+                            <div class="charge-category">Charge fixe • Mensuel</div>
+                        </div>
+                    </div>
+                    <div class="charge-amount">-€2,500</div>
+                </div>
+                <div class="charge-item" onclick="alert('Détail Salaires')">
+                    <div class="charge-info">
+                        <div class="charge-icon staff">👥</div>
+                        <div>
+                            <div class="charge-name">Salaires cuisine</div>
+                            <div class="charge-category">Charge fixe • Mensuel</div>
+                        </div>
+                    </div>
+                    <div class="charge-amount">-€2,950</div>
+                </div>
+                <div class="charge-item" onclick="alert('Détail Électricité')">
+                    <div class="charge-info">
+                        <div class="charge-icon energy">⚡</div>
+                        <div>
+                            <div class="charge-name">Électricité</div>
+                            <div class="charge-category">Charge variable • Mensuel</div>
+                        </div>
+                    </div>
+                    <div class="charge-amount">-€890</div>
+                </div>
+                <div class="charge-item" onclick="alert('Détail Gaz')">
+                    <div class="charge-info">
+                        <div class="charge-icon energy">🔥</div>
+                        <div>
+                            <div class="charge-name">Gaz</div>
+                            <div class="charge-category">Charge variable • Mensuel</div>
+                        </div>
+                    </div>
+                    <div class="charge-amount">-€630</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

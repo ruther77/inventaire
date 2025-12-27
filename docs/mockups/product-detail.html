@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Détail Produit - Tomates grappe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-teal: #06b6d4;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(16, 185, 129, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .product-header {
+            display: flex;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+        .product-image {
+            width: 200px;
+            height: 200px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 80px;
+        }
+        .product-info { flex: 1; }
+        .product-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .product-category {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+        .product-badges {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-active { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .badge-warning { background: rgba(245,158,11,0.2); color: var(--accent-amber); }
+        .badge-critical { background: rgba(244,63,94,0.2); color: var(--accent-rose); }
+        .product-actions { display: flex; gap: 12px; }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-emerald), var(--accent-teal));
+            color: white;
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .info-item {
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+        }
+        .info-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .info-value { font-size: 18px; font-weight: 600; }
+        .chart-placeholder {
+            height: 200px;
+            background: linear-gradient(180deg, rgba(16,185,129,0.1) 0%, transparent 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            padding: 16px;
+        }
+        .bar {
+            width: 30px;
+            background: linear-gradient(180deg, var(--accent-emerald), var(--accent-teal));
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+        }
+        .bar:hover { opacity: 0.8; }
+        .supplier-list { display: flex; flex-direction: column; gap: 12px; }
+        .supplier-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .supplier-item:hover { background: rgba(255,255,255,0.08); }
+        .supplier-name { font-weight: 500; }
+        .supplier-price { font-weight: 600; }
+        .supplier-item.best .supplier-price { color: var(--accent-emerald); }
+        .movement-list { display: flex; flex-direction: column; gap: 8px; }
+        .movement-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .movement-item.in { background: rgba(16,185,129,0.1); }
+        .movement-item.out { background: rgba(244,63,94,0.1); }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            background: rgba(255,255,255,0.03);
+            padding: 4px;
+            border-radius: 10px;
+            width: fit-content;
+        }
+        .tab {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            border: none;
+            background: transparent;
+        }
+        .tab.active {
+            background: rgba(16,185,129,0.2);
+            color: var(--accent-emerald);
+            font-weight: 500;
+        }
+        @media (max-width: 768px) {
+            .product-header { flex-direction: column; }
+            .grid-2 { grid-template-columns: 1fr; }
+            .info-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="epicerie.html">Épicerie</a>
+            <span>/</span>
+            <a href="#">Catalogue</a>
+            <span>/</span>
+            <span>Tomates grappe</span>
+        </div>
+
+        <div class="product-header">
+            <div class="product-image">🍅</div>
+            <div class="product-info">
+                <h1 class="product-title">Tomates grappe</h1>
+                <p class="product-category">Catégorie: Légumes frais • SKU: TOM-GRP-001</p>
+                <div class="product-badges">
+                    <span class="badge badge-active">Actif</span>
+                    <span class="badge badge-critical">Stock critique</span>
+                    <span class="badge badge-warning">Variation prix +14%</span>
+                </div>
+                <div class="product-actions">
+                    <button class="btn btn-primary" onclick="alert('Ouvre la modale de commande')">Commander</button>
+                    <button class="btn btn-secondary" onclick="alert('Ouvre le formulaire d\'édition')">Modifier</button>
+                    <button class="btn btn-secondary" onclick="alert('Voir l\'historique complet')">Historique</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active">Vue générale</button>
+            <button class="tab">Stock</button>
+            <button class="tab">Prix</button>
+            <button class="tab">Fournisseurs</button>
+            <button class="tab">Historique</button>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">📊 Informations stock</div>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Stock actuel</div>
+                        <div class="info-value" style="color: var(--accent-rose);">2 kg</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Seuil minimum</div>
+                        <div class="info-value">10 kg</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Consommation moyenne</div>
+                        <div class="info-value">5 kg/jour</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Jours de stock</div>
+                        <div class="info-value" style="color: var(--accent-rose);">0.4 jours</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Rotation</div>
+                        <div class="info-value">2.5 jours</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Valeur stock</div>
+                        <div class="info-value">€6.40</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">💰 Informations prix</div>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Prix actuel</div>
+                        <div class="info-value">€3.20/kg</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Prix moyen 6 mois</div>
+                        <div class="info-value">€2.80/kg</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Variation</div>
+                        <div class="info-value" style="color: var(--accent-rose);">+14%</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Meilleur fournisseur</div>
+                        <div class="info-value" style="color: var(--accent-emerald);">Metro</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">📈 Évolution des sorties (30j)</div>
+                <div class="chart-placeholder">
+                    <div class="bar" style="height: 60%;" onclick="alert('Sem. 1: 32kg')"></div>
+                    <div class="bar" style="height: 80%;" onclick="alert('Sem. 2: 45kg')"></div>
+                    <div class="bar" style="height: 70%;" onclick="alert('Sem. 3: 38kg')"></div>
+                    <div class="bar" style="height: 90%;" onclick="alert('Sem. 4: 52kg')"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🏪 Comparatif fournisseurs</div>
+                <div class="supplier-list">
+                    <div class="supplier-item best" onclick="alert('Détail Metro')">
+                        <div>
+                            <div class="supplier-name">Metro</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">Livraison J+1</div>
+                        </div>
+                        <div class="supplier-price">€3.20/kg ⭐</div>
+                    </div>
+                    <div class="supplier-item" onclick="alert('Détail Brake')">
+                        <div>
+                            <div class="supplier-name">Brake</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">Livraison J+2</div>
+                        </div>
+                        <div class="supplier-price">€3.45/kg</div>
+                    </div>
+                    <div class="supplier-item" onclick="alert('Détail Pomona')">
+                        <div>
+                            <div class="supplier-name">Pomona</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">Livraison J+1</div>
+                        </div>
+                        <div class="supplier-price">€3.50/kg</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📦 Mouvements récents</div>
+            <div class="movement-list">
+                <div class="movement-item out">
+                    <span>Sortie production - Sauce tomate</span>
+                    <span>-3 kg</span>
+                    <span style="color: var(--text-muted);">Il y a 2h</span>
+                </div>
+                <div class="movement-item out">
+                    <span>Sortie production - Salade composée</span>
+                    <span>-1.5 kg</span>
+                    <span style="color: var(--text-muted);">Il y a 4h</span>
+                </div>
+                <div class="movement-item in">
+                    <span>Réception Metro #1820</span>
+                    <span>+10 kg</span>
+                    <span style="color: var(--text-muted);">Hier</span>
+                </div>
+                <div class="movement-item out">
+                    <span>Sortie production - Pizza</span>
+                    <span>-2 kg</span>
+                    <span style="color: var(--text-muted);">Hier</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

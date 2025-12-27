@@ -1,5 +1,73 @@
 #!/usr/bin/env python3
-"""Script pour importer toutes les factures Eurociel dans la base de données."""
+"""
+Module d'import automatique des factures fournisseur Eurociel.
+
+Ce script permet de:
+- Scanner un répertoire contenant des factures PDF Eurociel
+- Extraire automatiquement le texte de chaque facture
+- Parser les lignes de produits avec prix et quantités
+- Enrichir les données avec le catalogue existant
+- Importer ou mettre à jour les produits dans la base de données
+- Initialiser le stock pour les nouveaux produits
+- Générer un rapport détaillé de l'import
+
+Le script traite tous les PDFs du répertoire EUROCIEL/ (à l'exception du catalogue
+principal qui est trop volumineux).
+
+Usage:
+    python scripts/import_eurociel.py
+
+Configuration:
+    Les paramètres suivants sont définis dans le script:
+    - EUROCIEL_DIR: Répertoire contenant les factures PDF
+    - TENANT_ID: Identifiant du tenant (par défaut: 1)
+    - MARGIN_PERCENT: Marge appliquée pour calculer le prix de vente (40%)
+    - INITIALIZE_STOCK: Active l'initialisation du stock (True)
+
+Prérequis:
+    - Les PDFs doivent être dans le répertoire EUROCIEL/ à la racine du projet
+    - La base de données doit être accessible via DATABASE_URL
+    - Les services backend.services.invoices doivent être configurés
+    - pdftotext ou un outil équivalent pour l'extraction PDF
+
+Fichiers d'entrée:
+    - EUROCIEL/*.pdf : Factures Eurociel au format PDF
+      (exclut automatiquement les fichiers contenant "catalogue" dans le nom)
+
+Fichiers de sortie:
+    - Logs détaillés dans la console (niveau INFO)
+    - Produits créés/mis à jour dans la table `produits`
+    - Stock initialisé dans la table `mouvements_stock`
+    - Documents stockés dans `processed_invoices`
+
+Workflow:
+    1. Scanner le répertoire EUROCIEL/
+    2. Pour chaque PDF:
+       a. Extraire le texte avec pdftotext
+       b. Stocker le document dans processed_invoices
+       c. Parser les lignes de produits
+       d. Enrichir avec le catalogue existant
+       e. Importer dans la base de données
+    3. Générer un rapport récapitulatif
+
+Notes:
+    - Le catalogue Eurociel principal est exclu automatiquement (trop volumineux)
+    - Les doublons sont gérés automatiquement (mise à jour au lieu de création)
+    - La marge de 40% est appliquée pour calculer le prix de vente
+    - Le stock est initialisé uniquement pour les nouveaux produits si INITIALIZE_STOCK=True
+
+Exemple de sortie:
+    Traitement de: facture_2024_01.pdf
+      Texte extrait: 15420 caractères
+      Documents stockés: 1
+      Lignes extraites: 45
+      Import terminé: 12 créés, 33 mis à jour
+
+    RÉSUMÉ DE L'IMPORT
+    Fichiers traités: 10
+    Total produits créés: 120
+    Total produits mis à jour: 340
+"""
 
 from __future__ import annotations
 
@@ -25,7 +93,39 @@ INITIALIZE_STOCK = True
 
 
 def import_pdf(pdf_path: Path) -> dict:
-    """Importe un fichier PDF Eurociel."""
+    """
+    Importe un fichier PDF de facture Eurociel dans le catalogue.
+
+    Cette fonction effectue toutes les étapes nécessaires pour traiter une facture:
+    1. Lecture du fichier PDF
+    2. Extraction du texte brut
+    3. Stockage du document dans processed_invoices
+    4. Parsing des lignes de produits
+    5. Enrichissement avec le catalogue existant
+    6. Import/mise à jour dans la base de données
+
+    Args:
+        pdf_path (Path): Chemin vers le fichier PDF à importer
+
+    Returns:
+        dict: Dictionnaire avec les statistiques d'import contenant:
+            - file: Nom du fichier traité
+            - status: Statut (success, empty, no_products, error)
+            - products: Nombre de produits détectés
+            - created: Nombre de produits créés
+            - updated: Nombre de produits mis à jour
+            - stock_initialized: Nombre de stocks initialisés
+            - errors: Liste des erreurs rencontrées
+
+    Raises:
+        Exception: En cas d'erreur lors du traitement (capturée et loggée)
+
+    Example:
+        >>> result = import_pdf(Path("EUROCIEL/facture_2024_01.pdf"))
+        >>> print(result)
+        {'file': 'facture_2024_01.pdf', 'status': 'success', 'products': 45,
+         'created': 12, 'updated': 33, 'stock_initialized': 12, 'errors': []}
+    """
     LOGGER.info(f"Traitement de: {pdf_path.name}")
 
     try:
@@ -99,7 +199,22 @@ def import_pdf(pdf_path: Path) -> dict:
 
 
 def main():
-    """Point d'entrée principal."""
+    """
+    Point d'entrée principal du script.
+
+    Cette fonction:
+    1. Vérifie l'existence du répertoire EUROCIEL
+    2. Liste tous les fichiers PDF (sauf le catalogue)
+    3. Traite chaque fichier séquentiellement
+    4. Accumule les statistiques d'import
+    5. Affiche un résumé récapitulatif
+
+    Returns:
+        None: Le script affiche les résultats et se termine
+
+    Raises:
+        SystemExit: En cas d'erreur (répertoire inexistant, aucun fichier)
+    """
     if not EUROCIEL_DIR.exists():
         LOGGER.error(f"Répertoire non trouvé: {EUROCIEL_DIR}")
         sys.exit(1)

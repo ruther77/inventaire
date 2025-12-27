@@ -1,40 +1,24 @@
 /**
- * useBarcodeScanner Hook
- *
- * Hook pour gérer la détection de codes-barres via la BarcodeDetector API native
- * avec fallback gracieux si non disponible.
- *
- * Features:
- * - Détection en temps réel avec BarcodeDetector API
- * - Support des formats: EAN-13, EAN-8, Code128, QR Code, etc.
- * - Modes: continu ou single-scan
- * - Gestion des permissions caméra
- * - Callbacks pour détection et erreurs
- *
- * @example
- * const {
- *   isScanning,
- *   detectedCode,
- *   startScanning,
- *   stopScanning,
- *   resetDetection,
- *   error,
- *   hasPermission,
- * } = useBarcodeScanner({
- *   onDetected: (code, format) => console.log('Detected:', code, format),
- *   continuous: false,
- *   formats: ['ean_13', 'ean_8', 'qr_code'],
- * });
+ * Module de hooks pour la détection de codes-barres et QR codes via la caméra.
+ * @module hooks/useBarcodeScanner
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 
-// Check if BarcodeDetector API is available
+/**
+ * Vérifie si l'API BarcodeDetector est disponible dans le navigateur.
+ * @private
+ * @returns {boolean} True si supportée
+ */
 const isBarcodeDetectorSupported = () => {
   return 'BarcodeDetector' in window;
 };
 
-// Default supported formats
+/**
+ * Formats de codes-barres supportés par défaut.
+ * @constant
+ * @type {string[]}
+ */
 const DEFAULT_FORMATS = [
   'ean_13',
   'ean_8',
@@ -46,6 +30,64 @@ const DEFAULT_FORMATS = [
   'upc_e',
 ];
 
+/**
+ * Hook pour scanner des codes-barres et QR codes via la BarcodeDetector API.
+ *
+ * Utilise l'API native BarcodeDetector pour détecter les codes-barres en temps réel
+ * depuis un flux vidéo. Supporte de nombreux formats (EAN-13, QR Code, Code128, etc.)
+ * et deux modes de scan : continu ou single-shot. Gère automatiquement les permissions
+ * caméra et fournit un feedback sonore lors de la détection.
+ *
+ * IMPORTANT: L'API BarcodeDetector n'est pas disponible sur tous les navigateurs.
+ * Vérifiez la propriété `isSupported` avant utilisation.
+ *
+ * @param {Object} options - Options de configuration
+ * @param {Function} [options.onDetected] - Callback appelé lors d'une détection (code, format)
+ * @param {Function} [options.onError] - Callback appelé en cas d'erreur
+ * @param {boolean} [options.continuous=false] - Mode de scan continu ou single-shot
+ * @param {string[]} [options.formats] - Formats à détecter (voir DEFAULT_FORMATS)
+ * @param {number} [options.scanInterval=300] - Intervalle entre scans en mode continu (ms)
+ * @param {boolean} [options.beepOnDetection=true] - Émettre un bip lors de la détection
+ *
+ * @returns {Object} État et méthodes du scanner
+ * @property {boolean} isScanning - Indique si le scan est en cours
+ * @property {Object} detectedCode - Code détecté {code, format, boundingBox}
+ * @property {string} error - Message d'erreur éventuel
+ * @property {boolean} hasPermission - Permission caméra accordée
+ * @property {boolean} isSupported - API BarcodeDetector supportée
+ * @property {Function} startScanning - Démarre le scan (videoElement)
+ * @property {Function} stopScanning - Arrête le scan
+ * @property {Function} resetDetection - Réinitialise l'état de détection
+ * @property {Function} manualScan - Effectue un scan manuel
+ * @property {Function} checkPermission - Vérifie la permission caméra
+ * @property {Function} getSupportedFormats - Liste les formats supportés
+ *
+ * @example
+ * const {
+ *   isScanning,
+ *   detectedCode,
+ *   startScanning,
+ *   stopScanning,
+ *   isSupported,
+ *   error
+ * } = useBarcodeScanner({
+ *   onDetected: (code, format) => {
+ *     console.log(`Code détecté: ${code} (${format})`);
+ *     // Rechercher le produit dans la base
+ *   },
+ *   continuous: false, // Arrêter après la première détection
+ *   formats: ['ean_13', 'ean_8', 'qr_code'],
+ *   beepOnDetection: true
+ * });
+ *
+ * // Dans le composant
+ * const videoRef = useRef();
+ * const handleStart = () => startScanning(videoRef.current);
+ *
+ * if (!isSupported) {
+ *   return <div>Votre navigateur ne supporte pas le scan de codes-barres</div>;
+ * }
+ */
 export function useBarcodeScanner({
   onDetected,
   onError,

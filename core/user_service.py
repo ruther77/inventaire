@@ -1,20 +1,109 @@
-import os  # Accès aux variables d'environnement
-import hmac  # Comparaison sécurisée des hash
-import hashlib  # Fonctions de hachage (PBKDF2)
-import secrets  # Génération de secrets cryptographiques
-import string  # Ensembles de caractères pour mots de passe
-import logging  # Journalisation
-from typing import Optional  # Typage optionnel
+"""
+Module de gestion des utilisateurs et de l'authentification.
 
-from sqlalchemy import text  # Construction de requêtes SQL textuelles
-from sqlalchemy.exc import IntegrityError  # Gestion des erreurs d'intégrité SQL
+Ce module fournit un système complet de gestion des utilisateurs avec:
+- Création, lecture, mise à jour des utilisateurs
+- Authentification sécurisée par mot de passe (PBKDF2-HMAC-SHA256)
+- Gestion des rôles (admin, manager, standard)
+- Protection du dernier administrateur
+- Bootstrap automatique d'un admin par défaut
 
-from .data_repository import query_df, exec_sql, exec_sql_return_id  # Fonctions d'accès base
+SÉCURITÉ:
+=========
+Le système utilise PBKDF2-HMAC-SHA256 avec 390 000 itérations pour le hachage
+des mots de passe, conforme aux recommandations OWASP 2024.
+
+Format du hash:
+    pbkdf2_sha256$390000$<sel_hex>$<digest_hex>
+
+Caractéristiques:
+- Sel aléatoire de 16 octets par mot de passe (protection contre rainbow tables)
+- Comparaison timing-safe avec hmac.compare_digest (protection contre timing attacks)
+- Longueur minimale de 8 caractères (appliquée à la création et au reset)
+
+RÔLES DISPONIBLES:
+==================
+- admin: Accès complet au système, gestion des utilisateurs
+- manager: Accès étendu aux fonctionnalités métier
+- standard: Accès basique aux fonctionnalités
+
+PROTECTION DU DERNIER ADMIN:
+=============================
+Le système empêche la suppression ou la rétrogradation du dernier administrateur
+pour éviter le verrouillage complet du système.
+
+BOOTSTRAP AUTOMATIQUE:
+======================
+Au premier démarrage, si aucun utilisateur n'existe, un admin par défaut est créé:
+- Username: Défini par DEFAULT_ADMIN_USERNAME (défaut: "admin")
+- Email: Défini par DEFAULT_ADMIN_EMAIL (défaut: "admin@example.com")
+- Password: Défini par DEFAULT_ADMIN_PASSWORD, ou généré aléatoirement
+
+Variables d'environnement de contrôle:
+- SKIP_USER_INIT: Désactive complètement l'initialisation
+- SKIP_USER_BOOTSTRAP: Désactive seulement le bootstrap de l'admin
+- DEFAULT_ADMIN_USERNAME: Username de l'admin par défaut
+- DEFAULT_ADMIN_EMAIL: Email de l'admin par défaut
+- DEFAULT_ADMIN_PASSWORD: Mot de passe de l'admin (si absent, généré aléatoirement)
+
+UTILISATION TYPIQUE:
+====================
+    from core.user_service import authenticate_user, create_user
+
+    # Authentification
+    user = authenticate_user("admin@example.com", "password123")
+    if user:
+        print(f"Connecté en tant que {user['username']} ({user['role']})")
+
+    # Création d'utilisateur
+    new_user = create_user(
+        username="johndoe",
+        email="john@example.com",
+        password="SecureP@ss123",
+        role="standard"
+    )
+
+    # Modification de rôle
+    update_user_role(user_id=new_user['id'], role="manager")
+
+    # Reset de mot de passe
+    new_password = reset_user_password(user_id=new_user['id'])
+    print(f"Nouveau mot de passe: {new_password}")
+
+STRUCTURE DE LA TABLE:
+======================
+    app_users:
+        - id (SERIAL PRIMARY KEY): Identifiant unique
+        - username (TEXT UNIQUE NOT NULL): Nom d'utilisateur (min 3 caractères)
+        - email (TEXT UNIQUE NOT NULL): Adresse email (validation basique)
+        - password_hash (TEXT NOT NULL): Hash PBKDF2 du mot de passe
+        - role (TEXT NOT NULL): Rôle parmi ALLOWED_ROLES
+        - created_at (TIMESTAMPTZ): Date de création (auto)
+"""
+
+import os
+import hmac
+import hashlib
+import secrets
+import string
+import logging
+from typing import Optional
+
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
+
+from .data_repository import query_df, exec_sql, exec_sql_return_id
 
 
-_PASSWORD_ITERATIONS = 390_000  # Nombre d'itérations PBKDF2
-_HASH_ALGO = "pbkdf2_sha256"  # Identifiant de l'algorithme utilisé
-ALLOWED_ROLES: tuple[str, ...] = ("admin", "manager", "standard")  # Rôles autorisés
+# === CONSTANTES DE SÉCURITÉ ===
+# Nombre d'itérations PBKDF2 (conforme OWASP 2024 pour SHA-256)
+_PASSWORD_ITERATIONS = 390_000
+
+# Identifiant de l'algorithme de hachage (format compatible Django)
+_HASH_ALGO = "pbkdf2_sha256"
+
+# Rôles autorisés dans le système (tuple immuable)
+ALLOWED_ROLES: tuple[str, ...] = ("admin", "manager", "standard")
 _USER_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS app_users (
     id SERIAL PRIMARY KEY,
@@ -283,7 +372,18 @@ def bootstrap_default_admin() -> None:
 
     default_username = os.getenv("DEFAULT_ADMIN_USERNAME", "admin")  # Valeur par défaut pour l'admin
     default_email = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@example.com")  # Email par défaut
-    default_password = os.getenv("DEFAULT_ADMIN_PASSWORD", "InventaireAdmin123")  # Mot de passe par défaut
+
+    # Sécurité : Génération d'un mot de passe aléatoire si non fourni via variable d'environnement
+    # Évite l'utilisation de mots de passe hardcodés faibles
+    default_password = os.getenv("DEFAULT_ADMIN_PASSWORD")
+    if not default_password:
+        # Génère un mot de passe sécurisé aléatoire
+        default_password = generate_secure_password(16)
+        logger.warning(
+            "Aucun DEFAULT_ADMIN_PASSWORD défini. Mot de passe généré aléatoirement pour l'admin: %s",
+            default_password
+        )
+        logger.warning("IMPORTANT: Changez ce mot de passe immédiatement et stockez-le de manière sécurisée!")
 
     create_user(default_username, default_email, default_password, role="admin")  # Crée l'utilisateur admin
 

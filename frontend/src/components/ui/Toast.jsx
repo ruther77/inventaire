@@ -6,6 +6,19 @@ import { X, CheckCircle2, AlertTriangle, AlertCircle, Info, Loader2 } from 'luci
 // Context
 const ToastContext = createContext(null);
 
+/**
+ * Hook useToast.
+ *
+ * Hook pour accéder au système de notifications toast depuis n'importe quel composant.
+ * Doit être utilisé à l'intérieur d'un ToastProvider.
+ *
+ * @returns {Object} - Objet avec {toasts, toast}
+ * @throws {Error} - Si utilisé en dehors d'un ToastProvider
+ *
+ * @example
+ * const { toast } = useToast();
+ * toast.success('Enregistré avec succès !');
+ */
 export function useToast() {
   const context = useContext(ToastContext);
   if (!context) {
@@ -15,7 +28,33 @@ export function useToast() {
 }
 
 /**
- * ToastProvider - Provider pour le système de notifications
+ * ToastProvider - Provider pour le système de notifications.
+ *
+ * Fournit le contexte et les méthodes pour afficher des notifications toast dans l'application.
+ * Gère automatiquement la pile de toasts, les animations et le positionnement.
+ * Propose des helpers pour les types courants (success, error, warning, info, loading, promise).
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {React.ReactNode} props.children - Contenu de l'application
+ * @param {string} [props.position='bottom-right'] - Position des toasts ('top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right')
+ * @param {number} [props.maxToasts=5] - Nombre maximum de toasts affichés simultanément
+ *
+ * @example
+ * <ToastProvider position="top-right" maxToasts={3}>
+ *   <App />
+ * </ToastProvider>
+ *
+ * // Utilisation dans un composant
+ * const { toast } = useToast();
+ * toast.success('Opération réussie !');
+ * toast.error('Une erreur est survenue', { duration: 8000 });
+ * toast.promise(saveData(), {
+ *   loading: 'Enregistrement...',
+ *   success: 'Données enregistrées !',
+ *   error: 'Échec de l\'enregistrement'
+ * });
  */
 export function ToastProvider({ children, position = 'bottom-right', maxToasts = 5 }) {
   const [toasts, setToasts] = useState([]);

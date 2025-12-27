@@ -413,6 +413,27 @@ CREATE TABLE IF NOT EXISTS restaurant_plat_ingredients (
     UNIQUE (plat_id, ingredient_id)
 );
 
+CREATE TABLE IF NOT EXISTS restaurant_sales (
+    id SERIAL PRIMARY KEY,
+    tenant_id INT NOT NULL DEFAULT 1,
+    plat_id INT NOT NULL REFERENCES restaurant_plats(id) ON DELETE CASCADE,
+    quantity NUMERIC(12,4) NOT NULL,
+    sold_at TIMESTAMPTZ NOT NULL,
+    source TEXT,
+    source_ref TEXT,
+    row_hash VARCHAR(40),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_restaurant_sales_row_hash
+ON restaurant_sales (tenant_id, row_hash) WHERE row_hash IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_restaurant_sales_tenant_sold_at
+ON restaurant_sales (tenant_id, sold_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_restaurant_sales_plat_sold_at
+ON restaurant_sales (plat_id, sold_at DESC);
+
 CREATE TABLE IF NOT EXISTS restaurant_ingredient_price_history (
     id SERIAL PRIMARY KEY,
     tenant_id INT NOT NULL DEFAULT 1,

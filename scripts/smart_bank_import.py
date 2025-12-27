@@ -193,14 +193,25 @@ class GlobalReport:
 # =============================================================================
 
 def fuzzy_match(str1: str, str2: str) -> float:
-    """Calcule la similarité entre deux chaînes (0.0 à 1.0).
+    """
+    Calcule la similarité entre deux chaînes avec SequenceMatcher.
+
+    Utilise l'algorithme de Ratcliff/Obershelp pour calculer un score
+    de similarité normalisé entre 0.0 et 1.0. Les chaînes sont normalisées
+    (uppercase, stripped) avant comparaison.
 
     Args:
-        str1: Première chaîne
-        str2: Deuxième chaîne
+        str1 (str): Première chaîne à comparer
+        str2 (str): Deuxième chaîne à comparer
 
     Returns:
-        Score de similarité (0.0 = différent, 1.0 = identique)
+        float: Score de similarité (0.0 = totalement différent, 1.0 = identique)
+
+    Example:
+        >>> fuzzy_match("VIREMENT LOYER", "Virement loyer ")
+        1.0
+        >>> fuzzy_match("ACHAT CARTE", "PAIEMENT CB")
+        0.15
     """
     s1 = str1.strip().upper()
     s2 = str2.strip().upper()

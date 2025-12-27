@@ -357,10 +357,27 @@ if MULTIPART_AVAILABLE:
         file: UploadFile = File(...),
         margin_percent: float = Form(40.0),
         supplier_hint: str | None = Form(default=None),
+        force: bool = Form(default=False),
         tenant: Tenant = Depends(get_current_tenant),
     ):
         try:
             content = await file.read()
+
+            # Vérification anti-doublon par hash de fichier
+            file_hash = invoices_service.compute_file_hash(content)
+            if not force:
+                existing = invoices_service.check_file_hash_exists(file_hash, tenant.id)
+                if existing:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "error": "duplicate_invoice",
+                            "message": f"Ce fichier a déjà été importé comme facture {existing['invoice_id']}",
+                            "existing_invoice": existing,
+                            "file_hash": file_hash,
+                        }
+                    )
+
             buffer = io.BytesIO(content)
             buffer.name = file.filename  # type: ignore[attr-defined]
             text = extract_text_from_file(buffer)
@@ -382,7 +399,14 @@ if MULTIPART_AVAILABLE:
             )
             items = _serialize_minimal(enriched)
             documents = _group_items_by_invoice(items, attachments=stored_docs)
+
+            # Ajouter le hash aux documents pour stockage ultérieur
+            for doc in documents:
+                doc.file_hash = file_hash
+
             return InvoiceExtractResponse(items=items, documents=documents)
+        except HTTPException:
+            raise
         except Exception as exc:
             LOGGER.exception("Invoice file extraction failed: %s", file.filename)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -397,6 +421,19 @@ def import_invoice(payload: InvoiceImportRequest, tenant: Tenant = Depends(get_c
 
     _ensure_valid_invoice_lines(payload.lines, tenant_id=tenant.id)
 
+    # Vérifier le hash si fourni (double check au niveau import)
+    if payload.file_hash:
+        existing = invoices_service.check_file_hash_exists(payload.file_hash, tenant.id)
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "duplicate_invoice",
+                    "message": f"Ce fichier a déjà été importé comme facture {existing['invoice_id']}",
+                    "existing_invoice": existing,
+                }
+            )
+
     df = pd.DataFrame([line.model_dump() for line in payload.lines])
     try:
         summary = invoices_service.apply_invoice_import(
@@ -406,6 +443,7 @@ def import_invoice(payload: InvoiceImportRequest, tenant: Tenant = Depends(get_c
             movement_type=payload.movement_type,
             invoice_date=payload.invoice_date,
             tenant_id=tenant.id,
+            file_hash=payload.file_hash,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

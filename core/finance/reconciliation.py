@@ -1,17 +1,93 @@
-"""Rapprochement automatique banque ⇄ factures."""  # Docstring décrivant le module de rapprochement
+"""
+Module de rapprochement bancaire automatique (Bank Reconciliation).
 
-from __future__ import annotations  # Active les annotations différées
+Ce module implémente un algorithme heuristique de rapprochement automatique entre:
+- Les écritures bancaires (débits/crédits sur les comptes LCL, BNP, SumUp, etc.)
+- Les documents factures fournisseurs enregistrés dans le système
 
-import json  # Sérialisation pour stocker les paramètres et stats
-from dataclasses import dataclass  # Structures simples pour les entrées
-from datetime import date  # Manipulation des dates
-from decimal import Decimal  # Calculs financiers précis
-from difflib import SequenceMatcher  # Calcul de similarité textuelle
-from typing import Any, Iterable  # Typage générique
+OBJECTIF:
+=========
+Automatiser la comptabilité en associant automatiquement chaque paiement bancaire
+à sa facture correspondante, réduisant ainsi le travail manuel et les erreurs.
 
-from sqlalchemy import text  # Requêtes SQL textuelles
+ALGORITHME DE MATCHING:
+=======================
+L'algorithme utilise trois critères principaux avec pondération:
 
-from core.data_repository import get_engine, query_df  # Accès base et utilitaires
+1. MONTANT (70% du score):
+   - Compare le montant bancaire avec le montant TTC/HT de la facture
+   - Tolère un écart paramétrable (défaut: ±2.00€)
+   - Plus l'écart est faible, plus le score est élevé
+
+2. DATE (20% du score):
+   - Compare la date de l'opération bancaire avec la date de facture
+   - Tolère un écart paramétrable (défaut: ±10 jours)
+   - Plus les dates sont proches, plus le score est élevé
+
+3. TEXTE (10% du score):
+   - Calcule la similarité textuelle entre:
+     * Le libellé bancaire et le nom du fournisseur
+     * Le libellé bancaire et la référence/numéro de facture
+   - Utilise l'algorithme SequenceMatcher (Ratcliff-Obershelp)
+
+BONUS SUPPLÉMENTAIRES:
+=====================
+- +10% si le libellé contient explicitement le nom du fournisseur
+- +10% si l'écart de montant < 10% de la tolérance (quasi-identique)
+- +5% si l'écart de date ≤ 5 jours (très récent)
+- +10% si le compte bancaire correspond au fournisseur
+
+TYPES DE MATCHING:
+==================
+1. HEURISTIC (1→1): Un paiement = Une facture
+   - Cas le plus courant
+   - Association directe
+
+2. GROUPED (N→1): Plusieurs paiements = Une facture
+   - Paiements fractionnés (échelonnement)
+   - Regroupe max 3 écritures sur une fenêtre temporelle
+   - Somme les montants et compare au total facture
+
+SEUILS DE DÉCISION:
+===================
+- Score ≥ 0.90 (auto_threshold): Match AUTO-VALIDÉ
+- Score < 0.90: Match EN ATTENTE de validation manuelle
+
+TABLES IMPLIQUÉES:
+==================
+- finance_bank_statement_lines: Écritures bancaires importées
+- finance_invoice_documents: Documents factures fournisseurs
+- finance_bank_invoice_matches: Associations créées (résultats)
+- finance_reconciliation_runs: Historique des exécutions
+
+UTILISATION TYPIQUE:
+====================
+    from core.finance.reconciliation import run_reconciliation_job
+
+    result = run_reconciliation_job(
+        tenant_id=1,
+        amount_tolerance=2.0,      # ±2€ d'écart acceptable
+        max_days_difference=10,    # ±10 jours d'écart acceptable
+        auto_threshold=0.90        # Seuil d'auto-validation
+    )
+
+    print(f"Créé {result['matches_created']} associations")
+    print(f"Dont {result['auto_matches']} auto-validées")
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
+from difflib import SequenceMatcher
+from typing import Any, Iterable
+
+from sqlalchemy import text
+
+from core.data_repository import get_engine, query_df
+from backend.cache import cached, CacheTTL
 
 
 @dataclass
@@ -512,16 +588,22 @@ def run_reconciliation_job(
     }  # Résumé du run
 
 
+@cached(ttl=CacheTTL.SHORT, prefix="reconciliation_matches", tenant_aware=True)
 def fetch_matches(tenant_id: int, status: str | None = None) -> list[dict[str, Any]]:
-    """Return reconciliation matches for manual review."""  # Docstring récupération des correspondances
+    """Return reconciliation matches for manual review.
 
-    filters: list[str] = ["m.tenant_id = :tenant_id"]  # Filtre tenant
-    params: dict[str, Any] = {"tenant_id": tenant_id}  # Paramètres de base
-    if status:  # Filtre optionnel sur le statut
-        filters.append("m.status = :status")  # Ajoute le prédicat
-        params["status"] = status  # Paramètre statut
+    Note: Cette fonction utilise des JOINs pour éviter les requêtes N+1.
+    Tous les détails (bank_statement, invoice_document) sont récupérés en une seule requête.
+    """
 
-    where_clause = " AND ".join(filters)  # Construit la clause WHERE
+    filters: list[str] = ["m.tenant_id = :tenant_id"]
+    params: dict[str, Any] = {"tenant_id": tenant_id}
+    if status:
+        filters.append("m.status = :status")
+        params["status"] = status
+
+    where_clause = " AND ".join(filters)
+    # Utilisation de JOINs pour récupérer toutes les données en une seule requête (évite N+1)
     sql = f"""
         SELECT
             m.id,
@@ -551,12 +633,12 @@ def fetch_matches(tenant_id: int, status: str | None = None) -> list[dict[str, A
         JOIN finance_invoice_documents doc ON doc.id = m.document_id
         WHERE {where_clause}
         ORDER BY m.created_at DESC
-    """  # Requête listant les correspondances
-    engine = get_engine()  # Moteur SQL
-    df = query_df(sql, params=params)  # Exécute la requête
-    if df.empty:  # Aucun résultat
-        return []  # Liste vide
-    return df.to_dict("records")  # Convertit en dicts
+    """
+    engine = get_engine()
+    df = query_df(sql, params=params)
+    if df.empty:
+        return []
+    return df.to_dict("records")
 
 
 def update_match_status(tenant_id: int, match_id: int, *, status: str, note: str | None = None) -> dict[str, Any]:

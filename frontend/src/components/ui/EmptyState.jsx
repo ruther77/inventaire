@@ -3,8 +3,31 @@ import { Package } from 'lucide-react';
 import Button from './Button.jsx';
 
 /**
- * EmptyState - Composant pour les états vides contextuels et actionnables
- * Remplace les "Aucune donnée" génériques
+ * Composant EmptyState.
+ *
+ * État vide contextuel et actionnable pour remplacer les messages génériques "Aucune donnée".
+ * Améliore l'UX en guidant l'utilisateur avec des icônes, descriptions et actions claires.
+ * Propose trois tailles (sm, md, lg) et supporte plusieurs actions.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {React.ComponentType} [props.icon=Package] - Composant icône à afficher
+ * @param {string} [props.title='Aucun élément'] - Titre de l'état vide
+ * @param {string} [props.description] - Description explicative optionnelle
+ * @param {Array} [props.actions=[]] - Tableau d'actions avec {label, onClick, variant, icon, disabled, loading}
+ * @param {string} [props.size='md'] - Taille du composant ('sm' | 'md' | 'lg')
+ * @param {string} [props.className] - Classes CSS additionnelles
+ *
+ * @example
+ * <EmptyState
+ *   icon={Package}
+ *   title="Aucun produit"
+ *   description="Commencez par ajouter votre premier produit au catalogue."
+ *   actions={[
+ *     { label: 'Ajouter un produit', onClick: handleAdd, variant: 'brand' }
+ *   ]}
+ * />
  */
 export default function EmptyState({
   icon: Icon = Package,
@@ -89,7 +112,19 @@ export default function EmptyState({
 }
 
 /**
- * Variantes prédéfinies pour les cas d'usage courants
+ * EmptySearch - État vide pour résultats de recherche.
+ *
+ * Variante prédéfinie pour afficher un message quand une recherche ne retourne aucun résultat.
+ * Propose optionnellement un bouton pour réinitialiser les filtres.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {Function} [props.onReset] - Callback pour réinitialiser les filtres
+ * @param {string} [props.className] - Classes CSS additionnelles
+ *
+ * @example
+ * <EmptySearch onReset={handleResetFilters} />
  */
 export function EmptySearch({ onReset, className }) {
   return (
@@ -107,6 +142,22 @@ export function EmptySearch({ onReset, className }) {
   );
 }
 
+/**
+ * EmptyList - État vide pour listes.
+ *
+ * Variante prédéfinie pour afficher un message quand une liste est vide.
+ * Encourage l'utilisateur à ajouter son premier élément.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {string} [props.itemName='élément'] - Nom de l'élément au singulier
+ * @param {Function} [props.onAdd] - Callback pour ajouter un élément
+ * @param {string} [props.className] - Classes CSS additionnelles
+ *
+ * @example
+ * <EmptyList itemName="fournisseur" onAdd={handleAddSupplier} />
+ */
 export function EmptyList({ itemName = 'élément', onAdd, className }) {
   return (
     <EmptyState
@@ -118,6 +169,21 @@ export function EmptyList({ itemName = 'élément', onAdd, className }) {
   );
 }
 
+/**
+ * EmptyError - État d'erreur de chargement.
+ *
+ * Variante prédéfinie pour afficher un message d'erreur avec possibilité de réessayer.
+ * Utile pour les erreurs réseau ou serveur.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {Function} [props.onRetry] - Callback pour réessayer le chargement
+ * @param {string} [props.className] - Classes CSS additionnelles
+ *
+ * @example
+ * <EmptyError onRetry={refetch} />
+ */
 export function EmptyError({ onRetry, className }) {
   return (
     <EmptyState

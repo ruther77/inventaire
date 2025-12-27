@@ -291,9 +291,14 @@ async def get_supplier_details(
     try:
         calculator = SupplierScoreCalculator(tenant.id)
 
-        # Trouver le fournisseur par ID (mockée pour l'instant)
-        # En production, récupérer le nom depuis la DB
-        supplier_name = f"Supplier_{supplier_id}"  # Mockée
+        # Récupérer le nom du fournisseur depuis supplier_score_history
+        supplier_name = calculator.get_supplier_name_by_id(supplier_id)
+        if not supplier_name:
+            return build_error_response(
+                code="NOT_FOUND",
+                message=f"Fournisseur ID {supplier_id} non trouvé",
+                suggestion="Vérifiez l'ID du fournisseur"
+            )
 
         # Calculer le score actuel
         score_obj = calculator.calculate_score(

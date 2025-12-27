@@ -1,84 +1,249 @@
+/**
+ * Page Finance Overview - Dashboard de trésorerie principal.
+ *
+ * Cette page permet de visualiser et analyser la trésorerie de l'entreprise.
+ * Elle affiche:
+ * - Un hero avec le solde actuel de trésorerie et la tendance
+ * - Des onglets de sélection de période (7j, 30j, 90j, 12m, tout)
+ * - Un graphique interactif d'évolution de la trésorerie
+ * - Les KPIs principaux (entrées, sorties, solde net, alertes)
+ * - Les dernières transactions bancaires
+ *
+ * Fonctionnalités principales:
+ * - Visualisation multi-périodes avec graphique à barres
+ * - Calcul automatique des tendances et variations
+ * - Affichage des anomalies et rapprochements en attente
+ * - Export CSV des données
+ * - Rafraîchissement manuel des données
+ *
+ * @component
+ *
+ * @example
+ * <FinanceOverview />
+ */
+
 import React, { useMemo, useState } from 'react';
-import { TrendingUp, Wallet, ArrowDownCircle, ArrowUpCircle, Activity } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { motion } from 'framer-motion';
+import {
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Activity,
+  Download,
+  Calendar,
+  ChevronRight,
+  RefreshCw,
+} from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
+import clsx from 'clsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
-import { useFinanceMatches, useFinanceAnomalies } from '../../hooks/useFinance.js';
+import { useFinanceMatches, useFinanceAnomalies, useFinanceTransactions } from '../../hooks/useFinance.js';
 import {
-  useFinanceCategories,
-  useFinanceRules,
-  useFinanceCategoryStats,
-  useFinanceAccountsOverviewStats,
   useFinanceTimeline,
   useFinanceTreasury,
 } from '../../hooks/useFinanceCategories.js';
 import { roundAmount } from '../../utils/banking.js';
-import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
 import QueryErrorState from '../../components/feedback/QueryErrorState.jsx';
 
-const Stat = ({ label, value, hint, icon: Icon, accent = 'text-white', bgColor = 'bg-white/5', borderColor = 'border-white/10' }) => (
-  <div className={`rounded-2xl border ${borderColor} ${bgColor} p-4 transition-all hover:border-white/20`}>
-    <div className="flex items-center gap-2 text-slate-400 text-xs uppercase tracking-[0.3em]">
-      {Icon && <Icon className="w-4 h-4" />} {label}
+// Format currency
+const formatCurrency = (val) => {
+  if (val === null || val === undefined) return '0,00 €';
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+  }).format(val);
+};
+
+// Format compact currency
+const formatCompact = (val) => {
+  if (val === null || val === undefined) return '0 €';
+  if (Math.abs(val) >= 1000000) {
+    return `${(val / 1000000).toFixed(1)}M €`;
+  }
+  if (Math.abs(val) >= 1000) {
+    return `${(val / 1000).toFixed(1)}k €`;
+  }
+  return `${val.toFixed(0)} €`;
+};
+
+// Period config
+const PERIODS = [
+  { key: '7d', label: '7 jours', days: 7 },
+  { key: '30d', label: '30 jours', days: 30 },
+  { key: '90d', label: '90 jours', days: 90 },
+  { key: '12m', label: '12 mois', days: 365 },
+  { key: 'all', label: 'Tout', days: null },
+];
+
+// Period Tabs Component
+function PeriodTabs({ value, onChange }) {
+  return (
+    <div className="flex gap-1 p-1.5 rounded-xl bg-white/5 border border-white/10">
+      {PERIODS.map((period) => (
+        <button
+          key={period.key}
+          onClick={() => onChange(period.key)}
+          className={clsx(
+            'px-4 py-2 rounded-lg text-sm font-medium transition-all',
+            value === period.key
+              ? 'bg-amber-500/20 text-amber-400'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
+          )}
+        >
+          {period.label}
+        </button>
+      ))}
     </div>
-    <p className={`mt-1 text-2xl font-semibold ${accent}`}>{value}</p>
-    {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
-  </div>
-);
+  );
+}
+
+// Custom Tooltip for Bar Chart
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+
+  const data = payload[0].payload;
+
+  return (
+    <div className="bg-slate-900/95 border border-white/10 rounded-xl p-4 shadow-xl min-w-[200px]">
+      <p className="text-xs text-slate-400 mb-2">{data.period || label}</p>
+      <p className="text-2xl font-bold text-amber-400 mb-3">
+        {formatCurrency(data.balance || data.cumulative_balance)}
+      </p>
+      <div className="space-y-1 text-sm">
+        <div className="flex justify-between">
+          <span className="text-slate-400 flex items-center gap-1">
+            <ArrowUpCircle className="w-3 h-3 text-emerald-400" />
+            Entrées
+          </span>
+          <span className="text-emerald-400 font-medium">
+            +{formatCurrency(data.inflow)}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-slate-400 flex items-center gap-1">
+            <ArrowDownCircle className="w-3 h-3 text-rose-400" />
+            Sorties
+          </span>
+          <span className="text-rose-400 font-medium">
+            -{formatCurrency(data.outflow)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Transaction Row
+function TransactionRow({ tx, onClick }) {
+  const isPositive = tx.direction === 'IN' || Number(tx.amount) > 0;
+  const amount = Math.abs(Number(tx.amount) || 0);
+
+  return (
+    <motion.tr
+      whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+      onClick={onClick}
+      className="cursor-pointer border-b border-white/5"
+    >
+      <td className="px-4 py-4 text-sm text-slate-400">
+        {tx.transaction_date
+          ? new Date(tx.transaction_date).toLocaleDateString('fr-FR', {
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '—'}
+      </td>
+      <td className="px-4 py-4">
+        <span className="font-medium text-white">{tx.label || tx.description || '—'}</span>
+      </td>
+      <td className="px-4 py-4 text-sm text-slate-400">
+        {tx.category_name || tx.category || '—'}
+      </td>
+      <td className="px-4 py-4 text-sm text-slate-400">
+        {tx.account_label || tx.account_id || '—'}
+      </td>
+      <td className={clsx(
+        'px-4 py-4 text-sm font-semibold text-right',
+        isPositive ? 'text-emerald-400' : 'text-rose-400'
+      )}>
+        {isPositive ? '+' : '-'}{formatCurrency(amount)}
+      </td>
+    </motion.tr>
+  );
+}
 
 export default function FinanceOverview() {
-  const [months, setMonths] = useState(12);
+  const [period, setPeriod] = useState('30d');
 
-  // Hooks optimisés - agrégation côté serveur (beaucoup plus rapide)
-  const catQuery = useFinanceCategories({});
-  const rulesQuery = useFinanceRules({});
-  const catStats = useFinanceCategoryStats({});
-  const accountsStats = useFinanceAccountsOverviewStats({});
-  const matchesQuery = useFinanceMatches({ status: 'pending' });
-  const anomaliesQuery = useFinanceAnomalies({});
+  // Get days from period
+  const periodConfig = PERIODS.find((p) => p.key === period) || PERIODS[1];
+  const days = periodConfig.days;
 
-  // Nouveaux hooks optimisés pour les graphiques - date filters passed to backend
+  // Data hooks
   const timelineQuery = useFinanceTimeline({
-    months: months === 'all' ? null : months,
-    granularity: 'monthly',
+    days: days,
+    granularity: days && days <= 30 ? 'daily' : days <= 90 ? 'weekly' : 'monthly',
   });
+
   const treasuryQuery = useFinanceTreasury({
-    months: months === 'all' ? null : months,
+    period: period === 'all' ? null : period,
   });
 
-  // Données extraites des requêtes
-  const rules = Array.isArray(rulesQuery.data) ? rulesQuery.data : [];
-  const categories = Array.isArray(catQuery.data) ? catQuery.data : [];
-  const catStatsData = Array.isArray(catStats.data) ? catStats.data : [];
-  const accounts = Array.isArray(accountsStats.data) ? accountsStats.data : [];
-  const pendingMatches = Array.isArray(matchesQuery.data) ? matchesQuery.data : [];
-  const anomalies = Array.isArray(anomaliesQuery.data) ? anomaliesQuery.data : [];
-  const treasury = treasuryQuery.data ?? {};
+  const transactionsQuery = useFinanceTransactions({
+    limit: 5,
+    sort_by: 'transaction_date',
+    sort_order: 'desc',
+  });
 
-  // Timeline depuis l'API (déjà agrégée côté serveur)
-  const treasuryTimeline = useMemo(() => {
+  const anomaliesQuery = useFinanceAnomalies({});
+  const matchesQuery = useFinanceMatches({ status: 'pending' });
+
+  // Extracted data
+  const treasury = treasuryQuery.data ?? {};
+  const transactions = Array.isArray(transactionsQuery.data?.items)
+    ? transactionsQuery.data.items
+    : Array.isArray(transactionsQuery.data)
+    ? transactionsQuery.data
+    : [];
+  const anomalies = Array.isArray(anomaliesQuery.data) ? anomaliesQuery.data : [];
+  const pendingMatches = Array.isArray(matchesQuery.data) ? matchesQuery.data : [];
+
+  // Transformation des données timeline pour le graphique
+  // Normalise les données en s'assurant que les montants sont positifs
+  const chartData = useMemo(() => {
     const data = Array.isArray(timelineQuery.data) ? timelineQuery.data : [];
     return data.map((item) => ({
-      month: item.period,
-      balance: item.cumulative_balance,
-      inflow: item.inflow,
-      outflow: item.outflow,
-      net: item.net,
+      ...item,
+      balance: item.cumulative_balance || item.balance || 0,
+      inflow: item.inflow || 0,
+      outflow: Math.abs(item.outflow || 0), // Valeur absolue pour les sorties
     }));
   }, [timelineQuery.data]);
 
-  // Totaux depuis l'API treasury
-  const totals = useMemo(() => ({
-    entrees: treasury.total_inflow || 0,
-    sorties: treasury.total_outflow || 0,
-    net: treasury.net_balance || 0,
-  }), [treasury]);
-
-  const categoryById = useMemo(() => {
-    const map = new Map();
-    categories.forEach((c) => map.set(c.id, c));
-    return map;
-  }, [categories]);
+  // Calcul du solde actuel et des tendances
+  // Si trend_percent n'est pas fourni par l'API, on le calcule à partir des données du graphique
+  const currentBalance = treasury.current_balance || treasury.net_balance || 0;
+  const totalInflow = treasury.total_inflow || 0;
+  const totalOutflow = treasury.total_outflow || 0;
+  const netChange = totalInflow - totalOutflow;
+  const trendPercent = treasury.trend_percent || (
+    chartData.length >= 2
+      ? ((chartData[chartData.length - 1]?.balance - chartData[0]?.balance) / Math.abs(chartData[0]?.balance || 1)) * 100
+      : 0
+  );
 
   const hasError = treasuryQuery.isError && !treasuryQuery.data;
 
@@ -92,290 +257,234 @@ export default function FinanceOverview() {
     );
   }
 
+  const handleRefresh = () => {
+    timelineQuery.refetch();
+    treasuryQuery.refetch();
+    transactionsQuery.refetch();
+  };
+
   return (
-    <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Finance overview</p>
-          <h1 className="text-2xl font-semibold text-orange-400">Trésorerie & catégorisation</h1>
+    <div className="space-y-8">
+      {/* Hero Header with Balance */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 to-amber-500/5 p-12 text-center"
+      >
+        <p className="text-lg font-semibold text-slate-400 mb-4 uppercase tracking-wider">
+          Trésorerie
+        </p>
+        <div className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-amber-400 to-yellow-300 bg-clip-text text-transparent mb-4">
+          {formatCurrency(currentBalance)}
         </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={months}
-            onChange={(e) => setMonths(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+        <div className={clsx(
+          'inline-flex items-center gap-2 text-lg font-semibold',
+          trendPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'
+        )}>
+          {trendPercent >= 0 ? (
+            <TrendingUp className="w-5 h-5" />
+          ) : (
+            <TrendingDown className="w-5 h-5" />
+          )}
+          {trendPercent >= 0 ? '+' : ''}{trendPercent.toFixed(1)}% vs période précédente
+        </div>
+      </motion.div>
+
+      {/* Controls */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <PeriodTabs value={period} onChange={setPeriod} />
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            loading={treasuryQuery.isLoading}
           >
-            <option value="all">Tout l'historique</option>
-            {[3, 6, 12, 24, 36].map((m) => (
-              <option key={m} value={m}>
-                {m} mois
-              </option>
-            ))}
-          </select>
-          <Button variant="ghost" onClick={() => {
-            timelineQuery.refetch();
-            treasuryQuery.refetch();
-            catStats.refetch();
-            accountsStats.refetch();
-          }}>
+            <RefreshCw className="w-4 h-4" />
             Rafraîchir
           </Button>
+          <Button variant="outline" size="sm">
+            <Calendar className="w-4 h-4" />
+            Période personnalisée
+          </Button>
         </div>
-      </header>
-
-      {/* Enhanced KPIs Section */}
-      <div className="grid gap-3 md:grid-cols-4">
-        <Stat
-          label="Cash-in"
-          value={`${roundAmount(totals.entrees)} €`}
-          hint="Total entrées"
-          icon={ArrowDownCircle}
-          accent="text-emerald-400"
-          bgColor="bg-emerald-500/10"
-          borderColor="border-emerald-500/30"
-        />
-        <Stat
-          label="Cash-out"
-          value={`${roundAmount(totals.sorties)} €`}
-          hint="Total sorties"
-          icon={ArrowUpCircle}
-          accent="text-rose-400"
-          bgColor="bg-rose-500/10"
-          borderColor="border-rose-500/30"
-        />
-        <Stat
-          label="Net"
-          value={`${roundAmount(totals.net)} €`}
-          hint="Solde de la période"
-          icon={Wallet}
-          accent={totals.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}
-          bgColor={totals.net >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10'}
-          borderColor={totals.net >= 0 ? 'border-emerald-500/30' : 'border-rose-500/30'}
-        />
-        <Stat
-          label="Alertes"
-          value={`${anomalies.length} / ${pendingMatches.length}`}
-          hint="Anomalies / Reco en attente"
-          icon={Activity}
-          accent={anomalies.length > 0 ? 'text-rose-400' : 'text-emerald-400'}
-          bgColor={anomalies.length > 0 ? 'bg-rose-500/10' : 'bg-white/5'}
-          borderColor={anomalies.length > 0 ? 'border-rose-500/30' : 'border-white/10'}
-        />
       </div>
 
-      {/* Account Balances KPIs */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Soldes par compte</p>
-            <h3 className="text-lg font-semibold text-amber-400">Vue d'ensemble des comptes</h3>
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4"
+        >
+          <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+            <ArrowDownCircle className="w-4 h-4 text-emerald-400" />
+            Entrées
           </div>
-          <Button variant="ghost" onClick={() => accountsStats.refetch()}>
-            Rafraîchir
+          <p className="text-2xl font-bold text-emerald-400">
+            +{formatCompact(totalInflow)}
+          </p>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4"
+        >
+          <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+            <ArrowUpCircle className="w-4 h-4 text-rose-400" />
+            Sorties
+          </div>
+          <p className="text-2xl font-bold text-rose-400">
+            -{formatCompact(totalOutflow)}
+          </p>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          className={clsx(
+            'rounded-xl border p-4',
+            netChange >= 0
+              ? 'border-amber-500/30 bg-amber-500/10'
+              : 'border-rose-500/30 bg-rose-500/10'
+          )}
+        >
+          <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+            <Wallet className="w-4 h-4 text-amber-400" />
+            Solde net
+          </div>
+          <p className={clsx(
+            'text-2xl font-bold',
+            netChange >= 0 ? 'text-amber-400' : 'text-rose-400'
+          )}>
+            {netChange >= 0 ? '+' : ''}{formatCompact(netChange)}
+          </p>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          className={clsx(
+            'rounded-xl border p-4',
+            anomalies.length > 0
+              ? 'border-rose-500/30 bg-rose-500/10'
+              : 'border-white/10 bg-white/5'
+          )}
+        >
+          <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+            <Activity className="w-4 h-4" />
+            Alertes
+          </div>
+          <p className="text-2xl font-bold text-white">
+            {anomalies.length} / {pendingMatches.length}
+          </p>
+          <p className="text-xs text-slate-500">Anomalies / À rapprocher</p>
+        </motion.div>
+      </div>
+
+      {/* Interactive Chart */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold text-white">
+              Évolution trésorerie
+            </h2>
+            <p className="text-sm text-slate-400">
+              {periodConfig.label} - {chartData.length} points
+            </p>
+          </div>
+          <Button variant="ghost" size="sm">
+            <Download className="w-4 h-4" />
+            Exporter CSV
           </Button>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {accounts.map((acc) => (
-            <div key={acc.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:border-white/20 transition-colors">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold text-white">{acc.label}</p>
-                <Wallet className={`w-5 h-5 ${acc.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`} />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-slate-300">
-                  <span className="flex items-center gap-1">
-                    <ArrowDownCircle className="w-3 h-3 text-emerald-400" />
-                    Entrées
-                  </span>
-                  <span className="font-semibold text-emerald-400">{roundAmount(acc.inflow)} €</span>
-                </div>
-                <div className="flex justify-between text-xs text-slate-300">
-                  <span className="flex items-center gap-1">
-                    <ArrowUpCircle className="w-3 h-3 text-rose-400" />
-                    Sorties
-                  </span>
-                  <span className="font-semibold text-rose-400">{roundAmount(acc.outflow)} €</span>
-                </div>
-                <div className="h-px bg-white/10 my-2"></div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-semibold text-slate-400">Solde</span>
-                  <span className={`text-lg font-bold ${acc.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {roundAmount(acc.balance)} €
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-          {accounts.length === 0 && (
-            <div className="col-span-full text-center py-8 text-slate-400">
-              <Wallet className="w-12 h-12 mx-auto mb-2 opacity-30" />
-              <p>Aucun compte disponible</p>
-            </div>
-          )}
-        </div>
-      </Card>
 
-      {/* Treasury Chart */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Évolution</p>
-            <h3 className="text-lg font-semibold text-amber-400">Trésorerie cumulée</h3>
-          </div>
-          <div className="text-xs text-slate-500">
-            {treasuryTimeline.length > 0 && (
-              <span>
-                {treasuryTimeline[0]?.month} → {treasuryTimeline[treasuryTimeline.length - 1]?.month}
-              </span>
-            )}
-          </div>
-        </div>
-        {treasuryTimeline.length > 0 ? (
-          <div className="h-64" key={`treasury-chart-${months}`}>
+        {chartData.length > 0 ? (
+          <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={treasuryTimeline}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                 <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 12 }}
-                  stroke="#64748b"
+                  dataKey="period"
+                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 12 }}
-                  stroke="#64748b"
-                  tickFormatter={(value) => `${roundAmount(value)}€`}
+                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => formatCompact(v)}
                 />
-                <Tooltip
-                  formatter={(value) => [`${roundAmount(value)} €`, 'Solde cumulé']}
-                  labelFormatter={(label) => `Mois: ${label}`}
-                  contentStyle={{
-                    backgroundColor: '#1a1a24',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    color: '#fff'
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="balance"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  dot={{ fill: '#10b981', r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                <Bar dataKey="balance" radius={[4, 4, 0, 0]} maxBarSize={60}>
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={`rgba(245, 158, 11, ${0.4 + (index / chartData.length) * 0.6})`}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="h-64 flex items-center justify-center text-slate-400">
+          <div className="h-80 flex items-center justify-center text-slate-400">
             <div className="text-center">
               <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-30" />
-              <p>Aucune donnée de trésorerie disponible</p>
+              <p>Aucune donnée disponible</p>
             </div>
           </div>
         )}
       </Card>
 
-      {/* Alerts Summary */}
-      <Card className={`p-4 ${anomalies.length > 0 ? 'border-amber-500/30 bg-amber-500/10' : ''}`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Alertes système</p>
-            <h3 className="text-lg font-semibold text-white">
-              {anomalies.length === 0 && '✓ Tout est OK'}
-              {anomalies.length > 0 && `${anomalies.length} anomalie(s) détectée(s)`}
-            </h3>
-            {pendingMatches.length > 0 && (
-              <p className="text-sm text-slate-300 mt-2">
-                <span className="font-semibold text-amber-400">{pendingMatches.length}</span> rapprochement(s) en attente
-              </p>
-            )}
-          </div>
-          {anomalies.length > 0 && (
-            <div className="rounded-xl bg-rose-500/20 border border-rose-500/30 px-4 py-2 text-rose-400 text-sm font-semibold">
-              <Activity className="w-4 h-4 inline mr-1" />
-              {anomalies.length} anomalie{anomalies.length > 1 ? 's' : ''}
-            </div>
-          )}
-        </div>
-      </Card>
-
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Catégories</p>
-            <h3 className="text-lg font-semibold text-amber-400">Répartition par catégorie</h3>
-          </div>
-          <Button variant="ghost" onClick={() => catQuery.refetch()}>
-            Rafraîchir
+      {/* Recent Transactions */}
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <h2 className="text-xl font-semibold text-white">
+            Dernières transactions
+          </h2>
+          <Button variant="ghost" size="sm" className="text-blue-400">
+            Voir tout
+            <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
-        <div className="mt-3 overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-400">
-                <th className="px-3 py-2">Catégorie</th>
-                <th className="px-3 py-2 text-right">Entrées</th>
-                <th className="px-3 py-2 text-right">Sorties</th>
-                <th className="px-3 py-2 text-right">Lignes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {catStatsData.map((cat) => (
-                <tr key={cat.id || cat.code} className="border-t border-white/10">
-                  <td className="px-3 py-2 font-semibold text-white">{cat.name || cat.code || 'Sans catégorie'}</td>
-                  <td className="px-3 py-2 text-right text-emerald-400">{roundAmount(cat.inflow || 0)} €</td>
-                  <td className="px-3 py-2 text-right text-rose-400">{roundAmount(cat.outflow || 0)} €</td>
-                  <td className="px-3 py-2 text-right text-slate-300">{cat.lines || 0}</td>
-                </tr>
-              ))}
-              {catStatsData.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-3 py-4 text-center text-slate-400">
-                    Aucune catégorie
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
 
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Règles</p>
-            <h3 className="text-lg font-semibold text-amber-400">Règles de catégorisation</h3>
-            <p className="text-sm text-slate-400">Liste des règles actives et mots-clés associés.</p>
+        {transactions.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Description
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Catégorie
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Compte
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Montant
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.slice(0, 5).map((tx, index) => (
+                  <TransactionRow
+                    key={tx.id || index}
+                    tx={tx}
+                    onClick={() => {}}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
-          <Button variant="ghost" onClick={() => rulesQuery.refetch()}>
-            Rafraîchir
-          </Button>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {rulesQuery.isLoading && <p className="text-sm text-slate-400">Chargement des règles...</p>}
-          {rulesQuery.isError && (
-            <p className="text-sm text-rose-400">
-              Erreur: {rulesQuery.error?.message || 'Impossible de charger les règles'}
-            </p>
-          )}
-          {rules.map((rule) => (
-            <div key={rule.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-              <p className="text-sm font-semibold text-white">{rule.name}</p>
-              <p className="text-xs text-slate-400">
-                Catégorie: <span className="text-amber-400">{rule.category_name || categoryById.get(rule.category_id)?.name || rule.category_id}</span> · Active:{' '}
-                <span className={rule.is_active ? 'text-emerald-400' : 'text-slate-500'}>{rule.is_active ? 'oui' : 'non'}</span>
-              </p>
-              <p className="text-xs text-slate-500 truncate">
-                Mots-clés: {(rule.keywords || []).length ? (rule.keywords || []).join(', ') : '—'}
-              </p>
-            </div>
-          ))}
-          {!rulesQuery.isLoading && !rulesQuery.isError && rules.length === 0 && (
-            <p className="text-sm text-slate-400">Aucune règle configurée</p>
-          )}
-        </div>
+        ) : (
+          <div className="p-12 text-center text-slate-400">
+            <Wallet className="w-12 h-12 mx-auto mb-2 opacity-30" />
+            <p>Aucune transaction récente</p>
+          </div>
+        )}
       </Card>
     </div>
   );

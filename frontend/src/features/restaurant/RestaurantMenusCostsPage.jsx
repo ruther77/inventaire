@@ -1,3 +1,28 @@
+/**
+ * Page Menus et Coûts Restaurant.
+ *
+ * Cette page permet de gérer les fiches techniques des plats et d'analyser leur rentabilité.
+ * Elle affiche:
+ * - Les métriques globales (marge moyenne, food cost moyen, nombre de plats)
+ * - Une liste complète des plats avec leurs coûts et marges
+ * - Les alertes sur les ingrédients manquants ou problématiques
+ * - Un modal de détail par plat avec décomposition des coûts
+ * - Un simulateur d'impact prix pour optimiser les marges
+ *
+ * Fonctionnalités principales:
+ * - Affichage du food cost et de la marge par plat
+ * - Décomposition détaillée des coûts par ingrédient
+ * - Simulation de hausse de prix (+5%, +10%) avec impact sur marge et food cost
+ * - Recalcul automatique des coûts après mise à jour des prix d'achat
+ * - Détection des ingrédients avec coût élevé ou données manquantes
+ * - Badges visuels pour identifier rapidement les plats problématiques
+ *
+ * @component
+ *
+ * @example
+ * <RestaurantMenusCostsPage />
+ */
+
 import { useState } from 'react';
 import { Card, Button, SectionHeader, Badge } from '@/components/ui';
 import { useRestaurantMenusOverview, useRestaurantPlatDetails, useSimulatePlatPrice } from '@/hooks/useRestaurant.js';
@@ -17,10 +42,17 @@ function Metric({ label, value, icon: Icon, accent }) {
   );
 }
 
+/**
+ * Modal de détail d'un plat avec simulateur de prix.
+ *
+ * Affiche la fiche technique complète d'un plat et permet de simuler
+ * l'impact d'une hausse de prix sur la marge et le food cost.
+ */
 function PlatDetailModal({ plat, onClose }) {
   const simulateMutation = useSimulatePlatPrice();
   const [simulation, setSimulation] = useState(null);
 
+  // Simuler une hausse de prix et calculer les nouveaux indicateurs
   const simulate = (deltaPct) => {
     if (!plat?.id) return;
     const newPrice = plat.selling_price * (1 + deltaPct / 100);

@@ -1,4 +1,15 @@
-"""Routes API d'audit et de gestion des écarts."""
+"""
+Module de gestion de l'audit et des écarts de stock.
+
+Ce module fournit les endpoints pour:
+- Diagnostics d'écarts de stock (différences théorique vs réel)
+- Gestion des actions correctives assignées
+- Historique des résolutions d'écarts
+- Création et suivi des tâches d'audit
+
+Le système détecte automatiquement les écarts et permet d'assigner
+des responsables pour leur résolution avec suivi complet.
+"""
 
 from __future__ import annotations
 

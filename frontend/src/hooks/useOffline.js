@@ -1,7 +1,12 @@
+/**
+ * Module de hooks pour la détection du statut de connexion réseau.
+ * @module hooks/useOffline
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 
 /**
- * Hook personnalisé pour détecter et gérer le statut online/offline de l'application.
+ * Hook pour détecter et gérer le statut de connexion réseau (online/offline).
  *
  * Utilise l'API navigator.onLine et écoute les événements online/offline
  * pour détecter les changements de connectivité en temps réel.

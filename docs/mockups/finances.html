@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finances - Trésorerie Interactive</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-gold: #f59e0b;
+            --accent-yellow: #fbbf24;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(245, 158, 11, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1800px; margin: 0 auto; }
+
+        /* Header avec solde */
+        .finance-header {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.1));
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 24px;
+            padding: 48px;
+            margin-bottom: 48px;
+            text-align: center;
+        }
+        .finance-header h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+        .balance {
+            font-family: 'Sora', sans-serif;
+            font-size: 72px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-gold), var(--accent-yellow));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+        }
+        .balance-trend {
+            font-size: 20px;
+            color: var(--accent-emerald);
+            font-weight: 600;
+        }
+
+        /* Tabs avec période */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 32px;
+        }
+        .period-tabs {
+            display: flex;
+            gap: 8px;
+            background: rgba(255,255,255,0.05);
+            padding: 6px;
+            border-radius: 12px;
+        }
+        .period-tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            color: var(--text-muted);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .period-tab:hover { background: rgba(255,255,255,0.08); }
+        .period-tab.active {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-gold);
+        }
+
+        /* Chart interactif */
+        .chart-section {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
+            margin-bottom: 32px;
+        }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        .chart-title { font-size: 24px; font-weight: 600; }
+        .chart-actions button {
+            padding: 10px 16px;
+            background: rgba(59,130,246,0.1);
+            border: 1px solid rgba(59,130,246,0.3);
+            border-radius: 10px;
+            color: #3b82f6;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .chart-actions button:hover { background: rgba(59,130,246,0.2); }
+
+        /* Graphique simplifié mais cliquable */
+        .chart-container {
+            height: 400px;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            padding: 20px 0;
+        }
+        .chart-bar-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .chart-bar-wrapper:hover {
+            transform: translateY(-4px);
+        }
+        .chart-bar-wrapper:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+        .chart-bar {
+            width: 100%;
+            background: linear-gradient(180deg, rgba(245,158,11,0.8), rgba(245,158,11,0.4));
+            border-radius: 8px 8px 0 0;
+            position: relative;
+        }
+        .chart-label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .tooltip {
+            position: absolute;
+            top: -80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.95);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            min-width: 200px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+            z-index: 100;
+        }
+        .tooltip h4 {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .tooltip .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent-gold);
+            margin-bottom: 8px;
+        }
+        .tooltip .detail {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        /* Transactions table */
+        .transactions-section {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            padding: 16px 12px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        td {
+            padding: 16px 12px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        tr:hover { background: rgba(255,255,255,0.05); }
+        .amount-positive { color: var(--accent-emerald); font-weight: 600; }
+        .amount-negative { color: var(--accent-rose); font-weight: 600; }
+
+        @media (max-width: 768px) {
+            .balance { font-size: 48px; }
+            .chart-container { height: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Finance Header avec solde -->
+        <div class="finance-header">
+            <h1>TRÉSORERIE</h1>
+            <div class="balance">€12,847.23</div>
+            <div class="balance-trend">↗ +5.2% vs période précédente</div>
+        </div>
+
+        <!-- Contrôles période -->
+        <div class="controls">
+            <div class="period-tabs">
+                <button class="period-tab">7 jours</button>
+                <button class="period-tab active">30 jours</button>
+                <button class="period-tab">90 jours</button>
+                <button class="period-tab">12 mois</button>
+                <button class="period-tab">Tout</button>
+            </div>
+            <button style="padding: 10px 20px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); border-radius: 10px; color: #3b82f6; font-weight: 600; cursor: pointer;">
+                📅 Période personnalisée
+            </button>
+        </div>
+
+        <!-- Chart interactif -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <div class="chart-title">💰 Évolution trésorerie (30 derniers jours)</div>
+                <div class="chart-actions">
+                    <button onclick="alert('Exporte les données du graphique en CSV avec date, solde, entrées, sorties')">📥 Exporter CSV</button>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <!-- Chaque barre est cliquable et affiche un tooltip -->
+                <div class="chart-bar-wrapper" onclick="alert('Drill-down : Voir toutes les transactions du 1er déc (12 entrées, 8 sorties)')">
+                    <div class="chart-bar" style="height: 60%;">
+                        <div class="tooltip">
+                            <h4>1 Décembre 2025</h4>
+                            <div class="value">€11,240</div>
+                            <div class="detail">↗ Entrées: €2,400</div>
+                            <div class="detail">↘ Sorties: €1,840</div>
+                            <div class="detail" style="margin-top: 8px; color: var(--accent-emerald);">🔍 Cliquer pour détails</div>
+                        </div>
+                    </div>
+                    <div class="chart-label">1/12</div>
+                </div>
+
+                <div class="chart-bar-wrapper" onclick="alert('Drill-down vers transactions du 5/12')">
+                    <div class="chart-bar" style="height: 70%;">
+                        <div class="tooltip">
+                            <h4>5 Décembre 2025</h4>
+                            <div class="value">€11,820</div>
+                            <div class="detail">↗ Entrées: €3,200</div>
+                            <div class="detail">↘ Sorties: €2,620</div>
+                            <div class="detail" style="margin-top: 8px; color: var(--accent-emerald);">🔍 Cliquer pour détails</div>
+                        </div>
+                    </div>
+                    <div class="chart-label">5/12</div>
+                </div>
+
+                <div class="chart-bar-wrapper" onclick="alert('Drill-down vers transactions du 10/12')">
+                    <div class="chart-bar" style="height: 65%;">
+                        <div class="tooltip">
+                            <h4>10 Décembre 2025</h4>
+                            <div class="value">€11,560</div>
+                            <div class="detail">↗ Entrées: €1,800</div>
+                            <div class="detail">↘ Sorties: €2,060</div>
+                            <div class="detail" style="margin-top: 8px; color: var(--accent-emerald);">🔍 Cliquer pour détails</div>
+                        </div>
+                    </div>
+                    <div class="chart-label">10/12</div>
+                </div>
+
+                <div class="chart-bar-wrapper" onclick="alert('Drill-down vers transactions du 15/12')">
+                    <div class="chart-bar" style="height: 85%;">
+                        <div class="tooltip">
+                            <h4>15 Décembre 2025</h4>
+                            <div class="value">€12,420</div>
+                            <div class="detail">↗ Entrées: €4,100</div>
+                            <div class="detail">↘ Sorties: €3,240</div>
+                            <div class="detail" style="margin-top: 8px; color: var(--accent-emerald);">🔍 Cliquer pour détails</div>
+                        </div>
+                    </div>
+                    <div class="chart-label">15/12</div>
+                </div>
+
+                <div class="chart-bar-wrapper" onclick="alert('Drill-down vers transactions du 20/12')">
+                    <div class="chart-bar" style="height: 90%;">
+                        <div class="tooltip">
+                            <h4>20 Décembre 2025</h4>
+                            <div class="value">€12,680</div>
+                            <div class="detail">↗ Entrées: €3,800</div>
+                            <div class="detail">↘ Sorties: €3,540</div>
+                            <div class="detail" style="margin-top: 8px; color: var(--accent-emerald);">🔍 Cliquer pour détails</div>
+                        </div>
+                    </div>
+                    <div class="chart-label">20/12</div>
+                </div>
+
+                <div class="chart-bar-wrapper" onclick="alert('Drill-down vers transactions du 23/12')">
+                    <div class="chart-bar" style="height: 100%;">
+                        <div class="tooltip">
+                            <h4>23 Décembre 2025 (Aujourd'hui)</h4>
+                            <div class="value">€12,847</div>
+                            <div class="detail">↗ Entrées: €2,900</div>
+                            <div class="detail">↘ Sorties: €2,733</div>
+                            <div class="detail" style="margin-top: 8px; color: var(--accent-emerald);">🔍 Cliquer pour détails</div>
+                        </div>
+                    </div>
+                    <div class="chart-label">23/12</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions récentes -->
+        <div class="transactions-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 style="font-size: 24px; font-weight: 600;">Dernières transactions</h2>
+                <button style="padding: 10px 20px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); border-radius: 10px; color: #3b82f6; font-weight: 600; cursor: pointer;">
+                    Voir tout →
+                </button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Catégorie</th>
+                        <th>Compte</th>
+                        <th>Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="cursor: pointer;" onclick="alert('Ouvre détails transaction avec pièce jointe, catégorisation, etc.')">
+                        <td>23 Déc 14:32</td>
+                        <td style="font-weight: 600; color: var(--text-primary);">Virement Metro</td>
+                        <td>Fournisseurs</td>
+                        <td>Compte courant</td>
+                        <td class="amount-negative">-€842.50</td>
+                    </tr>
+                    <tr style="cursor: pointer;" onclick="alert('Drill-down transaction')">
+                        <td>22 Déc 09:15</td>
+                        <td style="font-weight: 600; color: var(--text-primary);">Vente Restaurant</td>
+                        <td>Recettes</td>
+                        <td>TPE</td>
+                        <td class="amount-positive">+€1,240.00</td>
+                    </tr>
+                    <tr style="cursor: pointer;" onclick="alert('Drill-down transaction')">
+                        <td>21 Déc 16:48</td>
+                        <td style="font-weight: 600; color: var(--text-primary);">Facture Brake</td>
+                        <td>Fournisseurs</td>
+                        <td>Compte courant</td>
+                        <td class="amount-negative">-€420.80</td>
+                    </tr>
+                    <tr style="cursor: pointer;" onclick="alert('Drill-down transaction')">
+                        <td>20 Déc 11:22</td>
+                        <td style="font-weight: 600; color: var(--text-primary);">Vente Épicerie</td>
+                        <td>Recettes</td>
+                        <td>Caisse</td>
+                        <td class="amount-positive">+€680.20</td>
+                    </tr>
+                    <tr style="cursor: pointer;" onclick="alert('Drill-down transaction')">
+                        <td>19 Déc 08:30</td>
+                        <td style="font-weight: 600; color: var(--text-primary);">Loyer</td>
+                        <td>Charges fixes</td>
+                        <td>Prélèvement</td>
+                        <td class="amount-negative">-€2,400.00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

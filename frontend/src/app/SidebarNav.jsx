@@ -1,83 +1,80 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronRight, X, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronRight, X, ChevronLeft, Menu } from 'lucide-react';
 import clsx from 'clsx';
 import { navigationSections } from './routes.jsx';
 
 // ============================================================================
-// ANIMATION VARIANTS - Premium 2025 Motion
+// SIDEBAR NAVIGATION - Design 2025 (basé sur mockup)
 // ============================================================================
 
-const sidebarVariants = {
-  hidden: { x: '-100%', opacity: 0 },
-  visible: {
-    x: 0,
-    opacity: 1,
-    transition: {
-      type: 'spring',
-      stiffness: 300,
-      damping: 30,
-      staggerChildren: 0.05,
-    },
-  },
-  exit: {
-    x: '-100%',
-    opacity: 0,
-    transition: { duration: 0.2 },
-  },
+// Mapping des icônes emoji par section/route
+const emojiMap = {
+  cockpit: '📊',
+  operations: '📦',
+  finances: '💳',
+  restaurant: '🍽️',
+  intelligence: '🧠',
+  parametres: '⚙️',
+  // Routes spécifiques
+  '/': '📊',
+  '/operations': '📦',
+  '/operations/factures': '📄',
+  '/operations/catalogue': '🛒',
+  '/operations/stock': '📈',
+  '/operations/prix': '💰',
+  '/operations/approvisionnement': '🚚',
+  '/intelligence/scoring/suppliers': '🏭',
+  '/finances': '💳',
+  '/finances/transactions': '💸',
+  '/finances/comptes': '🏦',
+  '/finances/rapprochement': '🔗',
+  '/finances/imports': '📥',
+  '/restaurant/plats': '🍽️',
+  '/restaurant/ingredients': '🥬',
+  '/restaurant/consommation': '📉',
+  '/restaurant/charges': '💵',
+  '/restaurant/previsions': '📅',
+  '/restaurant/food-cost': '🧮',
+  '/restaurant/link-epicerie': '🔗',
+  '/intelligence': '🧠',
+  '/parametres/audit': '🔍',
+  '/parametres/regles': '📋',
 };
 
-const itemVariants = {
-  hidden: { x: -20, opacity: 0 },
-  visible: {
-    x: 0,
-    opacity: 1,
-    transition: { type: 'spring', stiffness: 300, damping: 24 },
-  },
+const getEmoji = (sectionId, path) => {
+  if (path && emojiMap[path]) return emojiMap[path];
+  if (sectionId && emojiMap[sectionId]) return emojiMap[sectionId];
+  return '📁';
 };
 
-const submenuVariants = {
-  hidden: { height: 0, opacity: 0 },
-  visible: {
-    height: 'auto',
-    opacity: 1,
-    transition: {
-      height: { type: 'spring', stiffness: 500, damping: 40 },
-      opacity: { duration: 0.2 },
-    },
-  },
-  exit: {
-    height: 0,
-    opacity: 0,
-    transition: { duration: 0.15 },
-  },
-};
+// Badge component
+function Badge({ count }) {
+  if (!count) return null;
+  return (
+    <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-500/20 text-rose-400">
+      {count}
+    </span>
+  );
+}
 
-const glowVariants = {
-  rest: { scale: 1, opacity: 0 },
-  hover: {
-    scale: 1.5,
-    opacity: 0.5,
-    transition: { duration: 0.3 },
-  },
-};
+// Collapsed badge (just a dot)
+function CollapsedBadge({ show }) {
+  if (!show) return null;
+  return (
+    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500" />
+  );
+}
 
-// ============================================================================
-// SIDEBAR NAVIGATION COMPONENT
-// ============================================================================
-
-export default function SidebarNav({ isOpen, onClose }) {
+export default function SidebarNav({ isOpen, onClose, isCollapsed = false, onToggleCollapse }) {
   const location = useLocation();
-  const [expandedSections, setExpandedSections] = useState(['cockpit']);
-  const [hoveredItem, setHoveredItem] = useState(null);
+  const [expandedSections, setExpandedSections] = useState(['operations']);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile/desktop on mount and resize
+  // Detect mobile
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -86,7 +83,7 @@ export default function SidebarNav({ isOpen, onClose }) {
   // Auto-expand section based on current route
   useEffect(() => {
     const currentSection = navigationSections.find((section) =>
-      section.routes.some((route) => {
+      section.routes?.some((route) => {
         if (route.path === '/') return location.pathname === '/';
         return location.pathname.startsWith(route.path);
       })
@@ -110,23 +107,25 @@ export default function SidebarNav({ isOpen, onClose }) {
   };
 
   const isSectionActive = (section) => {
-    // Pour les vues unifiées, vérifier si on est sur le directPath ou une sous-route
     if (section.isUnified && section.directPath) {
       return location.pathname.startsWith(section.directPath);
     }
-    return section.routes.some((route) => isRouteActive(route.path));
+    if (section.isHome) {
+      return location.pathname === '/';
+    }
+    return section.routes?.some((route) => isRouteActive(route.path));
   };
 
-  // Handle close for mobile
-  const handleClose = () => {
-    if (onClose) {
-      onClose();
-    }
-  };
+  const handleClose = () => onClose?.();
+
+  const toggleCollapse = () => onToggleCollapse?.();
+
+  // Sidebar width
+  const sidebarWidth = isCollapsed ? 72 : 260;
 
   return (
     <>
-      {/* Overlay for mobile - clickable to close */}
+      {/* Overlay for mobile */}
       <AnimatePresence>
         {isOpen && isMobile && (
           <motion.div
@@ -141,293 +140,238 @@ export default function SidebarNav({ isOpen, onClose }) {
 
       {/* Sidebar */}
       <motion.aside
-        initial={!isMobile ? false : 'hidden'}
-        animate={isOpen || !isMobile ? 'visible' : 'hidden'}
-        exit="exit"
-        variants={sidebarVariants}
+        initial={false}
+        animate={{
+          width: isMobile ? 260 : sidebarWidth,
+          x: isMobile && !isOpen ? -260 : 0
+        }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         className={clsx(
-          'fixed inset-y-0 left-0 z-50 w-72 flex flex-col',
-          'glass-sidebar',
+          'fixed inset-y-0 left-0 z-50 flex flex-col',
+          'bg-[rgba(15,15,25,0.98)] border-r border-white/10',
           isMobile && !isOpen && '-translate-x-full',
           'lg:translate-x-0'
         )}
       >
-        {/* Logo & Brand */}
-        <div className="flex items-center justify-between px-6 py-6 border-b border-white/5">
-          <motion.div
-            className="flex items-center gap-3"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <div className="relative">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
+        {/* Header */}
+        <div className={clsx(
+          'flex items-center border-b border-white/10',
+          isCollapsed ? 'justify-center px-3 py-5' : 'justify-between px-5 py-5'
+        )}>
+          {isCollapsed ? (
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-xl">
+              📦
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-lg">
+                📦
               </div>
-              <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 opacity-30 blur-lg" />
+              <span className="font-display text-lg font-semibold text-white">Inventaire</span>
             </div>
-            <div>
-              <h1 className="font-display text-lg font-bold text-white">Inventaire</h1>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Pro 2025</p>
-            </div>
-          </motion.div>
+          )}
 
-          {/* Close button (mobile) - larger touch target */}
-          <button
-            onClick={handleClose}
-            className="lg:hidden p-3 -mr-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 active:bg-white/20 transition-colors"
-            style={{
-              touchAction: 'manipulation',
-              minWidth: '48px',
-              minHeight: '48px',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-            aria-label="Fermer le menu"
-            type="button"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          {/* Close button (mobile) */}
+          {isMobile && (
+            <button
+              onClick={handleClose}
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Collapse toggle (desktop) */}
+          {!isMobile && !isCollapsed && (
+            <button
+              onClick={toggleCollapse}
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+              title="Réduire"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
+        {/* Expand button when collapsed */}
+        {isCollapsed && !isMobile && (
+          <button
+            onClick={toggleCollapse}
+            className="mx-3 mt-3 p-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5"
+            title="Étendre"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {navigationSections.map((section, sectionIndex) => {
+        <nav className={clsx(
+          'flex-1 overflow-y-auto py-4',
+          isCollapsed ? 'px-3' : 'px-3'
+        )}>
+          {navigationSections.map((section, idx) => {
             const isExpanded = expandedSections.includes(section.id);
             const sectionActive = isSectionActive(section);
-            const SectionIcon = section.icon;
+            const emoji = getEmoji(section.id);
+
+            // Divider before section (except first)
+            const showDivider = idx > 0 && (idx === 1 || idx === 3 || idx === 4);
 
             return (
-              <motion.div
-                key={section.id}
-                variants={itemVariants}
-                custom={sectionIndex}
-              >
-                {/* Section avec lien direct (Home ou Vue unifiée) */}
-                {section.isHome || section.isUnified ? (
+              <div key={section.id}>
+                {showDivider && (
+                  <div className={clsx(
+                    'my-3',
+                    isCollapsed ? 'mx-2 w-8 h-px bg-white/10' : 'h-px bg-white/10'
+                  )} />
+                )}
+
+                {/* Section Title (expanded only) */}
+                {!isCollapsed && idx > 0 && (
+                  <div className="px-3 py-2 text-[11px] uppercase tracking-wider text-slate-500">
+                    {section.label}
+                  </div>
+                )}
+
+                {/* Home or Unified sections - direct link */}
+                {(section.isHome || section.isUnified) ? (
                   <NavLink
                     to={section.directPath || '/'}
                     onClick={handleClose}
                     className={({ isActive }) =>
                       clsx(
-                        'group relative flex items-center gap-3 px-4 py-3 rounded-xl',
-                        'transition-all duration-300',
+                        'relative flex items-center gap-3 rounded-xl mb-1 transition-all',
+                        isCollapsed ? 'w-12 h-12 justify-center mx-auto' : 'px-3 py-3',
                         isActive
-                          ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/10 text-white'
+                          ? 'bg-emerald-500/15 text-emerald-400'
                           : 'text-slate-400 hover:text-white hover:bg-white/5'
                       )
                     }
+                    title={isCollapsed ? section.label : undefined}
                   >
-                    {({ isActive }) => (
-                      <>
-                        {/* Glow effect */}
-                        <motion.div
-                          className={clsx(
-                            'absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-full',
-                            `bg-gradient-to-b ${section.gradient}`
-                          )}
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{
-                            height: isActive ? 32 : 0,
-                            opacity: isActive ? 1 : 0,
-                          }}
-                          style={{
-                            boxShadow: isActive ? `0 0 20px var(--color-accent-${section.color || 'blue'})` : 'none',
-                          }}
-                        />
-
-                        <div className={clsx(
-                          'relative p-2 rounded-lg',
-                          isActive ? `bg-gradient-to-br ${section.gradient}` : 'bg-white/5'
-                        )}>
-                          <SectionIcon className="w-4 h-4" />
-                          {isActive && (
-                            <div className="absolute inset-0 rounded-lg bg-white/20 animate-pulse" />
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{section.label}</p>
-                          <p className="text-[11px] text-slate-500 truncate">{section.description}</p>
-                        </div>
-
-                        {/* Active indicator dot */}
-                        {isActive && (
-                          <motion.div
-                            layoutId={`activeIndicator-${section.id}`}
-                            className={clsx(
-                              'w-2 h-2 rounded-full',
-                              section.color === 'emerald' ? 'bg-emerald-400' :
-                              section.color === 'violet' ? 'bg-violet-400' :
-                              section.color === 'pink' ? 'bg-pink-400' : 'bg-blue-400'
-                            )}
-                            style={{ boxShadow: `0 0 10px rgba(59, 130, 246, 0.8)` }}
-                          />
-                        )}
-                      </>
+                    <span className={clsx('text-lg', isCollapsed && 'text-xl')}>{emoji}</span>
+                    {!isCollapsed && (
+                      <span className="text-sm font-medium flex-1">{section.label}</span>
                     )}
+                    <CollapsedBadge show={isCollapsed && section.badge} />
                   </NavLink>
                 ) : (
                   <>
-                    {/* Section header expandable */}
-                    <button
-                      onClick={() => toggleSection(section.id)}
-                      onMouseEnter={() => setHoveredItem(section.id)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      className={clsx(
-                        'group relative w-full flex items-center gap-3 px-4 py-3 rounded-xl',
-                        'transition-all duration-300',
-                        sectionActive
-                          ? 'bg-white/5 text-white'
-                          : 'text-slate-400 hover:text-white hover:bg-white/5'
-                      )}
-                    >
-                      {/* Glow on hover */}
-                      <motion.div
+                    {/* Expandable section header */}
+                    {isCollapsed ? (
+                      // Collapsed: show first route as main icon
+                      <NavLink
+                        to={section.routes?.[0]?.path || '/'}
+                        onClick={handleClose}
                         className={clsx(
-                          'absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-full',
-                          `bg-gradient-to-b ${section.gradient}`
+                          'relative w-12 h-12 flex items-center justify-center rounded-xl mb-1 mx-auto transition-all',
+                          sectionActive
+                            ? 'bg-emerald-500/15 text-emerald-400'
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
                         )}
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{
-                          height: sectionActive || hoveredItem === section.id ? 24 : 0,
-                          opacity: sectionActive || hoveredItem === section.id ? 1 : 0,
-                        }}
-                        style={{
-                          boxShadow: sectionActive ? `0 0 15px var(--color-accent-${section.color})` : 'none',
-                        }}
-                      />
-
-                      <div className={clsx(
-                        'relative p-2 rounded-lg transition-colors duration-200',
-                        sectionActive ? `bg-gradient-to-br ${section.gradient}` : 'bg-white/5 group-hover:bg-white/10'
-                      )}>
-                        <SectionIcon className="w-4 h-4" />
-                      </div>
-
-                      <div className="flex-1 min-w-0 text-left">
-                        <p className="font-medium text-sm">{section.label}</p>
-                        <p className="text-[11px] text-slate-500 truncate">{section.description}</p>
-                      </div>
-
-                      <motion.div
-                        animate={{ rotate: isExpanded ? 180 : 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="text-slate-500"
+                        title={section.label}
                       >
-                        <ChevronDown className="w-4 h-4" />
-                      </motion.div>
-                    </button>
-
-                    {/* Submenu */}
-                    <AnimatePresence>
-                      {isExpanded && (
-                        <motion.div
-                          variants={submenuVariants}
-                          initial="hidden"
-                          animate="visible"
-                          exit="exit"
-                          className="overflow-hidden"
+                        <span className="text-xl">{emoji}</span>
+                        <CollapsedBadge show={section.badge} />
+                      </NavLink>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => toggleSection(section.id)}
+                          className={clsx(
+                            'w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-1 transition-all',
+                            sectionActive
+                              ? 'bg-white/5 text-white'
+                              : 'text-slate-400 hover:text-white hover:bg-white/5'
+                          )}
                         >
-                          <div className="ml-4 pl-4 mt-1 space-y-0.5 border-l border-white/5">
-                            {section.routes.map((route) => {
-                              const RouteIcon = route.icon;
-                              const isActive = isRouteActive(route.path);
+                          <span className="text-lg">{emoji}</span>
+                          <span className="text-sm font-medium flex-1 text-left">{section.label}</span>
+                          {section.badge && <Badge count={section.badge} />}
+                          <motion.div
+                            animate={{ rotate: isExpanded ? 180 : 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <ChevronDown className="w-4 h-4 text-slate-500" />
+                          </motion.div>
+                        </button>
 
-                              return (
-                                <NavLink
-                                  key={route.path}
-                                  to={route.path}
-                                  onClick={handleClose}
-                                  className={clsx(
-                                    'group relative flex items-center gap-3 px-3 py-2.5 rounded-lg',
-                                    'transition-all duration-200',
-                                    isActive
-                                      ? 'bg-white/10 text-white'
-                                      : 'text-slate-500 hover:text-white hover:bg-white/5 hover:pl-4'
-                                  )}
-                                >
-                                  {/* Dot indicator */}
-                                  <motion.div
-                                    className={clsx(
-                                      'absolute -left-4 w-1.5 h-1.5 rounded-full',
-                                      isActive
-                                        ? `bg-gradient-to-br ${section.gradient}`
-                                        : 'bg-slate-700 group-hover:bg-slate-500'
-                                    )}
-                                    animate={{
-                                      scale: isActive ? 1.2 : 1,
-                                      boxShadow: isActive
-                                        ? `0 0 8px var(--color-accent-${section.color})`
-                                        : 'none',
-                                    }}
-                                  />
+                        {/* Submenu */}
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="ml-4 pl-3 border-l border-white/5 space-y-0.5">
+                                {section.routes?.map((route) => {
+                                  const isActive = isRouteActive(route.path);
+                                  const routeEmoji = getEmoji(null, route.path);
 
-                                  <RouteIcon className={clsx(
-                                    'w-4 h-4 transition-colors',
-                                    isActive ? 'text-white' : 'text-slate-600 group-hover:text-slate-400'
-                                  )} />
-
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm truncate">{route.label}</p>
-                                  </div>
-
-                                  {isActive && (
-                                    <ChevronRight className="w-3 h-3 text-slate-500" />
-                                  )}
-                                </NavLink>
-                              );
-                            })}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                                  return (
+                                    <NavLink
+                                      key={route.path}
+                                      to={route.path}
+                                      onClick={handleClose}
+                                      className={clsx(
+                                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all',
+                                        isActive
+                                          ? 'bg-white/10 text-white'
+                                          : 'text-slate-500 hover:text-white hover:bg-white/5'
+                                      )}
+                                    >
+                                      <span className="text-base">{routeEmoji}</span>
+                                      <span className="text-sm flex-1">{route.label}</span>
+                                      {isActive && <ChevronRight className="w-3 h-3 text-slate-500" />}
+                                    </NavLink>
+                                  );
+                                })}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </>
+                    )}
                   </>
                 )}
-              </motion.div>
+              </div>
             );
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="px-4 py-4 border-t border-white/5">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="relative overflow-hidden rounded-2xl p-4"
-            style={{
-              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-            }}
-          >
-            {/* Animated gradient border */}
-            <div className="absolute inset-0 rounded-2xl opacity-50">
-              <div
-                className="absolute inset-0 rounded-2xl"
-                style={{
-                  background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #3b82f6)',
-                  backgroundSize: '300% 100%',
-                  animation: 'border-flow 4s linear infinite',
-                  opacity: 0.3,
-                }}
-              />
+        {/* Footer - User Profile */}
+        <div className={clsx(
+          'border-t border-white/10',
+          isCollapsed ? 'p-3' : 'p-4'
+        )}>
+          {isCollapsed ? (
+            <div
+              className="w-10 h-10 mx-auto rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-sm font-semibold text-white cursor-pointer"
+              title="Jean Dupont - Admin"
+            >
+              JD
             </div>
-
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-blue-400" />
-                <p className="text-xs font-semibold text-white">Pro Features</p>
+          ) : (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-white/3 hover:bg-white/5 cursor-pointer transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-sm font-semibold text-white">
+                JD
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Intelligence artificielle activée. Détection d'anomalies et prévisions en temps réel.
-              </p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">Jean Dupont</p>
+                <p className="text-xs text-slate-500">Admin</p>
+              </div>
             </div>
-          </motion.div>
+          )}
 
           {/* Version */}
-          <p className="text-center text-[10px] text-slate-600 mt-4">
-            v2.0.0 • Build 2025.12
-          </p>
+          {!isCollapsed && (
+            <p className="text-center text-[10px] text-slate-600 mt-3">
+              v2.0.0 • Inventaire Pro
+            </p>
+          )}
         </div>
       </motion.aside>
     </>

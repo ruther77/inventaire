@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant - Maquette Améliorée (Vue Unifiée)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: rgba(255, 255, 255, 0.08);
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-orange: #f97316;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+            --accent-amber: #f59e0b;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(249, 115, 22, 0.12), transparent),
+                        radial-gradient(ellipse 60% 40% at 100% 0%, rgba(245, 158, 11, 0.08), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 32px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .page-header .left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .page-header .icon-wrapper {
+            padding: 16px;
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(245, 158, 11, 0.2));
+            border-radius: 16px;
+        }
+
+        .page-header .icon {
+            width: 32px;
+            height: 32px;
+            color: var(--accent-orange);
+        }
+
+        .page-header h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .page-header p {
+            font-size: 18px;
+            color: var(--text-muted);
+        }
+
+        .page-header .right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .stat-badge {
+            padding: 12px 20px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--accent-emerald);
+        }
+
+        .stat-badge.warning {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.3);
+            color: var(--accent-amber);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px;
+            border-radius: 16px;
+            margin-bottom: 32px;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.3), rgba(245, 158, 11, 0.2));
+            color: var(--text-primary);
+        }
+
+        /* Food Cost Overview */
+        .food-cost-hero {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 48px;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .food-cost-hero h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .food-cost-hero .percentage {
+            font-family: 'Sora', sans-serif;
+            font-size: 96px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-emerald), #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+        }
+
+        .food-cost-hero .status {
+            font-size: 18px;
+            color: var(--accent-emerald);
+            font-weight: 600;
+        }
+
+        /* Plats Grid */
+        .plats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .plat-card {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            overflow: hidden;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .plat-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .plat-card .image {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(245, 158, 11, 0.1));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            position: relative;
+        }
+
+        .plat-card .food-cost-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            padding: 8px 16px;
+            background: rgba(16, 185, 129, 0.9);
+            backdrop-filter: blur(8px);
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 14px;
+            color: white;
+        }
+
+        .plat-card .food-cost-badge.warning {
+            background: rgba(245, 158, 11, 0.9);
+        }
+
+        .plat-card .food-cost-badge.danger {
+            background: rgba(244, 63, 94, 0.9);
+        }
+
+        .plat-card .content {
+            padding: 20px;
+        }
+
+        .plat-card h3 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .plat-card .category {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 16px;
+        }
+
+        .plat-card .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .plat-card .metric {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .plat-card .metric .label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .plat-card .metric .value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .plat-card .ingredients {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 16px;
+            margin-top: 16px;
+        }
+
+        .plat-card .ingredients-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .plat-card .ingredients-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .plat-card .ingredient-tag {
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .plat-card .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .plat-card .btn {
+            flex: 1;
+            padding: 10px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #3b82f6;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .plat-card .btn:hover {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .plat-card .btn.secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.15);
+            color: var(--text-secondary);
+        }
+
+        .plat-card .btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 24px;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .stat-card .value {
+            font-size: 36px;
+            font-weight: 700;
+            font-family: 'Sora', sans-serif;
+            color: var(--text-primary);
+        }
+
+        .stat-card .hint {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        /* Help Tooltip */
+        .help-tooltip {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-amber));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(249, 115, 22, 0.3);
+            transition: transform 0.2s;
+        }
+
+        .help-tooltip:hover {
+            transform: scale(1.1);
+        }
+
+        .help-tooltip svg {
+            width: 24px;
+            height: 24px;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .page-header h1 {
+                font-size: 32px;
+            }
+
+            .tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+            }
+
+            .plats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .food-cost-hero .percentage {
+                font-size: 64px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="left">
+                <div class="icon-wrapper">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>Restaurant</h1>
+                    <p>Gestion des plats, ingrédients & food cost</p>
+                </div>
+            </div>
+            <div class="right">
+                <div class="stat-badge">Food Cost: 28%</div>
+                <div class="stat-badge warning">12 plats actifs</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active">Food Cost & Plats</button>
+            <button class="tab">Ingrédients & Prix</button>
+            <button class="tab">Stock & Consommations</button>
+        </div>
+
+        <!-- Food Cost Hero -->
+        <div class="food-cost-hero">
+            <h2>FOOD COST MOYEN</h2>
+            <div class="percentage">28%</div>
+            <div class="status">✓ Objectif atteint (<30%)</div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">Prix Moyen Plat</div>
+                <div class="value">€14.50</div>
+                <div class="hint">+€0.80 vs mois dernier</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Coût Moyen Matière</div>
+                <div class="value">€4.06</div>
+                <div class="hint">-€0.12 (optimisation fournisseurs)</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Marge Moyenne</div>
+                <div class="value">€10.44</div>
+                <div class="hint">72% de marge brute</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Plat le + Rentable</div>
+                <div class="value">Pasta</div>
+                <div class="hint">18% food cost, marge €12.80</div>
+            </div>
+        </div>
+
+        <!-- Plats Grid -->
+        <div class="plats-grid">
+            <!-- Plat 1 -->
+            <div class="plat-card">
+                <div class="image">
+                    🍕
+                    <div class="food-cost-badge">22%</div>
+                </div>
+                <div class="content">
+                    <h3>Pizza Margherita</h3>
+                    <div class="category">Pizzas • Entrée</div>
+
+                    <div class="metrics">
+                        <div class="metric">
+                            <div class="label">Prix de vente</div>
+                            <div class="value">€15.00</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Coût matière</div>
+                            <div class="value">€3.30</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Marge</div>
+                            <div class="value">€11.70</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Ventes (7j)</div>
+                            <div class="value">42</div>
+                        </div>
+                    </div>
+
+                    <div class="ingredients">
+                        <div class="ingredients-title">Ingrédients (6)</div>
+                        <div class="ingredients-list">
+                            <span class="ingredient-tag">Pâte à pizza</span>
+                            <span class="ingredient-tag">Sauce tomate</span>
+                            <span class="ingredient-tag">Mozzarella</span>
+                            <span class="ingredient-tag">Basilic</span>
+                            <span class="ingredient-tag">Huile d'olive</span>
+                            <span class="ingredient-tag">Origan</span>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button class="btn">Modifier prix</button>
+                        <button class="btn secondary">Historique</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plat 2 -->
+            <div class="plat-card">
+                <div class="image">
+                    🍝
+                    <div class="food-cost-badge">18%</div>
+                </div>
+                <div class="content">
+                    <h3>Pasta Carbonara</h3>
+                    <div class="category">Pâtes • Plat principal</div>
+
+                    <div class="metrics">
+                        <div class="metric">
+                            <div class="label">Prix de vente</div>
+                            <div class="value">€16.00</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Coût matière</div>
+                            <div class="value">€2.88</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Marge</div>
+                            <div class="value">€13.12</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Ventes (7j)</div>
+                            <div class="value">38</div>
+                        </div>
+                    </div>
+
+                    <div class="ingredients">
+                        <div class="ingredients-title">Ingrédients (5)</div>
+                        <div class="ingredients-list">
+                            <span class="ingredient-tag">Spaghetti</span>
+                            <span class="ingredient-tag">Lardons</span>
+                            <span class="ingredient-tag">Œufs</span>
+                            <span class="ingredient-tag">Parmesan</span>
+                            <span class="ingredient-tag">Poivre</span>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button class="btn">Modifier prix</button>
+                        <button class="btn secondary">Historique</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plat 3 -->
+            <div class="plat-card">
+                <div class="image">
+                    🥗
+                    <div class="food-cost-badge warning">35%</div>
+                </div>
+                <div class="content">
+                    <h3>Salade César</h3>
+                    <div class="category">Salades • Entrée</div>
+
+                    <div class="metrics">
+                        <div class="metric">
+                            <div class="label">Prix de vente</div>
+                            <div class="value">€12.00</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Coût matière</div>
+                            <div class="value">€4.20</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Marge</div>
+                            <div class="value">€7.80</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Ventes (7j)</div>
+                            <div class="value">28</div>
+                        </div>
+                    </div>
+
+                    <div class="ingredients">
+                        <div class="ingredients-title">Ingrédients (7)</div>
+                        <div class="ingredients-list">
+                            <span class="ingredient-tag">Laitue romaine</span>
+                            <span class="ingredient-tag">Poulet</span>
+                            <span class="ingredient-tag">Croûtons</span>
+                            <span class="ingredient-tag">Parmesan</span>
+                            <span class="ingredient-tag">Sauce César</span>
+                            <span class="ingredient-tag">Tomates</span>
+                            <span class="ingredient-tag">Anchois</span>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button class="btn">Optimiser</button>
+                        <button class="btn secondary">Historique</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plat 4 -->
+            <div class="plat-card">
+                <div class="image">
+                    🍔
+                    <div class="food-cost-badge danger">42%</div>
+                </div>
+                <div class="content">
+                    <h3>Burger Maison</h3>
+                    <div class="category">Burgers • Plat principal</div>
+
+                    <div class="metrics">
+                        <div class="metric">
+                            <div class="label">Prix de vente</div>
+                            <div class="value">€14.00</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Coût matière</div>
+                            <div class="value">€5.88</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Marge</div>
+                            <div class="value">€8.12</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Ventes (7j)</div>
+                            <div class="value">52</div>
+                        </div>
+                    </div>
+
+                    <div class="ingredients">
+                        <div class="ingredients-title">Ingrédients (8)</div>
+                        <div class="ingredients-list">
+                            <span class="ingredient-tag">Pain burger</span>
+                            <span class="ingredient-tag">Steak haché</span>
+                            <span class="ingredient-tag">Fromage cheddar</span>
+                            <span class="ingredient-tag">Laitue</span>
+                            <span class="ingredient-tag">Tomate</span>
+                            <span class="ingredient-tag">Oignon</span>
+                            <span class="ingredient-tag">Sauce burger</span>
+                            <span class="ingredient-tag">Cornichons</span>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button class="btn">⚠️ Optimiser urgence</button>
+                        <button class="btn secondary">Historique</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Tooltip -->
+        <div class="help-tooltip">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+    </div>
+</body>
+</html>

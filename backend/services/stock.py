@@ -8,6 +8,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from core.data_repository import get_engine, query_df
+from core.finance.event_sourcing import emit_stock_correction
 
 
 def fetch_movement_timeseries(
@@ -142,6 +143,19 @@ def adjust_stock_level(
             {"pid": product_id, "tenant_id": int(tenant_id)},
         ).fetchone()
         new_stock = float(new_row[0] if new_row else target_quantity)
+
+    # Émet un événement de correction de stock
+    try:
+        emit_stock_correction(
+            tenant_id=tenant_id,
+            product_id=product_id,
+            old_quantity=current_stock,
+            new_quantity=new_stock,
+            reason=f"Ajustement manuel par {username or 'système'}",
+        )
+    except Exception as e:
+        # Log l'erreur mais ne bloque pas l'opération
+        print(f"Warning: Failed to emit stock correction event: {e}")
 
     return {
         "product_id": product_id,

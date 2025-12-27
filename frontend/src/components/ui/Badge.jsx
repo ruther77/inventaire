@@ -1,7 +1,36 @@
 import clsx from 'clsx';
 
 /**
- * Badge - Composant de badge/tag pour afficher des statuts, labels, etc.
+ * Composant Badge.
+ *
+ * Badge/tag réutilisable pour afficher des statuts, labels, compteurs et catégories.
+ * Propose de nombreuses variantes de couleurs et styles (soft, solid, outline).
+ * Supporte les icônes, points indicateurs et bouton de suppression.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {React.ReactNode} props.children - Contenu du badge (texte, nombre, etc.)
+ * @param {string} [props.variant='default'] - Variante de couleur et style
+ *   ('default' | 'brand' | 'success' | 'warning' | 'error' | 'info' |
+ *    'default-solid' | 'brand-solid' | 'success-solid' | 'warning-solid' | 'error-solid' | 'info-solid' |
+ *    'default-outline' | 'brand-outline' | 'success-outline' | 'warning-outline' | 'error-outline' | 'info-outline')
+ * @param {string} [props.size='md'] - Taille du badge ('xs' | 'sm' | 'md' | 'lg')
+ * @param {boolean} [props.dot=false] - Affiche un point indicateur
+ * @param {boolean} [props.removable=false] - Affiche un bouton de suppression
+ * @param {Function} [props.onRemove] - Callback appelé lors du clic sur le bouton de suppression
+ * @param {React.ComponentType} [props.icon] - Composant icône à afficher
+ * @param {string} [props.className] - Classes CSS additionnelles
+ *
+ * @example
+ * <Badge variant="success" dot>
+ *   Actif
+ * </Badge>
+ *
+ * @example
+ * <Badge variant="error-solid" size="sm" removable onRemove={handleRemove}>
+ *   Urgent
+ * </Badge>
  */
 
 const variants = {
@@ -105,7 +134,21 @@ function getDotColor(variant) {
 }
 
 /**
- * StatusBadge - Badge préconfiguré pour les statuts courants
+ * StatusBadge - Badge préconfiguré pour les statuts courants.
+ *
+ * Badge de statut avec configurations prédéfinies pour les états standards d'une application.
+ * Simplifie l'affichage de statuts cohérents sans répéter les configurations.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {string} props.status - Type de statut ('active' | 'inactive' | 'pending' | 'error' | 'draft' | 'published' | 'archived' | 'critical' | 'ok' | 'low')
+ * @param {string} [props.label] - Label personnalisé (remplace le label par défaut)
+ * @param {string} [props.size='sm'] - Taille du badge
+ *
+ * @example
+ * <StatusBadge status="active" />
+ * <StatusBadge status="pending" label="En cours" />
  */
 export function StatusBadge({ status, label, size = 'sm' }) {
   const statusConfig = {
@@ -131,7 +174,22 @@ export function StatusBadge({ status, label, size = 'sm' }) {
 }
 
 /**
- * CountBadge - Badge pour afficher un compteur
+ * CountBadge - Badge de compteur.
+ *
+ * Badge spécialisé pour afficher des compteurs (notifications, messages non lus, etc.).
+ * Affiche automatiquement "99+" si le nombre dépasse le maximum. Retourne null si count === 0.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {number} props.count - Nombre à afficher
+ * @param {number} [props.max=99] - Nombre maximum avant affichage de "max+"
+ * @param {string} [props.variant='brand'] - Variante de couleur (utilisera automatiquement le style solid)
+ * @param {string} [props.className] - Classes CSS additionnelles
+ *
+ * @example
+ * <CountBadge count={5} variant="error" />
+ * <CountBadge count={150} max={99} />
  */
 export function CountBadge({ count, max = 99, variant = 'brand', className }) {
   const displayCount = count > max ? `${max}+` : count;

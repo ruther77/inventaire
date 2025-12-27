@@ -10,6 +10,43 @@ const stateClasses = {
   success: 'border-emerald-500/50 focus:border-emerald-500 focus:ring-emerald-500/30',
 };
 
+/**
+ * Composant Input.
+ *
+ * Champ de saisie accessible avec support des labels, messages d'erreur, icônes et états visuels.
+ * Conforme aux normes d'accessibilité avec génération automatique d'ID, aria-describedby et cible tactile 44px minimum.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {string} [props.label] - Label du champ affiché au-dessus
+ * @param {string} [props.error] - Message d'erreur (affiche le champ en état d'erreur)
+ * @param {string} [props.hint] - Texte d'aide affiché sous le champ
+ * @param {React.ComponentType} [props.icon] - Composant icône à afficher
+ * @param {string} [props.iconPosition='left'] - Position de l'icône ('left' | 'right')
+ * @param {boolean} [props.success=false] - Active l'état de succès
+ * @param {boolean} [props.required=false] - Marque le champ comme requis (affiche un astérisque)
+ * @param {string} [props.className] - Classes CSS additionnelles pour l'input
+ * @param {string} [props.containerClassName] - Classes CSS pour le conteneur
+ * @param {React.Ref} ref - Ref forwarded vers l'élément input
+ *
+ * @example
+ * <Input
+ *   label="Email"
+ *   type="email"
+ *   placeholder="exemple@email.com"
+ *   required
+ *   error={errors.email}
+ * />
+ *
+ * @example
+ * <Input
+ *   label="Recherche"
+ *   icon={Search}
+ *   iconPosition="left"
+ *   placeholder="Rechercher..."
+ * />
+ */
 const Input = forwardRef(function Input(
   {
     label,

@@ -1,3 +1,16 @@
+/**
+ * Client API pour les communications avec le backend.
+ *
+ * Ce module centralise tous les appels HTTP vers l'API REST.
+ * Utilise Axios avec intercepteurs pour:
+ * - Ajout automatique du token JWT (via cookies HTTP-Only)
+ * - Gestion des erreurs 401 (refresh token)
+ * - Unwrapping automatique des enveloppes API {success, data, error, meta}
+ * - Support du multi-tenant (header X-Tenant pour newcms)
+ *
+ * @module api/client
+ */
+
 import axios from 'axios';
 
 /**
@@ -15,15 +28,34 @@ const api = axios.create({
 
 let unauthorizedHandler = null;
 
-// Note: Les tokens sont gérés via cookies HTTP-Only, pas besoin de les stocker côté JS
+/**
+ * Défini le token d'accès (no-op car gestion via cookies HTTP-Only).
+ *
+ * @deprecated Les tokens sont gérés automatiquement par les cookies HTTP-Only
+ */
 export const setAccessToken = () => {
   // No-op: les cookies sont gérés automatiquement par le navigateur
 };
 
+/**
+ * Supprime le token d'accès (no-op car gestion via cookies HTTP-Only).
+ *
+ * @deprecated Les cookies sont supprimés par le backend via /auth/logout
+ */
 export const clearAccessToken = () => {
   // No-op: les cookies sont supprimés par le backend via /auth/logout
 };
 
+/**
+ * Enregistre un handler pour les erreurs 401 (non autorisé).
+ *
+ * @param {Function} handler - Fonction callback à appeler sur erreur 401
+ *
+ * @example
+ * registerUnauthorizedHandler(() => {
+ *   navigate('/login');
+ * });
+ */
 export const registerUnauthorizedHandler = (handler) => {
   unauthorizedHandler = handler;
 };
@@ -54,34 +86,127 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// ============================================================================
+// CATALOGUE & INVENTAIRE
+// ============================================================================
+
 /**
- * Groupe de requêtes catalogue/inventaire/mouvements.
+ * Récupère la liste des produits du catalogue.
+ *
+ * @async
+ * @param {Object} [params={}] - Paramètres de filtrage
+ * @param {number} [params.page] - Numéro de page
+ * @param {number} [params.per_page] - Résultats par page
+ * @param {string} [params.q] - Recherche textuelle
+ * @param {number} [params.category_id] - Filtrer par catégorie
+ * @param {string} [params.supplier] - Filtrer par fournisseur
+ *
+ * @returns {Promise<Object>} Liste des produits avec métadonnées
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ *
+ * @example
+ * const products = await fetchProducts({ page: 1, category_id: 5 });
  */
 export const fetchProducts = async (params = {}) => {
-  const { data } = await api.get('/products', { params });
+  const { data } = await api.get('/catalog/products', { params });
   return data;
 };
 
+/**
+ * Récupère les détails complets d'un produit.
+ *
+ * @async
+ * @param {number} productId - ID du produit
+ *
+ * @returns {Promise<Object>} Détails du produit
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ *
+ * @example
+ * const product = await fetchProductDetail(123);
+ */
+export const fetchProductDetail = async (productId) => {
+  const { data } = await api.get(`/catalog/products/${productId}/detail`);
+  return data;
+};
+
+/**
+ * Récupère le résumé de l'inventaire.
+ *
+ * @async
+ * @returns {Promise<Object>} Résumé de l'inventaire
+ * @property {number} total_products - Nombre total de produits
+ * @property {number} total_value - Valeur totale du stock
+ * @property {number} low_stock_count - Produits en rupture
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ *
+ * @example
+ * const summary = await fetchInventorySummary();
+ */
 export const fetchInventorySummary = async () => {
   const { data } = await api.get('/inventory/summary');
   return data;
 };
 
+// ============================================================================
+// RESTAURANT - CONSOMMATIONS & INGREDIENTS
+// ============================================================================
+
+/**
+ * Récupère les consommations restaurant par période.
+ *
+ * @async
+ * @param {string} [period='all'] - Période ('all', 'month', 'week', etc.)
+ *
+ * @returns {Promise<Object>} Données de consommations
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ *
+ * @example
+ * const consumptions = await fetchRestaurantConsumptions('month');
+ */
 export const fetchRestaurantConsumptions = async (period = 'all') => {
   const { data } = await api.get('/restaurant/consumptions', { params: { period } });
   return data;
 };
 
+/**
+ * Récupère la comparaison de l'historique des prix.
+ *
+ * @async
+ * @returns {Promise<Object>} Comparaison des prix dans le temps
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantPriceHistoryComparison = async () => {
   const { data } = await api.get('/restaurant/price-history/comparison');
   return data;
 };
 
+/**
+ * Récupère la liste des produits épicerie.
+ *
+ * @async
+ * @returns {Promise<Array>} Liste des produits épicerie
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchEpicerieProducts = async () => {
   const { data } = await api.get('/restaurant/epicerie/products');
   return data;
 };
 
+/**
+ * Synchronise les prix des ingrédients restaurant avec l'épicerie.
+ *
+ * @async
+ * @param {boolean} [forceUpdate=false] - Force la mise à jour même si déjà synchronisé
+ *
+ * @returns {Promise<Object>} Résultat de la synchronisation
+ * @property {number} synced_count - Nombre d'ingrédients synchronisés
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ *
+ * @example
+ * const result = await syncRestaurantIngredientPrices(true);
+ */
 export const syncRestaurantIngredientPrices = async (forceUpdate = false) => {
   const params = new URLSearchParams();
   if (forceUpdate) params.set('force_update', forceUpdate);
@@ -90,6 +215,17 @@ export const syncRestaurantIngredientPrices = async (forceUpdate = false) => {
   return data;
 };
 
+/**
+ * Récupère le statut de synchronisation des prix ingrédients.
+ *
+ * @async
+ * @returns {Promise<Object>} Statut de synchronisation
+ * @property {number} synced_count - Ingrédients synchronisés
+ * @property {number} linked_count - Ingrédients liés à l'épicerie
+ * @property {number} total_count - Total des ingrédients
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantPriceSyncStatus = async () => {
   const { data } = await api.get('/restaurant/ingredients/price-sync-status');
   const payload = data?.data ?? data;
@@ -101,6 +237,20 @@ export const fetchRestaurantPriceSyncStatus = async () => {
   };
 };
 
+/**
+ * Lie un ingrédient restaurant à un produit épicerie.
+ *
+ * @async
+ * @param {number} ingredientId - ID de l'ingrédient restaurant
+ * @param {number} epicerieProductId - ID du produit épicerie
+ * @param {number} [ratio=1.0] - Ratio de conversion (défaut: 1.0)
+ *
+ * @returns {Promise<Object>} Ingrédient lié mis à jour
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ *
+ * @example
+ * await linkIngredientToEpicerie(123, 456, 0.5);
+ */
 export const linkIngredientToEpicerie = async (ingredientId, epicerieProductId, ratio = 1.0) => {
   const { data } = await api.put(`/restaurant/ingredients/${ingredientId}/link-epicerie`, {
     produit_epicerie_id: epicerieProductId,
@@ -109,61 +259,183 @@ export const linkIngredientToEpicerie = async (ingredientId, epicerieProductId, 
   return data;
 };
 
+/**
+ * Délie un ingrédient restaurant d'un produit épicerie.
+ *
+ * @async
+ * @param {number} ingredientId - ID de l'ingrédient restaurant
+ *
+ * @returns {Promise<Object>} Résultat de la suppression
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const unlinkIngredientFromEpicerie = async (ingredientId) => {
   const { data } = await api.delete(`/restaurant/ingredients/${ingredientId}/link-epicerie`);
   return data;
 };
 
+/**
+ * Met à jour le ratio de conversion d'un ingrédient.
+ *
+ * @async
+ * @param {number} ingredientId - ID de l'ingrédient
+ * @param {number} ratio - Nouveau ratio
+ *
+ * @returns {Promise<Object>} Ingrédient mis à jour
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const updateIngredientRatio = async (ingredientId, ratio) => {
   const { data } = await api.patch(`/restaurant/ingredients/${ingredientId}/ratio`, { ratio });
   return data;
 };
 
+/**
+ * Met à jour le prix d'un ingrédient restaurant.
+ *
+ * @async
+ * @param {number} ingredientId - ID de l'ingrédient
+ * @param {Object} payload - Données de prix
+ * @param {number} payload.price - Nouveau prix
+ *
+ * @returns {Promise<Object>} Ingrédient mis à jour
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const updateRestaurantIngredientPrice = async (ingredientId, payload) => {
   const { data } = await api.patch(`/restaurant/ingredients/${ingredientId}/price`, payload);
   return data;
 };
 
+/**
+ * Récupère l'historique des prix d'un ingrédient.
+ *
+ * @async
+ * @param {number} ingredientId - ID de l'ingrédient
+ *
+ * @returns {Promise<Array>} Historique des prix
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantIngredientPriceHistory = async (ingredientId) => {
   const { data } = await api.get(`/restaurant/ingredients/${ingredientId}/price-history`);
   return data;
 };
 
+// ============================================================================
+// RESTAURANT - PLATS & RECETTES
+// ============================================================================
+
+/**
+ * Met à jour le prix de vente d'un plat.
+ *
+ * @async
+ * @param {number} platId - ID du plat
+ * @param {Object} payload - Données de prix
+ * @param {number} payload.price - Nouveau prix de vente TTC
+ *
+ * @returns {Promise<Object>} Plat mis à jour
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const updateRestaurantPlatPrice = async (platId, payload) => {
   const { data } = await api.patch(`/restaurant/plats/${platId}/price`, payload);
   return data;
 };
 
+/**
+ * Ajoute un ingrédient à un plat.
+ *
+ * @async
+ * @param {number} platId - ID du plat
+ * @param {Object} payload - Données de l'ingrédient
+ * @param {number} payload.ingredient_id - ID de l'ingrédient
+ * @param {number} payload.quantity - Quantité utilisée
+ *
+ * @returns {Promise<Object>} Ingrédient ajouté
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const addIngredientToPlat = async (platId, payload) => {
   const { data } = await api.post(`/restaurant/plats/${platId}/ingredients`, payload);
   return data;
 };
 
+/**
+ * Met à jour un ingrédient d'un plat.
+ *
+ * @async
+ * @param {number} platId - ID du plat
+ * @param {number} ingredientId - ID de l'ingrédient
+ * @param {Object} payload - Nouvelles données
+ * @param {number} [payload.quantity] - Nouvelle quantité
+ *
+ * @returns {Promise<Object>} Ingrédient mis à jour
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const updateIngredientOnPlat = async (platId, ingredientId, payload) => {
   const { data } = await api.patch(`/restaurant/plats/${platId}/ingredients/${ingredientId}`, payload);
   return data;
 };
 
+/**
+ * Retire un ingrédient d'un plat.
+ *
+ * @async
+ * @param {number} platId - ID du plat
+ * @param {number} ingredientId - ID de l'ingrédient à retirer
+ *
+ * @returns {Promise<Object>} Résultat de la suppression
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const removeIngredientFromPlat = async (platId, ingredientId) => {
   const { data } = await api.delete(`/restaurant/plats/${platId}/ingredients/${ingredientId}`);
   return data;
 };
 
+/**
+ * Récupère l'historique des prix d'un plat.
+ *
+ * @async
+ * @param {number} platId - ID du plat
+ *
+ * @returns {Promise<Array>} Historique des prix
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantPlatPriceHistory = async (platId) => {
   const { data } = await api.get(`/restaurant/plats/${platId}/price-history`);
   return data;
 };
 
+/**
+ * Récupère la vue d'ensemble de l'historique des prix restaurant.
+ *
+ * @async
+ * @returns {Promise<Object>} Vue d'ensemble des évolutions de prix
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantPriceHistoryOverview = async () => {
   const { data } = await api.get('/restaurant/prices/history');
   return data;
 };
 
+/**
+ * Récupère la vue d'ensemble des prévisions restaurant.
+ *
+ * @async
+ * @returns {Promise<Object>} Prévisions (ventes, consommations, etc.)
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantForecastOverview = async () => {
   const { data } = await api.get('/restaurant/forecasts/overview');
   return data;
 };
 
+/**
+ * Récupère le résumé TVA des charges restaurant.
+ *
+ * @async
+ * @param {Object} [filters={}] - Filtres de période
+ * @param {string} [filters.dateFrom] - Date de début (YYYY-MM-DD)
+ * @param {string} [filters.dateTo] - Date de fin (YYYY-MM-DD)
+ *
+ * @returns {Promise<Object>} Résumé TVA par taux
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantTvaSummary = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.dateFrom) params.set('date_from', filters.dateFrom);
@@ -173,6 +445,13 @@ export const fetchRestaurantTvaSummary = async (filters = {}) => {
   return data;
 };
 
+/**
+ * Récupère le dashboard restaurant global.
+ *
+ * @async
+ * @returns {Promise<Object>} Métriques et KPIs du restaurant
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantDashboard = async () => {
   const { data } = await api.get('/restaurant/dashboard/overview');
   return data;
@@ -182,6 +461,17 @@ export const fetchRestaurantDashboard = async () => {
 // RESTAURANT FOOD COST & OVERVIEW
 // ============================================================================
 
+/**
+ * Récupère la vue d'ensemble restaurant avec food cost.
+ *
+ * @async
+ * @param {Object} [filters={}] - Filtres de période
+ * @param {string} [filters.dateFrom] - Date de début
+ * @param {string} [filters.dateTo] - Date de fin
+ *
+ * @returns {Promise<Object>} Vue d'ensemble avec métriques food cost
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantOverview = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.dateFrom) params.set('date_from', filters.dateFrom);
@@ -191,21 +481,65 @@ export const fetchRestaurantOverview = async (filters = {}) => {
   return data;
 };
 
+/**
+ * Récupère les détails complets d'un plat restaurant.
+ *
+ * @async
+ * @param {number} platId - ID du plat
+ *
+ * @returns {Promise<Object>} Détails du plat avec coûts et ingrédients
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantPlatDetails = async (platId) => {
   const { data } = await api.get(`/restaurant/plats/${platId}/detail`);
   return data;
 };
 
+/**
+ * Récupère la décomposition des coûts d'un plat par ingrédient.
+ *
+ * @async
+ * @param {number} platId - ID du plat
+ *
+ * @returns {Promise<Array>} Liste des ingrédients avec coûts détaillés
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantPlatIngredients = async (platId) => {
   const { data } = await api.get(`/restaurant/plats/${platId}/cost-breakdown`);
   return data;
 };
 
+/**
+ * Simule l'impact d'un changement de prix sur un plat.
+ *
+ * @async
+ * @param {number} platId - ID du plat
+ * @param {Object} payload - Paramètres de simulation
+ * @param {number} [payload.new_price] - Nouveau prix simulé
+ * @param {number} [payload.target_margin] - Marge cible
+ *
+ * @returns {Promise<Object>} Résultats de la simulation
+ * @property {number} food_cost_pct - Food cost en %
+ * @property {number} margin_pct - Marge en %
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const simulatePlatPrice = async (platId, payload) => {
   const { data } = await api.post(`/restaurant/plats/${platId}/simulate-price`, payload);
   return data;
 };
 
+/**
+ * Récupère les alertes restaurant (food cost, stocks, etc.).
+ *
+ * @async
+ * @param {Object} [filters={}] - Filtres d'alertes
+ * @param {string} [filters.type] - Type d'alerte
+ * @param {string} [filters.severity] - Sévérité (low, medium, high, critical)
+ *
+ * @returns {Promise<Array>} Liste des alertes
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantAlerts = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.type) params.set('type', filters.type);
@@ -215,6 +549,19 @@ export const fetchRestaurantAlerts = async (filters = {}) => {
   return data;
 };
 
+/**
+ * Récupère l'analyse food cost détaillée.
+ *
+ * @async
+ * @param {Object} [filters={}] - Filtres d'analyse
+ * @param {string} [filters.period] - Période d'analyse
+ * @param {number} [filters.target_food_cost] - Food cost cible (%)
+ * @param {string} [filters.dateFrom] - Date de début
+ * @param {string} [filters.dateTo] - Date de fin
+ *
+ * @returns {Promise<Object>} Analyse food cost complète
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantFoodCostAnalysis = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.period) params.set('period', filters.period);
@@ -230,38 +577,129 @@ export const fetchRestaurantFoodCostAnalysis = async (filters = {}) => {
 // Restaurant Menus & Costs (Scénario 3.6)
 // ---------------------------------------------------------------------------
 
+/**
+ * Récupère la vue d'ensemble des menus restaurant.
+ *
+ * @async
+ * @returns {Promise<Object>} Vue d'ensemble des menus avec coûts
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchRestaurantMenusOverview = async () => {
   const { data } = await api.get('/restaurant/menus/overview');
   return data;
 };
 
+// ============================================================================
+// POS - POINT OF SALE
+// ============================================================================
+
+/**
+ * Effectue le checkout d'un panier POS.
+ *
+ * @async
+ * @param {Object} payload - Données du panier
+ * @param {Array} payload.items - Articles du panier
+ * @param {string} payload.payment_method - Méthode de paiement
+ *
+ * @returns {Promise<Object>} Résultat de la transaction
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const checkoutCart = async (payload) => {
   const { data } = await api.post('/pos/checkout', payload);
   return data;
 };
 
+// ============================================================================
+// CATALOGUE - CRUD PRODUITS
+// ============================================================================
+
+/**
+ * Crée un nouveau produit dans le catalogue.
+ *
+ * @async
+ * @param {Object} payload - Données du produit
+ * @param {string} payload.name - Nom du produit
+ * @param {string} [payload.code] - Code produit
+ * @param {number} [payload.price] - Prix de vente
+ * @param {number} [payload.cost] - Prix d'achat
+ *
+ * @returns {Promise<Object>} Produit créé
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const createProduct = async (payload) => {
   const { data } = await api.post('/catalog/products', payload);
   return data;
 };
 
+/**
+ * Met à jour un produit existant.
+ *
+ * @async
+ * @param {number} productId - ID du produit
+ * @param {Object} payload - Données à mettre à jour
+ *
+ * @returns {Promise<Object>} Produit mis à jour
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const updateProductRequest = async (productId, payload) => {
   const { data } = await api.patch(`/catalog/products/${productId}`, payload);
   return data;
 };
 
+/**
+ * Supprime un produit du catalogue.
+ *
+ * @async
+ * @param {number} productId - ID du produit à supprimer
+ *
+ * @returns {Promise<boolean>} true si succès
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const deleteProductRequest = async (productId) => {
   await api.delete(`/catalog/products/${productId}`);
   return true;
 };
 
+/**
+ * Recherche un produit par code-barres.
+ *
+ * @async
+ * @param {string} barcode - Code-barres EAN/UPC
+ *
+ * @returns {Promise<Object>} Produit trouvé
+ * @throws {AxiosError} Si produit non trouvé ou erreur serveur
+ *
+ * @example
+ * const product = await lookupProductByBarcode('3760123456789');
+ */
 export const lookupProductByBarcode = async (barcode) => {
   const { data } = await api.get(`/catalog/products/barcode/${encodeURIComponent(barcode)}`);
   return data;
 };
 
+// ============================================================================
+// SUPPLY PLANNING - APPROVISIONNEMENT
+// ============================================================================
+
 /**
- * Flux planning / audit / stock : compose les queryparams et consomme les endpints correspondants.
+ * Récupère le plan d'approvisionnement recommandé.
+ *
+ * @async
+ * @param {Object} [filters={}] - Filtres du plan
+ * @param {number} [filters.targetCoverage=21] - Couverture cible en jours
+ * @param {number} [filters.alertThreshold=7] - Seuil d'alerte en jours
+ * @param {number} [filters.minDailySales=0] - Ventes min journalières
+ * @param {Array<string>} [filters.categories] - Filtrer par catégories
+ * @param {string} [filters.search] - Recherche textuelle
+ *
+ * @returns {Promise<Object>} Plan d'approvisionnement
+ * @property {Array} items - Produits à commander
+ * @property {Object} summary - Résumé du plan
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ *
+ * @example
+ * const plan = await fetchSupplyPlan({ targetCoverage: 14, categories: ['FRUITS'] });
  */
 export const fetchSupplyPlan = async (filters = {}) => {
   const params = new URLSearchParams();
@@ -291,6 +729,23 @@ export const fetchSupplyPlan = async (filters = {}) => {
   return data;
 };
 
+// ============================================================================
+// AUDIT & DIAGNOSTICS
+// ============================================================================
+
+/**
+ * Récupère les diagnostics d'audit (écarts, anomalies).
+ *
+ * @async
+ * @param {Object} [filters={}] - Filtres de diagnostic
+ * @param {Array<string>} [filters.categories] - Catégories à auditer
+ * @param {Array<string>} [filters.levels] - Niveaux de sévérité
+ * @param {number} [filters.minAbs] - Écart absolu min
+ * @param {number} [filters.maxAbs] - Écart absolu max
+ *
+ * @returns {Promise<Array>} Liste des diagnostics
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchAuditDiagnostics = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.categories) {
@@ -310,26 +765,84 @@ export const fetchAuditDiagnostics = async (filters = {}) => {
   return data;
 };
 
+/**
+ * Récupère les actions d'audit en cours ou terminées.
+ *
+ * @async
+ * @param {boolean} [includeClosed=false] - Inclure les actions fermées
+ *
+ * @returns {Promise<Array>} Liste des actions d'audit
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchAuditActions = async (includeClosed = false) => {
   const { data } = await api.get('/audit/actions', { params: { include_closed: includeClosed } });
   return data;
 };
 
+/**
+ * Récupère les résolutions d'audit disponibles.
+ *
+ * @async
+ * @returns {Promise<Array>} Types de résolutions possibles
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchAuditResolutions = async () => {
   const { data } = await api.get('/audit/resolutions');
   return data;
 };
 
+/**
+ * Crée une affectation d'action d'audit.
+ *
+ * @async
+ * @param {Object} payload - Données d'affectation
+ * @param {number} payload.action_id - ID de l'action
+ * @param {number} payload.user_id - ID de l'utilisateur assigné
+ *
+ * @returns {Promise<Object>} Affectation créée
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const createAuditAssignment = async (payload) => {
   const { data } = await api.post('/audit/assignments', payload);
   return data;
 };
 
+/**
+ * Met à jour le statut d'une action d'audit.
+ *
+ * @async
+ * @param {Object} params - Paramètres de mise à jour
+ * @param {number} params.actionId - ID de l'action
+ * @param {string} params.status - Nouveau statut
+ * @param {string} [params.note] - Note de résolution
+ *
+ * @returns {Promise<Object>} Action mise à jour
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const updateAuditActionStatus = async ({ actionId, status, note }) => {
   const { data } = await api.post(`/audit/actions/${actionId}/status`, { status, note });
   return data;
 };
 
+// ============================================================================
+// INVOICES - EXTRACTION & IMPORT
+// ============================================================================
+
+/**
+ * Extrait les données d'une facture à partir de texte.
+ *
+ * @async
+ * @param {Object} params - Paramètres d'extraction
+ * @param {string} params.text - Texte de la facture (OCR, copier-coller)
+ * @param {number} params.marginPercent - Marge appliquée (%)
+ * @param {string} [params.supplierHint] - Nom du fournisseur (aide l'IA)
+ *
+ * @returns {Promise<Object>} Facture extraite avec lignes détectées
+ * @property {Array} lines - Lignes de facture extraites
+ * @property {string} supplier - Fournisseur détecté
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const extractInvoiceFromText = async ({ text, marginPercent, supplierHint }) => {
   const payload = {
     text,
@@ -342,6 +855,18 @@ export const extractInvoiceFromText = async ({ text, marginPercent, supplierHint
   return data;
 };
 
+/**
+ * Extrait les données d'une facture à partir d'un fichier (PDF, image).
+ *
+ * @async
+ * @param {Object} params - Paramètres d'extraction
+ * @param {File} params.file - Fichier facture (PDF, JPG, PNG)
+ * @param {number} params.marginPercent - Marge appliquée (%)
+ * @param {string} [params.supplierHint] - Nom du fournisseur (aide l'IA)
+ *
+ * @returns {Promise<Object>} Facture extraite avec lignes détectées
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const extractInvoiceFromFile = async ({ file, marginPercent, supplierHint }) => {
   const formData = new FormData();
   formData.append('file', file);
@@ -355,6 +880,29 @@ export const extractInvoiceFromFile = async ({ file, marginPercent, supplierHint
   return data;
 };
 
+/**
+ * Import "zero-click" d'une facture : extraction + matching + import auto.
+ *
+ * @async
+ * @param {Object} params - Paramètres d'import
+ * @param {File} params.file - Fichier facture
+ * @param {number} [params.marginPercent=40] - Marge appliquée (%)
+ * @param {string} [params.supplierHint=null] - Nom du fournisseur
+ * @param {boolean} [params.autoConfirm=true] - Confirmation automatique
+ *
+ * @returns {Promise<Object>} Résultat de l'import automatique
+ * @property {number} matched - Produits matchés automatiquement
+ * @property {number} created - Nouveaux produits créés
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ *
+ * @example
+ * const result = await zeroClickInvoiceImport({
+ *   file: pdfFile,
+ *   marginPercent: 35,
+ *   supplierHint: 'Metro'
+ * });
+ */
 export const zeroClickInvoiceImport = async ({ file, marginPercent = 40, supplierHint = null, autoConfirm = true }) => {
   const formData = new FormData();
   formData.append('file', file);
@@ -370,7 +918,22 @@ export const zeroClickInvoiceImport = async ({ file, marginPercent = 40, supplie
   return data;
 };
 
-// Zero-click avec jobs async (pour gros fichiers)
+/**
+ * Lance un job zero-click asynchrone (pour gros fichiers).
+ *
+ * @async
+ * @param {Object} params - Paramètres du job
+ * @param {File} params.file - Fichier facture
+ * @param {number} [params.marginPercent=40] - Marge (%)
+ * @param {string} [params.supplierHint=null] - Fournisseur
+ * @param {boolean} [params.autoConfirm=true] - Confirmation auto
+ * @param {string} [params.sessionId=null] - ID session (groupement)
+ *
+ * @returns {Promise<Object>} Job créé
+ * @property {string} job_id - ID du job pour polling
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const zeroClickInvoiceJob = async ({ file, marginPercent = 40, supplierHint = null, autoConfirm = true, sessionId = null }) => {
   const formData = new FormData();
   formData.append('file', file);
@@ -389,13 +952,36 @@ export const zeroClickInvoiceJob = async ({ file, marginPercent = 40, supplierHi
   return data;
 };
 
-// Polling du statut d'un job zero-click
+/**
+ * Récupère le statut d'un job zero-click (polling).
+ *
+ * @async
+ * @param {string} jobId - ID du job
+ *
+ * @returns {Promise<Object>} Statut du job
+ * @property {string} status - pending|processing|completed|failed
+ * @property {number} progress - Progression (0-100)
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchZeroClickJobStatus = async (jobId) => {
   const { data } = await api.get(`/invoices/zero-click/jobs/${jobId}`);
   return data;
 };
 
-// Liste des jobs zero-click récents
+/**
+ * Récupère la liste des jobs zero-click récents.
+ *
+ * @async
+ * @param {Object} [params={}] - Paramètres de recherche
+ * @param {string} [params.status] - Filtrer par statut
+ * @param {string} [params.sessionId] - Filtrer par session
+ * @param {number} [params.limit=50] - Limite résultats
+ * @param {number} [params.offset=0] - Offset pagination
+ *
+ * @returns {Promise<Array>} Liste des jobs
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchZeroClickJobs = async ({ status = null, sessionId = null, limit = 50, offset = 0 } = {}) => {
   const params = new URLSearchParams();
   if (status) params.set('status', status);
@@ -407,7 +993,17 @@ export const fetchZeroClickJobs = async ({ status = null, sessionId = null, limi
   return data;
 };
 
-// Sessions d'import
+/**
+ * Récupère les sessions d'import de factures.
+ *
+ * @async
+ * @param {Object} [params={}] - Paramètres de pagination
+ * @param {number} [params.limit=50] - Limite résultats
+ * @param {number} [params.offset=0] - Offset pagination
+ *
+ * @returns {Promise<Array>} Liste des sessions d'import
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchImportSessions = async ({ limit = 50, offset = 0 } = {}) => {
   const params = new URLSearchParams();
   if (limit) params.set('limit', limit);
@@ -417,11 +1013,34 @@ export const fetchImportSessions = async ({ limit = 50, offset = 0 } = {}) => {
   return data;
 };
 
+/**
+ * Récupère les détails d'une session d'import.
+ *
+ * @async
+ * @param {string} sessionId - ID de la session
+ *
+ * @returns {Promise<Object>} Détails de la session avec jobs associés
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchImportSessionDetails = async (sessionId) => {
   const { data } = await api.get(`/invoices/sessions/${encodeURIComponent(sessionId)}`);
   return data;
 };
 
+/**
+ * Importe les lignes d'une facture dans le système.
+ *
+ * @async
+ * @param {Object} params - Paramètres d'import
+ * @param {Array} params.lines - Lignes de facture
+ * @param {string} params.supplier - Fournisseur
+ * @param {string} params.movementType - Type mouvement (ENTREE/SORTIE)
+ * @param {string} params.username - Utilisateur
+ * @param {string} [params.invoiceDate] - Date facture (YYYY-MM-DD)
+ *
+ * @returns {Promise<Object>} Résultat de l'import
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const importInvoiceLines = async ({ lines, supplier, movementType, username, invoiceDate }) => {
   const { data } = await api.post('/invoices/import', {
     lines,
@@ -433,6 +1052,17 @@ export const importInvoiceLines = async ({ lines, supplier, movementType, userna
   return data;
 };
 
+/**
+ * Lie une ligne de facture à un produit existant.
+ *
+ * @async
+ * @param {Object} params - Paramètres de liaison
+ * @param {Object} params.line - Ligne de facture
+ * @param {number} params.productId - ID du produit catalogue
+ *
+ * @returns {Promise<Object>} Ligne mise à jour
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const linkInvoiceLine = async ({ line, productId }) => {
   const { data } = await api.post('/invoices/lines/link', {
     line,
@@ -441,6 +1071,19 @@ export const linkInvoiceLine = async ({ line, productId }) => {
   return data.line;
 };
 
+/**
+ * Crée un nouveau produit à partir d'une ligne de facture.
+ *
+ * @async
+ * @param {Object} params - Paramètres de création
+ * @param {Object} params.line - Ligne de facture
+ * @param {string} params.supplier - Fournisseur
+ * @param {boolean} [params.initializeStock=false] - Initialiser le stock
+ * @param {string} [params.invoiceDate] - Date facture
+ *
+ * @returns {Promise<Object>} Résumé de la création
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const createProductFromLine = async ({ line, supplier, initializeStock = false, invoiceDate }) => {
   const { data } = await api.post('/invoices/lines/create-product', {
     line,
@@ -451,6 +1094,20 @@ export const createProductFromLine = async ({ line, supplier, initializeStock = 
   return data.summary;
 };
 
+/**
+ * Confirme les mouvements de stock d'une facture.
+ *
+ * @async
+ * @param {Object} params - Paramètres de confirmation
+ * @param {Array} params.lines - Lignes à confirmer
+ * @param {string} [params.movementType='ENTREE'] - Type mouvement
+ * @param {string} params.supplier - Fournisseur
+ * @param {string} [params.invoiceDate] - Date facture
+ * @param {string} params.username - Utilisateur
+ *
+ * @returns {Promise<Object>} Résultat de la confirmation
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const confirmInvoiceStock = async ({ lines, movementType = 'ENTREE', supplier, invoiceDate, username }) => {
   const { data } = await api.post('/invoices/lines/confirm-stock', {
     lines,
@@ -462,6 +1119,20 @@ export const confirmInvoiceStock = async ({ lines, movementType = 'ENTREE', supp
   return data;
 };
 
+/**
+ * Importe une facture dans le catalogue avec création de produits.
+ *
+ * @async
+ * @param {Object} params - Paramètres d'import
+ * @param {Array} params.lines - Lignes de facture
+ * @param {string} params.supplier - Fournisseur
+ * @param {string} params.username - Utilisateur
+ * @param {boolean} params.initializeStock - Initialiser les stocks
+ * @param {string} [params.invoiceDate] - Date facture
+ *
+ * @returns {Promise<Object>} Résultat de l'import
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const importInvoiceToCatalog = async ({ lines, supplier, username, initializeStock, invoiceDate }) => {
   const { data } = await api.post('/invoices/catalog/import', {
     lines,
@@ -473,6 +1144,18 @@ export const importInvoiceToCatalog = async ({ lines, supplier, username, initia
   return data;
 };
 
+/**
+ * Récupère les suggestions de matching pour un produit.
+ *
+ * @async
+ * @param {Object} params - Paramètres de recherche
+ * @param {string} params.query - Texte de recherche
+ * @param {number} [params.maxResults=5] - Nombre max de résultats
+ * @param {number} [params.minScore=60.0] - Score min de similarité
+ *
+ * @returns {Promise<Array>} Suggestions de produits similaires
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchProductMatchSuggestions = async ({ query, maxResults = 5, minScore = 60.0 }) => {
   const params = new URLSearchParams();
   params.set('query', query);
@@ -482,6 +1165,20 @@ export const fetchProductMatchSuggestions = async ({ query, maxResults = 5, minS
   return data.suggestions ?? [];
 };
 
+/**
+ * Récupère l'historique des factures importées.
+ *
+ * @async
+ * @param {Object} [filters={}] - Filtres de recherche
+ * @param {string} [filters.supplier] - Filtrer par fournisseur
+ * @param {string} [filters.invoiceId] - Filtrer par N° facture
+ * @param {string} [filters.dateStart] - Date début
+ * @param {string} [filters.dateEnd] - Date fin
+ * @param {number} [filters.limit] - Limite résultats
+ *
+ * @returns {Promise<Array>} Historique des factures
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchInvoiceHistory = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.supplier) params.set('supplier', filters.supplier);
@@ -494,6 +1191,15 @@ export const fetchInvoiceHistory = async (filters = {}) => {
   return data.items ?? [];
 };
 
+/**
+ * Télécharge le fichier PDF d'une facture importée.
+ *
+ * @async
+ * @param {string} invoiceId - ID de la facture
+ *
+ * @returns {Promise<AxiosResponse>} Réponse avec blob PDF
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const downloadInvoiceFile = async (invoiceId) => {
   const response = await api.get(`/invoices/history/${encodeURIComponent(invoiceId)}/file`, {
     responseType: 'blob',
@@ -501,16 +1207,53 @@ export const downloadInvoiceFile = async (invoiceId) => {
   return response;
 };
 
+// ============================================================================
+// CATALOGUE - RÉFÉRENTIELS
+// ============================================================================
+
+/**
+ * Récupère la liste des catégories de produits.
+ *
+ * @async
+ * @returns {Promise<Array>} Liste des catégories
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchCategories = async () => {
   const { data } = await api.get('/catalog/categories');
   return data;
 };
 
+/**
+ * Récupère la liste des fournisseurs.
+ *
+ * @async
+ * @returns {Promise<Array>} Liste des fournisseurs
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchVendors = async () => {
-  const { data } = await api.get('/catalog/vendors');
+  const { data} = await api.get('/catalog/vendors');
   return data;
 };
 
+// ============================================================================
+// SALES - VENTES & MÉTRIQUES
+// ============================================================================
+
+/**
+ * Récupère les métriques de ventes.
+ *
+ * @async
+ * @param {Object} [filters={}] - Filtres de période
+ * @param {string} [filters.dateStart] - Date début
+ * @param {string} [filters.dateEnd] - Date fin
+ * @param {Array<string>} [filters.categories] - Filtrer par catégories
+ *
+ * @returns {Promise<Object>} Métriques de ventes
+ * @property {number} total_sales - Total des ventes
+ * @property {number} avg_basket - Panier moyen
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchSalesMetrics = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.dateStart) params.set('date_start', filters.dateStart);
@@ -525,6 +1268,18 @@ export const fetchSalesMetrics = async (filters = {}) => {
   return data;
 };
 
+/**
+ * Récupère la projection de croissance des ventes.
+ *
+ * @async
+ * @param {Object} [filters={}] - Filtres de période
+ * @param {string} [filters.dateStart] - Date début
+ * @param {string} [filters.dateEnd] - Date fin
+ * @param {Array<string>} [filters.categories] - Filtrer par catégories
+ *
+ * @returns {Promise<Object>} Projection de croissance
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const fetchSalesGrowthProjection = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.dateStart) params.set('date_start', filters.dateStart);
@@ -633,8 +1388,30 @@ export const fetchPOSCategorySales = async (filters = {}) => {
   return data;
 };
 
-// --- Finance (transactions/catégories refonte) ---
+// ============================================================================
+// FINANCE - TRANSACTIONS & CATÉGORISATION
+// ============================================================================
 
+/**
+ * Recherche des transactions financières avec filtres avancés.
+ *
+ * @async
+ * @param {Object} [filters={}] - Filtres de recherche
+ * @param {number} [filters.entityId] - ID entité
+ * @param {number} [filters.accountId] - ID compte bancaire
+ * @param {number} [filters.categoryId] - ID catégorie
+ * @param {string} [filters.dateFrom] - Date début
+ * @param {string} [filters.dateTo] - Date fin
+ * @param {number} [filters.amountMin] - Montant min
+ * @param {number} [filters.amountMax] - Montant max
+ * @param {string} [filters.q] - Recherche textuelle
+ * @param {number} [filters.page=1] - Page
+ * @param {number} [filters.size=50] - Résultats/page
+ * @param {string} [filters.sort='-date_operation'] - Tri
+ *
+ * @returns {Promise<Object>} Résultats paginés avec transactions
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const searchFinanceTransactions = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.entityId) params.set('entity_id', filters.entityId);
@@ -653,6 +1430,17 @@ export const searchFinanceTransactions = async (filters = {}) => {
   return data;
 };
 
+/**
+ * Suggère les catégories "Autre" les plus utilisées (pour catégorisation rapide).
+ *
+ * @async
+ * @param {Object} [params={}] - Paramètres
+ * @param {number} [params.entityId] - ID entité
+ * @param {number} [params.limit=50] - Limite résultats
+ *
+ * @returns {Promise<Array>} Top catégories "Autre"
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const suggestFinanceAutreTop = async ({ entityId, limit = 50 } = {}) => {
   const params = new URLSearchParams();
   if (entityId) params.set('entity_id', entityId);
@@ -662,6 +1450,18 @@ export const suggestFinanceAutreTop = async ({ entityId, limit = 50 } = {}) => {
   return data;
 };
 
+/**
+ * Autocomplétion pour recherche de catégories financières.
+ *
+ * @async
+ * @param {Object} params - Paramètres de recherche
+ * @param {string} params.q - Texte recherché
+ * @param {number} [params.entityId] - ID entité
+ * @param {number} [params.limit=20] - Limite résultats
+ *
+ * @returns {Promise<Array>} Catégories correspondantes
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const autocompleteFinanceCategories = async ({ q, entityId, limit = 20 }) => {
   if (!q) return [];
   const params = new URLSearchParams();
@@ -673,21 +1473,63 @@ export const autocompleteFinanceCategories = async ({ q, entityId, limit = 20 })
   return data;
 };
 
+/**
+ * Catégorise plusieurs transactions en une seule requête.
+ *
+ * @async
+ * @param {Object} payload - Données de catégorisation
+ * @param {Array<number>} payload.transaction_ids - IDs transactions
+ * @param {number} payload.category_id - ID catégorie cible
+ *
+ * @returns {Promise<Object>} Résultat de la catégorisation en lot
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const batchCategorizeFinanceTransactions = async (payload) => {
   const { data } = await api.post('/finance/transactions/batch-categorize', payload);
   return data;
 };
 
+/**
+ * Met à jour une transaction financière.
+ *
+ * @async
+ * @param {Object} params - Paramètres
+ * @param {number} params.transactionId - ID transaction
+ * @param {Object} params.payload - Données à mettre à jour
+ *
+ * @returns {Promise<Object>} Transaction mise à jour
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const updateFinanceTransaction = async ({ transactionId, payload }) => {
   const { data } = await api.patch(`/finance/transactions/${transactionId}`, payload);
   return data;
 };
 
+/**
+ * Verrouille une transaction (empêche modification).
+ *
+ * @async
+ * @param {number} transactionId - ID transaction à verrouiller
+ *
+ * @returns {Promise<Object>} Transaction verrouillée
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const lockFinanceTransaction = async (transactionId) => {
   const { data } = await api.post(`/finance/transactions/${transactionId}/lock`);
   return data;
 };
 
+/**
+ * Met à jour la catégorie d'une transaction (wrapper de batchCategorize).
+ *
+ * @async
+ * @param {Object} params - Paramètres
+ * @param {number} params.transactionId - ID transaction
+ * @param {number} params.categoryId - ID nouvelle catégorie
+ *
+ * @returns {Promise<Object>} Résultat de la catégorisation
+ * @throws {AxiosError} Si erreur réseau ou serveur
+ */
 export const updateTransactionCategory = async ({ transactionId, categoryId }) => {
   const { data } = await api.post('/finance/transactions/batch-categorize', {
     transaction_ids: [transactionId],
@@ -697,13 +1539,22 @@ export const updateTransactionCategory = async ({ transactionId, categoryId }) =
 };
 
 // ============================================================================
-// PHASE 4: FEEDBACK CATÉGORISATION (ML Learning Loop)
+// FINANCE - FEEDBACK ML (Machine Learning Loop)
 // ============================================================================
 
 /**
  * Enregistre un feedback de correction de catégorie pour améliorer le ML.
+ *
+ * @async
  * @param {number} transactionId - ID de la transaction corrigée
- * @param {Object} payload - { actual_category_id, predicted_category_id, confidence_score, correction_source }
+ * @param {Object} payload - Données du feedback
+ * @param {number} payload.actual_category_id - Catégorie correcte
+ * @param {number} [payload.predicted_category_id] - Catégorie prédite (ML)
+ * @param {number} [payload.confidence_score] - Score de confiance ML
+ * @param {string} [payload.correction_source] - Source correction
+ *
+ * @returns {Promise<Object>} Feedback enregistré
+ * @throws {AxiosError} Si erreur réseau ou serveur
  */
 export const recordCategoryFeedback = async (transactionId, payload) => {
   const { data } = await api.post(`/finance/transactions/${transactionId}/feedback`, payload);
@@ -712,7 +1563,14 @@ export const recordCategoryFeedback = async (transactionId, payload) => {
 
 /**
  * Récupère les statistiques globales de feedback de catégorisation.
- * @returns {Object} { total_corrections, unique_transactions, avg_wrong_confidence, ... }
+ *
+ * @async
+ * @returns {Promise<Object>} Statistiques de feedback
+ * @property {number} total_corrections - Total corrections
+ * @property {number} unique_transactions - Transactions uniques corrigées
+ * @property {number} avg_wrong_confidence - Confiance moyenne des erreurs
+ *
+ * @throws {AxiosError} Si erreur réseau ou serveur
  */
 export const fetchCategoryFeedbackStats = async () => {
   const { data } = await api.get('/finance/categorization/feedback/stats');
@@ -720,9 +1578,13 @@ export const fetchCategoryFeedbackStats = async () => {
 };
 
 /**
- * Récupère les corrections de catégories les plus fréquentes.
- * @param {number} limit - Nombre max de patterns à retourner (défaut: 10)
- * @returns {Array} Liste des patterns de correction fréquents
+ * Récupère les patterns de corrections les plus fréquents.
+ *
+ * @async
+ * @param {number} [limit=10] - Nombre max de patterns
+ *
+ * @returns {Promise<Array>} Patterns de correction fréquents
+ * @throws {AxiosError} Si erreur réseau ou serveur
  */
 export const fetchCommonCorrections = async (limit = 10) => {
   const { data } = await api.get(`/finance/categorization/feedback/common-corrections?limit=${limit}`);
@@ -1676,11 +2538,52 @@ export const exportReport = async (type) => {
 };
 
 // ============================================================================
+// SUPPLIERS CRUD
+// ============================================================================
+
+export const fetchSuppliers = async (params = {}) => {
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.set('page', params.page);
+  if (params.per_page) searchParams.set('per_page', params.per_page);
+  if (params.search) searchParams.set('search', params.search);
+  if (params.actif !== undefined) searchParams.set('actif', params.actif);
+  if (params.sort_by) searchParams.set('sort_by', params.sort_by);
+  if (params.sort_order) searchParams.set('sort_order', params.sort_order);
+  const query = searchParams.toString();
+  const { data } = await api.get(query ? `/suppliers?${query}` : '/suppliers');
+  return data;
+};
+
+export const fetchSupplier = async (id) => {
+  const { data } = await api.get(`/suppliers/${id}`);
+  return data;
+};
+
+export const createSupplier = async (supplierData) => {
+  const { data } = await api.post('/suppliers', supplierData);
+  return data;
+};
+
+export const updateSupplier = async (id, supplierData) => {
+  const { data } = await api.put(`/suppliers/${id}`, supplierData);
+  return data;
+};
+
+export const deleteSupplier = async (id) => {
+  await api.delete(`/suppliers/${id}`);
+};
+
+// ============================================================================
 // UTILITAIRES
 // ============================================================================
 
 /**
  * Retourne l'URL de base de l'API pour construire des liens de téléchargement.
+ *
+ * @returns {string} URL de base de l'API (ex: '/api' ou 'https://api.example.com')
+ *
+ * @example
+ * const pdfUrl = `${getApiBaseUrl()}/invoices/${id}/download`;
  */
 export const getApiBaseUrl = () => api.defaults.baseURL ?? '/api';
 

@@ -1,4 +1,37 @@
-"""Application FastAPI qui expose les fonctionnalités d'inventaire pour la nouvelle SPA."""
+"""
+Module principal de l'application FastAPI.
+
+Ce module configure et initialise l'application complète incluant:
+
+Architecture:
+- API REST modulaire avec routeurs séparés par domaine
+- Support multi-tenant avec isolation des données
+- Authentification JWT avec cookies httpOnly
+- Middleware avancés (CORS, performance, contexte, idempotence)
+- Cache Redis pour optimisation des requêtes
+- Event sourcing pour synchronisation des données
+
+Modules principaux:
+1. Operations: Catalogue, stock, factures, approvisionnement
+2. Restaurant: Plats, ingrédients, marges restauration
+3. Finance: Trésorerie, relevés bancaires, rapprochement
+4. Intelligence: Prévisions, anomalies, scoring fournisseurs
+5. Cockpit: Vue consolidée avec KPIs
+6. Admin: Administration système et sauvegardes
+
+Sécurité:
+- Validation stricte des origines CORS en production
+- Secrets JWT configurables via env vars
+- Rate limiting sur endpoints sensibles
+- RBAC (Role-Based Access Control) par endpoint
+- Headers de sécurité (HSTS, CSP, etc.)
+
+Monitoring:
+- Métriques de performance par endpoint
+- Statistiques cache Redis
+- Logging structuré avec request IDs
+- Server-Timing headers pour debugging
+"""
 
 from __future__ import annotations
 
@@ -214,7 +247,32 @@ def _load_allowed_origins() -> list[str]:
 
 @lru_cache
 def create_app() -> FastAPI:
-    """Construit l'application FastAPI ainsi que tous les routeurs de domaine."""
+    """
+    Factory pour créer et configurer l'application FastAPI complète.
+
+    Cette fonction:
+    1. Configure les métadonnées OpenAPI (titre, version, description)
+    2. Initialise les tables système (tenants, users)
+    3. Configure CORS avec validation stricte en production
+    4. Ajoute les middlewares de sécurité et performance
+    5. Enregistre tous les routeurs par domaine métier
+    6. Configure les event handlers pour synchronisation
+    7. Initialise le pool Redis pour le cache
+
+    Le résultat est caché (lru_cache) pour éviter les reconfigurations.
+
+    Returns:
+        Instance FastAPI configurée et prête à démarrer
+
+    Security Notes:
+        - En production, CORS_ALLOWED_ORIGINS DOIT être configuré
+        - Wildcard (*) CORS est interdit en production
+        - JWT_SECRET_KEY doit être robuste (>32 caractères)
+
+    Example:
+        >>> app = create_app()
+        >>> # Lancer avec: uvicorn backend.main:app --reload
+    """
 
     app = FastAPI(
         title="Inventaire Epicerie API",

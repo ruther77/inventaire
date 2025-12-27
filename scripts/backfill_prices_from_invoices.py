@@ -1,15 +1,96 @@
 #!/usr/bin/env python3
 """
-Backfill product prices from historical invoices.
+Module de mise à jour rétrospective des prix d'achat depuis les factures historiques.
 
-This script:
-1. Reads all stored invoice PDFs from data/processed_invoices/
-2. Parses each invoice to extract product lines
-3. Matches products by name using fuzzy matching
-4. Updates produits.prix_achat and creates price history
+Ce script permet de:
+- Scanner toutes les factures PDF stockées dans data/processed_invoices/
+- Extraire et parser les lignes de produits de chaque facture
+- Identifier les produits dans le catalogue via fuzzy matching intelligent
+- Mettre à jour les prix d'achat uniquement si le nouveau prix est plus élevé (logique d'inflation)
+- Créer un historique des prix dans produits_price_history
+- Filtrer par fournisseur (METRO, EUROCIEL, TAIYAT)
+- Générer des rapports détaillés de matching et mise à jour
+
+Le script applique une stratégie conservatrice: seuls les prix à la hausse sont appliqués,
+car on suppose que les prix augmentent avec l'inflation. Les prix à la baisse peuvent
+indiquer des promotions temporaires ou des erreurs de parsing.
 
 Usage:
-    python scripts/backfill_prices_from_invoices.py [--dry-run] [--limit N]
+    # Traiter toutes les factures
+    python scripts/backfill_prices_from_invoices.py
+
+    # Mode dry-run pour simuler sans modifier
+    python scripts/backfill_prices_from_invoices.py --dry-run
+
+    # Limiter le nombre de PDFs traités
+    python scripts/backfill_prices_from_invoices.py --limit 10
+
+    # Filtrer par fournisseur
+    python scripts/backfill_prices_from_invoices.py --supplier METRO
+
+    # Combiner les options
+    python scripts/backfill_prices_from_invoices.py --supplier EUROCIEL --limit 20 --dry-run
+
+Arguments CLI:
+    --dry-run       : Mode simulation - affiche les changements sans les appliquer
+    --limit N       : Limite le traitement à N fichiers PDF (0 = illimité)
+    --tenant ID     : ID du tenant (par défaut: 1)
+    --supplier NAME : Filtre par fournisseur (METRO, EUROCIEL, TAIYAT)
+
+Prérequis:
+    - PDFs de factures dans data/processed_invoices/
+    - Base de données avec tables produits et produits_price_history
+    - Module core.parsers pour le parsing des factures
+    - Module core.inventory_service pour le fuzzy matching
+    - pypdf ou PyPDF2 pour l'extraction de texte
+
+Fichiers d'entrée:
+    - data/processed_invoices/*.pdf : Factures stockées
+      Nommage suggéré: inv-NNNN-YYYY-MM-DD.pdf (METRO)
+                       eurociel-YYYY-MM-DD.pdf (Eurociel)
+                       taiyat-YYYY-MM-DD.pdf (Taiyat)
+
+Fichiers de sortie:
+    - Logs détaillés dans la console (niveau INFO)
+    - Mises à jour dans produits.prix_achat
+    - Enregistrements dans produits_price_history
+
+Algorithme de matching:
+    Le script utilise une stratégie de matching en 2 passes:
+    1. Normalisation complète du nom (suppression pays, unités, caractères spéciaux)
+    2. Si échec, extraction du nom "core" (premier mot significatif)
+    3. Fuzzy matching avec seuil de similarité ajustable (50% par défaut)
+
+Normalisation des noms:
+    - Suppression des pays d'origine (SENEGAL, VIETNAM, MAROC, etc.)
+    - Suppression des termes non-essentiels (BIO, PROMO, RING, etc.)
+    - Normalisation des unités (1KG, 500G, etc.)
+    - Suppression des accents et casse uniforme
+
+Logique de mise à jour:
+    - UNIQUEMENT si nouveau_prix > prix_actuel (logique d'inflation)
+    - Ignore les prix <= 0
+    - Enregistre la date de facture dans l'historique
+    - Enregistre la source (fournisseur)
+
+Exemple de sortie:
+    Found 150 PDF files
+    Processing: inv-1234-2024-01-15.pdf
+      Updated produit 42: 12.50 -> 13.20
+      Updated produit 89: 8.00 -> 8.50
+
+    BACKFILL SUMMARY
+    PDFs processed: 150
+    Lines parsed: 4,520
+    Lines matched: 3,890 (86.1%)
+    Prices updated: 245
+    Errors: 3
+
+Notes:
+    - Les prix à la baisse sont ignorés (sauf en cas d'erreur de prix actuel)
+    - Le matching échoue si similarité < 50%
+    - Les produits non trouvés sont loggés mais ne bloquent pas le traitement
+    - Le mode dry-run est recommandé pour le premier essai
 """
 
 import argparse
@@ -40,7 +121,21 @@ INVOICE_DIR = PROJECT_ROOT / "data" / "processed_invoices"
 
 
 def extract_text_from_pdf(pdf_path: Path) -> str:
-    """Extract text content from a PDF file using pypdf."""
+    """
+    Extrait le contenu textuel d'un fichier PDF.
+
+    Utilise pypdf (ou PyPDF2 en fallback) pour extraire le texte de toutes
+    les pages du PDF et les concaténer.
+
+    Args:
+        pdf_path (Path): Chemin vers le fichier PDF
+
+    Returns:
+        str: Texte extrait de toutes les pages, séparé par des retours à la ligne
+
+    Raises:
+        ImportError: Si ni pypdf ni PyPDF2 ne sont installés
+    """
     try:
         from pypdf import PdfReader
     except ImportError:

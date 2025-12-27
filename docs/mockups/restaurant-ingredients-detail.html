@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant - Détail Ingrédient</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-orange: #f97316;
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(249, 115, 22, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .ingredient-header {
+            display: flex;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+        .ingredient-image {
+            width: 160px;
+            height: 160px;
+            background: linear-gradient(135deg, rgba(249,115,22,0.2), rgba(245,158,11,0.2));
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+        }
+        .ingredient-info { flex: 1; }
+        .ingredient-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .ingredient-category { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; }
+        .ingredient-badges { display: flex; gap: 8px; margin-bottom: 20px; }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-active { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .badge-warning { background: rgba(245,158,11,0.2); color: var(--accent-amber); }
+        .ingredient-actions { display: flex; gap: 12px; }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-amber));
+            color: white;
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-value {
+            font-family: 'Sora', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .stat-label { font-size: 13px; color: var(--text-muted); }
+        .card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .plats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+        }
+        .plat-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .plat-item:hover { background: rgba(255,255,255,0.08); }
+        .plat-icon { font-size: 24px; }
+        .plat-name { font-size: 14px; font-weight: 500; }
+        .plat-usage { font-size: 12px; color: var(--text-muted); }
+        .price-history {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .price-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+        }
+        .price-date { font-size: 13px; color: var(--text-muted); }
+        .price-value { font-size: 14px; font-weight: 600; }
+        .price-change { font-size: 12px; }
+        .price-change.up { color: var(--accent-rose); }
+        .price-change.down { color: var(--accent-emerald); }
+        @media (max-width: 900px) {
+            .ingredient-header { flex-direction: column; }
+            .grid-3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="restaurant.html">Restaurant</a>
+            <span>/</span>
+            <a href="#">Ingrédients</a>
+            <span>/</span>
+            <span>Entrecôte de boeuf</span>
+        </div>
+
+        <div class="ingredient-header">
+            <div class="ingredient-image">🥩</div>
+            <div class="ingredient-info">
+                <h1 class="ingredient-title">Entrecôte de boeuf</h1>
+                <p class="ingredient-category">Catégorie: Viandes • Unité: kg • SKU: ING-BOEUF-001</p>
+                <div class="ingredient-badges">
+                    <span class="badge badge-active">Actif</span>
+                    <span class="badge badge-warning">Prix +8% ce mois</span>
+                </div>
+                <div class="ingredient-actions">
+                    <button class="btn btn-primary" onclick="alert('Modifier ingrédient')">Modifier</button>
+                    <button class="btn btn-secondary" onclick="alert('Historique prix')">Historique prix</button>
+                    <button class="btn btn-secondary" onclick="alert('Lier à épicerie')">Lier produit</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-3">
+            <div class="stat-card">
+                <div class="stat-value" style="color: var(--accent-amber);">€22.00</div>
+                <div class="stat-label">Prix actuel / kg</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">8</div>
+                <div class="stat-label">Plats utilisant cet ingrédient</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">45 kg</div>
+                <div class="stat-label">Consommation mensuelle</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">🍽️ Utilisé dans ces plats</div>
+            <div class="plats-grid">
+                <div class="plat-item" onclick="alert('Détail Entrecôte grillée')">
+                    <span class="plat-icon">🥩</span>
+                    <div>
+                        <div class="plat-name">Entrecôte grillée</div>
+                        <div class="plat-usage">250g / portion</div>
+                    </div>
+                </div>
+                <div class="plat-item" onclick="alert('Détail Steak frites')">
+                    <span class="plat-icon">🍟</span>
+                    <div>
+                        <div class="plat-name">Steak frites</div>
+                        <div class="plat-usage">200g / portion</div>
+                    </div>
+                </div>
+                <div class="plat-item" onclick="alert('Détail Tartare')">
+                    <span class="plat-icon">🥩</span>
+                    <div>
+                        <div class="plat-name">Tartare de boeuf</div>
+                        <div class="plat-usage">180g / portion</div>
+                    </div>
+                </div>
+                <div class="plat-item" onclick="alert('Détail Carpaccio')">
+                    <span class="plat-icon">🥩</span>
+                    <div>
+                        <div class="plat-name">Carpaccio</div>
+                        <div class="plat-usage">120g / portion</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📈 Historique des prix</div>
+            <div class="price-history">
+                <div class="price-item">
+                    <span class="price-date">Décembre 2025</span>
+                    <span class="price-value">€22.00/kg</span>
+                    <span class="price-change up">+8%</span>
+                </div>
+                <div class="price-item">
+                    <span class="price-date">Novembre 2025</span>
+                    <span class="price-value">€20.35/kg</span>
+                    <span class="price-change up">+3%</span>
+                </div>
+                <div class="price-item">
+                    <span class="price-date">Octobre 2025</span>
+                    <span class="price-value">€19.75/kg</span>
+                    <span class="price-change down">-2%</span>
+                </div>
+                <div class="price-item">
+                    <span class="price-date">Septembre 2025</span>
+                    <span class="price-value">€20.15/kg</span>
+                    <span class="price-change">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

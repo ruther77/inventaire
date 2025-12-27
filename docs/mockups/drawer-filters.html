@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drawer - Filtres</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-emerald: #10b981;
+            --accent-blue: #3b82f6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 380px;
+            height: 100vh;
+            background: rgba(15, 15, 25, 0.98);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        .drawer-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .drawer-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.06);
+            border: none;
+            color: var(--text-muted);
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        .filter-section { margin-bottom: 28px; }
+        .filter-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .filter-options { display: flex; flex-direction: column; gap: 8px; }
+        .filter-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-option:hover { background: rgba(255,255,255,0.06); }
+        .filter-option.selected {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: transparent;
+        }
+        .filter-option.selected .checkbox {
+            background: var(--accent-emerald);
+            border-color: var(--accent-emerald);
+            color: white;
+        }
+        .filter-label { font-size: 14px; flex: 1; }
+        .filter-count {
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 2px 8px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 4px;
+        }
+        .range-slider {
+            padding: 16px 0;
+        }
+        .range-inputs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .range-input {
+            flex: 1;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            text-align: center;
+        }
+        .range-track {
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            position: relative;
+        }
+        .range-fill {
+            position: absolute;
+            left: 20%;
+            right: 30%;
+            height: 100%;
+            background: var(--accent-emerald);
+            border-radius: 3px;
+        }
+        .date-inputs {
+            display: flex;
+            gap: 12px;
+        }
+        .date-input {
+            flex: 1;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        .quick-dates {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .quick-date {
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        .quick-date:hover { background: rgba(255,255,255,0.1); }
+        .quick-date.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+        .drawer-footer {
+            display: flex;
+            gap: 12px;
+            padding: 20px 24px;
+            border-top: 1px solid var(--border);
+        }
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        .btn-primary {
+            background: var(--accent-emerald);
+            border: none;
+            color: white;
+        }
+        .active-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 16px 24px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid var(--border);
+        }
+        .active-filter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--accent-emerald);
+        }
+        .active-filter button {
+            background: none;
+            border: none;
+            color: inherit;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="drawer-overlay"></div>
+    <div class="drawer">
+        <div class="drawer-header">
+            <h2 class="drawer-title">🔍 Filtres</h2>
+            <button class="drawer-close" onclick="alert('Fermer')">✕</button>
+        </div>
+
+        <div class="active-filters">
+            <div class="active-filter">
+                Fruits & Légumes <button>✕</button>
+            </div>
+            <div class="active-filter">
+                Stock bas <button>✕</button>
+            </div>
+            <div class="active-filter">
+                7 derniers jours <button>✕</button>
+            </div>
+        </div>
+
+        <div class="drawer-body">
+            <div class="filter-section">
+                <div class="filter-title">Catégorie</div>
+                <div class="filter-options">
+                    <div class="filter-option selected" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">Fruits & Légumes</span>
+                        <span class="filter-count">127</span>
+                    </div>
+                    <div class="filter-option" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">Viandes</span>
+                        <span class="filter-count">84</span>
+                    </div>
+                    <div class="filter-option" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">Poissons</span>
+                        <span class="filter-count">42</span>
+                    </div>
+                    <div class="filter-option" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">Épicerie sèche</span>
+                        <span class="filter-count">256</span>
+                    </div>
+                    <div class="filter-option" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">Boissons</span>
+                        <span class="filter-count">93</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">État du stock</div>
+                <div class="filter-options">
+                    <div class="filter-option selected" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">🔴 Stock bas</span>
+                        <span class="filter-count">23</span>
+                    </div>
+                    <div class="filter-option" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">🟡 Stock moyen</span>
+                        <span class="filter-count">145</span>
+                    </div>
+                    <div class="filter-option" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">🟢 Stock OK</span>
+                        <span class="filter-count">412</span>
+                    </div>
+                    <div class="filter-option" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">⚪ Rupture</span>
+                        <span class="filter-count">8</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">Fourchette de prix</div>
+                <div class="range-slider">
+                    <div class="range-inputs">
+                        <input type="number" class="range-input" value="0" placeholder="Min €">
+                        <input type="number" class="range-input" value="100" placeholder="Max €">
+                    </div>
+                    <div class="range-track">
+                        <div class="range-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">Période</div>
+                <div class="date-inputs">
+                    <input type="date" class="date-input" value="2025-12-17">
+                    <input type="date" class="date-input" value="2025-12-24">
+                </div>
+                <div class="quick-dates">
+                    <span class="quick-date active" onclick="alert('Aujourd\'hui')">Aujourd'hui</span>
+                    <span class="quick-date" onclick="alert('7 jours')">7 jours</span>
+                    <span class="quick-date" onclick="alert('30 jours')">30 jours</span>
+                    <span class="quick-date" onclick="alert('Ce mois')">Ce mois</span>
+                    <span class="quick-date" onclick="alert('Trimestre')">Trimestre</span>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">Fournisseur</div>
+                <div class="filter-options">
+                    <div class="filter-option" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">Metro France</span>
+                        <span class="filter-count">187</span>
+                    </div>
+                    <div class="filter-option" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">Brake France</span>
+                        <span class="filter-count">124</span>
+                    </div>
+                    <div class="filter-option" onclick="this.classList.toggle('selected')">
+                        <div class="checkbox">✓</div>
+                        <span class="filter-label">Pomona</span>
+                        <span class="filter-count">89</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="drawer-footer">
+            <button class="btn btn-secondary" onclick="alert('Réinitialiser')">Réinitialiser</button>
+            <button class="btn btn-primary" onclick="alert('Appliquer les filtres')">Appliquer (23 résultats)</button>
+        </div>
+    </div>
+</body>
+</html>

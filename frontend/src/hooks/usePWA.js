@@ -1,16 +1,60 @@
+/**
+ * Module de hooks pour la gestion complète des Progressive Web Apps (PWA).
+ * @module hooks/usePWA
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 
 /**
- * Hook personnalisé pour gérer les fonctionnalités PWA
+ * Hook complet pour gérer toutes les fonctionnalités PWA.
  *
- * Fonctionnalités:
- * - Détection de l'installabilité de l'application
- * - Gestion du prompt d'installation
- * - Détection du mode standalone (app installée)
- * - Gestion des mises à jour du Service Worker
+ * Gère l'installation, les mises à jour du Service Worker, la détection du mode standalone,
+ * les capacités de partage (Web Share API), la gestion des caches et les informations
+ * sur l'appareil. Fournit une API complète pour transformer une web app en PWA installable.
+ *
+ * Fonctionnalités principales:
+ * - Détection de l'installabilité et gestion du prompt d'installation
+ * - Détection du mode standalone (app déjà installée)
+ * - Gestion des mises à jour du Service Worker (auto-check toutes les heures)
  * - Détection du support PWA
+ * - Web Share API pour partager du contenu
+ * - Gestion des caches (lecture, nettoyage)
+ * - Informations sur l'appareil et ses capacités
  *
- * @returns {Object} État et méthodes pour gérer le PWA
+ * @returns {Object} État et méthodes PWA
+ * @property {boolean} isInstallable - L'app peut être installée
+ * @property {boolean} isInstalled - L'app est déjà installée
+ * @property {boolean} isStandalone - L'app tourne en mode standalone
+ * @property {boolean} updateAvailable - Une mise à jour est disponible
+ * @property {boolean} isPWASupported - Le navigateur supporte les PWA
+ * @property {ServiceWorkerRegistration} registration - Enregistrement du SW
+ * @property {Function} promptInstall - Affiche le prompt d'installation
+ * @property {Function} activateUpdate - Active une mise à jour en attente
+ * @property {Function} unregister - Désinstalle le Service Worker
+ * @property {Function} clearCaches - Vide tous les caches
+ * @property {Function} getCacheInfo - Obtient les infos sur les caches
+ * @property {Function} canShare - Vérifie le support du partage
+ * @property {Function} share - Partage du contenu (Web Share API)
+ * @property {Function} getDeviceCapabilities - Infos sur l'appareil
+ *
+ * @example
+ * const {
+ *   isInstallable,
+ *   isStandalone,
+ *   promptInstall,
+ *   updateAvailable,
+ *   activateUpdate
+ * } = usePWA();
+ *
+ * // Afficher le bouton d'installation
+ * {isInstallable && !isStandalone && (
+ *   <button onClick={promptInstall}>Installer l'app</button>
+ * )}
+ *
+ * // Afficher la notification de mise à jour
+ * {updateAvailable && (
+ *   <button onClick={activateUpdate}>Mettre à jour</button>
+ * )}
  */
 export function usePWA() {
   // État pour le prompt d'installation

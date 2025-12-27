@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant - Liens Épicerie</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --text-primary: #ffffff;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent-orange: #f97316;
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-teal: #06b6d4;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at 50% -20%, rgba(249, 115, 22, 0.12), transparent),
+                        var(--bg-primary);
+            color: var(--text-primary);
+            padding: 32px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        h1 {
+            font-family: 'Sora', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .stat-value { font-size: 24px; font-weight: 700; }
+        .linking-area {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .panel {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        .item-list { display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; }
+        .item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .item:hover { background: rgba(255,255,255,0.08); }
+        .item.selected {
+            border-color: var(--accent-orange);
+            background: rgba(249,115,22,0.1);
+        }
+        .item.linked {
+            border-color: var(--accent-emerald);
+            background: rgba(16,185,129,0.1);
+        }
+        .item-icon { font-size: 20px; }
+        .item-content { flex: 1; }
+        .item-name { font-size: 14px; font-weight: 500; }
+        .item-meta { font-size: 12px; color: var(--text-muted); }
+        .link-indicator {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .link-indicator.linked { background: rgba(16,185,129,0.2); color: var(--accent-emerald); }
+        .link-indicator.unlinked { background: rgba(245,158,11,0.2); color: var(--accent-amber); }
+        .connector {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+        .link-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-amber));
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .link-btn:hover { transform: scale(1.1); }
+        .unlink-btn {
+            padding: 8px 16px;
+            background: rgba(244,63,94,0.2);
+            border: 1px solid rgba(244,63,94,0.3);
+            border-radius: 8px;
+            color: #f43f5e;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .auto-link-btn {
+            padding: 8px 16px;
+            background: rgba(6,182,212,0.2);
+            border: 1px solid rgba(6,182,212,0.3);
+            border-radius: 8px;
+            color: var(--accent-teal);
+            font-size: 12px;
+            cursor: pointer;
+        }
+        @media (max-width: 1024px) {
+            .linking-area { grid-template-columns: 1fr; }
+            .connector { flex-direction: row; padding: 16px 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="cockpit.html">Accueil</a>
+            <span>/</span>
+            <a href="restaurant.html">Restaurant</a>
+            <span>/</span>
+            <span>Liens Épicerie</span>
+        </div>
+
+        <h1>🔗 Liens Épicerie-Restaurant</h1>
+        <p class="subtitle">Associez les ingrédients restaurant aux produits du stock épicerie</p>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-label">Ingrédients liés</div>
+                <div class="stat-value" style="color: var(--accent-emerald);">45</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Non liés</div>
+                <div class="stat-value" style="color: var(--accent-amber);">12</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Suggestions IA</div>
+                <div class="stat-value">8</div>
+            </div>
+        </div>
+
+        <div class="linking-area">
+            <div class="panel">
+                <div class="panel-title">
+                    🍴 Ingrédients Restaurant
+                    <span style="margin-left: auto; font-size: 12px; color: var(--text-muted);">57 ingrédients</span>
+                </div>
+                <input type="text" class="search-input" placeholder="Rechercher un ingrédient...">
+                <div class="item-list">
+                    <div class="item selected">
+                        <span class="item-icon">🥩</span>
+                        <div class="item-content">
+                            <div class="item-name">Entrecôte de boeuf</div>
+                            <div class="item-meta">Unité: kg</div>
+                        </div>
+                        <span class="link-indicator unlinked">Non lié</span>
+                    </div>
+                    <div class="item linked">
+                        <span class="item-icon">🍅</span>
+                        <div class="item-content">
+                            <div class="item-name">Tomates</div>
+                            <div class="item-meta">Unité: kg</div>
+                        </div>
+                        <span class="link-indicator linked">✓ Lié</span>
+                    </div>
+                    <div class="item linked">
+                        <span class="item-icon">🧀</span>
+                        <div class="item-content">
+                            <div class="item-name">Parmesan</div>
+                            <div class="item-meta">Unité: kg</div>
+                        </div>
+                        <span class="link-indicator linked">✓ Lié</span>
+                    </div>
+                    <div class="item">
+                        <span class="item-icon">🥬</span>
+                        <div class="item-content">
+                            <div class="item-name">Salade verte</div>
+                            <div class="item-meta">Unité: kg</div>
+                        </div>
+                        <span class="link-indicator unlinked">Non lié</span>
+                    </div>
+                    <div class="item">
+                        <span class="item-icon">🧈</span>
+                        <div class="item-content">
+                            <div class="item-name">Beurre</div>
+                            <div class="item-meta">Unité: kg</div>
+                        </div>
+                        <span class="link-indicator unlinked">Non lié</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="connector">
+                <button class="auto-link-btn" onclick="alert('Lancer l\'auto-liaison IA')">
+                    🤖 Auto-lier
+                </button>
+                <button class="link-btn" onclick="alert('Lier les éléments sélectionnés')">
+                    🔗
+                </button>
+                <button class="unlink-btn" onclick="alert('Délier')">
+                    Délier
+                </button>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">
+                    🛒 Produits Épicerie
+                    <span style="margin-left: auto; font-size: 12px; color: var(--text-muted);">1,247 produits</span>
+                </div>
+                <input type="text" class="search-input" placeholder="Rechercher un produit...">
+                <div class="item-list">
+                    <div class="item selected">
+                        <span class="item-icon">🥩</span>
+                        <div class="item-content">
+                            <div class="item-name">Entrecôte boeuf FR - Metro</div>
+                            <div class="item-meta">€22.00/kg • Stock: 15kg</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <span class="item-icon">🥩</span>
+                        <div class="item-content">
+                            <div class="item-name">Entrecôte boeuf - Brake</div>
+                            <div class="item-meta">€23.50/kg • Stock: 8kg</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <span class="item-icon">🥩</span>
+                        <div class="item-content">
+                            <div class="item-name">Faux-filet boeuf FR</div>
+                            <div class="item-meta">€19.80/kg • Stock: 12kg</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <span class="item-icon">🥩</span>
+                        <div class="item-content">
+                            <div class="item-name">Bavette boeuf</div>
+                            <div class="item-meta">€16.50/kg • Stock: 6kg</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

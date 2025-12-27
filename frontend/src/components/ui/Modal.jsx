@@ -4,27 +4,47 @@ import { X } from 'lucide-react';
 import Button from './Button.jsx';
 
 /**
- * Modal - Composant de dialogue accessible avec animations
- * WCAG 2.1 Level AA compliant
+ * Composant Modal.
  *
- * Accessibility features:
- * - Focus trap (Tab key cycles through modal elements only)
- * - Focus management (restores focus on close)
- * - Keyboard navigation (Escape to close)
- * - ARIA attributes (role="dialog", aria-modal, aria-labelledby, aria-describedby)
- * - Screen reader announcements
- * - Body scroll lock with iOS compatibility
- * - Minimum touch target size (44x44px for close button)
+ * Dialogue modal accessible avec animations, gestion du focus et verrouillage du scroll.
+ * Conforme WCAG 2.1 Level AA avec focus trap, navigation clavier et attributs ARIA complets.
  *
- * @param {boolean} open - Controls modal visibility
- * @param {string} title - Modal title (required for accessibility)
- * @param {string} description - Optional description
- * @param {ReactNode} children - Modal content
- * @param {Array} actions - Action buttons
- * @param {Function} onClose - Close handler
- * @param {string} size - Modal size (sm, md, lg, xl, full)
- * @param {boolean} closeOnOverlayClick - Allow closing by clicking overlay
- * @param {boolean} showCloseButton - Show close button
+ * Fonctionnalités d'accessibilité:
+ * - Focus trap (Tab cycle uniquement dans la modal)
+ * - Gestion du focus (restauration au retour)
+ * - Navigation clavier (Escape pour fermer)
+ * - Attributs ARIA complets (role="dialog", aria-modal, aria-labelledby, aria-describedby)
+ * - Annonces pour lecteurs d'écran
+ * - Verrouillage du scroll (compatible iOS)
+ * - Cibles tactiles minimales 44x44px
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {boolean} [props.open] - Contrôle la visibilité de la modal
+ * @param {boolean} [props.isOpen] - Alias de 'open' pour compatibilité
+ * @param {string} props.title - Titre de la modal (requis pour accessibilité)
+ * @param {string} [props.description] - Description optionnelle
+ * @param {React.ReactNode} props.children - Contenu de la modal
+ * @param {Array} [props.actions] - Tableau de boutons d'action avec {label, variant, onClick, type, disabled, loading}
+ * @param {Function} props.onClose - Callback de fermeture
+ * @param {string} [props.size='md'] - Taille de la modal ('sm' | 'md' | 'lg' | 'xl' | 'full')
+ * @param {boolean} [props.closeOnOverlayClick=true] - Permet la fermeture en cliquant sur l'overlay
+ * @param {boolean} [props.showCloseButton=true] - Affiche le bouton de fermeture
+ *
+ * @example
+ * <Modal
+ *   open={isOpen}
+ *   onClose={handleClose}
+ *   title="Confirmation"
+ *   description="Êtes-vous sûr de vouloir continuer ?"
+ *   actions={[
+ *     { label: 'Annuler', variant: 'ghost', onClick: handleClose },
+ *     { label: 'Confirmer', variant: 'primary', onClick: handleConfirm }
+ *   ]}
+ * >
+ *   <p>Contenu de la modal</p>
+ * </Modal>
  */
 export default function Modal({
   open,
@@ -232,7 +252,34 @@ export default function Modal({
 }
 
 /**
- * ConfirmDialog - Modal de confirmation pour les actions destructives
+ * ConfirmDialog - Modal de confirmation pour les actions destructives.
+ *
+ * Dialogue de confirmation prédéfini pour simplifier l'usage des modales de confirmation.
+ * Utilise automatiquement une taille compacte et propose des actions Annuler/Confirmer.
+ *
+ * @component
+ *
+ * @param {Object} props - Propriétés du composant
+ * @param {boolean} props.open - Contrôle la visibilité
+ * @param {Function} props.onClose - Callback de fermeture/annulation
+ * @param {Function} props.onConfirm - Callback de confirmation
+ * @param {string} [props.title='Confirmer l\'action'] - Titre de la confirmation
+ * @param {string} [props.description='Êtes-vous sûr de vouloir continuer ?'] - Description
+ * @param {string} [props.confirmLabel='Confirmer'] - Libellé du bouton de confirmation
+ * @param {string} [props.cancelLabel='Annuler'] - Libellé du bouton d'annulation
+ * @param {string} [props.variant='destructive'] - Variante du bouton de confirmation
+ * @param {boolean} [props.loading=false] - État de chargement du bouton de confirmation
+ *
+ * @example
+ * <ConfirmDialog
+ *   open={showConfirm}
+ *   onClose={() => setShowConfirm(false)}
+ *   onConfirm={handleDelete}
+ *   title="Supprimer l'élément"
+ *   description="Cette action est irréversible."
+ *   confirmLabel="Supprimer"
+ *   variant="destructive"
+ * />
  */
 export function ConfirmDialog({
   open,

@@ -1,8 +1,28 @@
 /**
- * SupplierScoringOverviewPage - Vue d'ensemble du scoring fournisseurs
+ * Page Vue d'Ensemble du Scoring Fournisseurs.
  *
- * Implémentation exacte selon SUPPLIER_SCORING_FRONTEND_INTEGRATION.md
- * Affiche les métriques clés, distribution des grades, top/bottom suppliers et alertes.
+ * Cette page permet de visualiser et analyser la performance globale des fournisseurs.
+ * Elle affiche:
+ * - Les métriques clés (nombre total, score moyen, tendance globale)
+ * - La distribution des fournisseurs par grade (A, B, C, D, F)
+ * - Le top 5 des meilleurs fournisseurs
+ * - Le bottom 5 des fournisseurs à surveiller
+ * - Les alertes actives nécessitant une attention
+ *
+ * Fonctionnalités principales:
+ * - Visualisation de la répartition des grades avec barres de progression
+ * - Recalcul manuel des scores pour tous les fournisseurs
+ * - Navigation rapide vers le détail d'un fournisseur
+ * - Affichage des tendances (amélioration, stable, déclin)
+ * - Badges de grade colorés pour identification rapide
+ * - Cartes métriques animées avec indicateurs de tendance
+ *
+ * Implémentation conforme à SUPPLIER_SCORING_FRONTEND_INTEGRATION.md
+ *
+ * @component
+ *
+ * @example
+ * <SupplierScoringOverviewPage />
  */
 
 import { useState } from 'react';

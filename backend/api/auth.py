@@ -21,6 +21,7 @@ from backend.dependencies.security import (
     revoke_token,
 )
 from backend.dependencies.tenant import DEFAULT_TENANT, Tenant, resolve_tenant
+from backend.middleware.rate_limiter import rate_limit
 from backend.schemas.auth import (
     AuthenticatedUserPayload,
     TokenResponse,
@@ -66,7 +67,8 @@ def _resolve_tenant(tenant_identifier: str | int | None) -> Tenant:
 
 
 @router.post("/token", response_model=TokenResponse)
-def issue_token(form_data: OAuth2TenantRequestForm = Depends()) -> TokenResponse:
+@rate_limit(requests=5, window=60, burst=2)  # Sécurité : limite à 5 tentatives/minute contre brute force
+def issue_token(request: Request, form_data: OAuth2TenantRequestForm = Depends()) -> TokenResponse:
     """Émet un token bearer OAuth2 (pour les clients API)."""
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
@@ -100,7 +102,9 @@ def issue_token(form_data: OAuth2TenantRequestForm = Depends()) -> TokenResponse
 
 
 @router.post("/login", response_model=CookieTokenResponse)
+@rate_limit(requests=5, window=60, burst=2)  # Sécurité : limite à 5 tentatives/minute contre brute force
 def login_with_cookies(
+    request: Request,
     response: Response,
     form_data: OAuth2TenantRequestForm = Depends(),
 ) -> CookieTokenResponse:

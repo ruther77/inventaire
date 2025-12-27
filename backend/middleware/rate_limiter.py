@@ -13,6 +13,8 @@ Usage :
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import time
 import logging
 from collections import defaultdict
@@ -189,10 +191,10 @@ def rate_limit(
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         config = RateLimitConfig(requests=requests, window=window, burst=burst)
         limiter = RateLimiter(config)
+        is_async = asyncio.iscoroutinefunction(func)
 
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            # Chercher Request dans args ou kwargs
+        async def _check_rate_limit(*args, **kwargs):
+            """Vérifie le rate limit et retourne la request si trouvée."""
             request = None
             for arg in args:
                 if isinstance(arg, Request):
@@ -201,25 +203,28 @@ def rate_limit(
             if request is None:
                 request = kwargs.get("request")
 
-            if request is None:
-                # Impossible de limiter sans requête, on continue
+            if request is not None:
+                is_allowed, headers = await limiter.check(request)
+                if not is_allowed:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail="Rate limit exceeded. Please retry later.",
+                        headers=headers,
+                    )
+
+        if is_async:
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                await _check_rate_limit(*args, **kwargs)
                 return await func(*args, **kwargs)
-
-            is_allowed, headers = await limiter.check(request)
-
-            if not is_allowed:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Rate limit exceeded. Please retry later.",
-                    headers=headers,
-                )
-
-            response = await func(*args, **kwargs)
-
-            # Remarque : il faudrait ajouter les en-têtes via un middleware pour un support complet
-            return response
-
-        return wrapper
+            return async_wrapper
+        else:
+            @wraps(func)
+            async def sync_wrapper(*args, **kwargs):
+                await _check_rate_limit(*args, **kwargs)
+                # Exécuter la fonction sync dans un thread pool pour éviter de bloquer
+                return func(*args, **kwargs)
+            return sync_wrapper
 
     return decorator
 

@@ -48,6 +48,67 @@ class StockAdjustmentResponse(BaseModel):
     movement_quantity: Optional[float] = None
 
 
+class CategoryBreakdown(BaseModel):
+    categorie: str
+    product_count: int
+    total_quantity: float
+    total_value: float
+
+
+class SnapshotCreateRequest(BaseModel):
+    snapshot_date: Optional[date] = None
+
+
+class SnapshotCreateResponse(BaseModel):
+    snapshot_id: int
+    snapshot_date: str
+    stock_value: float
+    bank_balance: float
+    cash_balance: float
+    total_assets: float
+    product_count: int
+    total_quantity: float
+    categories: List[CategoryBreakdown]
+
+
+class SnapshotData(BaseModel):
+    id: int
+    date: str
+    stock_value: float
+    bank_balance: float
+    cash_balance: float
+    total_assets: float
+
+
+class SnapshotComparisonRequest(BaseModel):
+    date1: date
+    date2: date
+
+
+class SnapshotComparisonResponse(BaseModel):
+    date1: str
+    date2: str
+    snapshot1: SnapshotData
+    snapshot2: SnapshotData
+    difference: float
+    difference_pct: float
+    evolution: str
+
+
+class SnapshotHistoryItem(BaseModel):
+    id: int
+    snapshot_date: str
+    stock_value: float
+    bank_balance: float
+    cash_balance: float
+    total_assets: float
+    created_at: str
+
+
+class SnapshotHistoryResponse(BaseModel):
+    items: List[SnapshotHistoryItem]
+
+
 __all__ = [
     "MovementTimeseriesResponse",
     "MovementPoint",
@@ -55,4 +116,12 @@ __all__ = [
     "RecentMovement",
     "StockAdjustmentRequest",
     "StockAdjustmentResponse",
+    "CategoryBreakdown",
+    "SnapshotCreateRequest",
+    "SnapshotCreateResponse",
+    "SnapshotData",
+    "SnapshotComparisonRequest",
+    "SnapshotComparisonResponse",
+    "SnapshotHistoryItem",
+    "SnapshotHistoryResponse",
 ]

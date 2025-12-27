@@ -37,6 +37,7 @@ from backend.schemas.restaurant import (
     RestaurantDashboardOverview,
     RestaurantAlert,
     RestaurantConsumptionEntry,
+    RestaurantSalesImportSummary,
     RestaurantPriceHistoryComparisonEntry,
     # Nouveaux schémas pour l'UX 4.7
     RestaurantOverview,
@@ -498,6 +499,26 @@ def list_consumptions(
 ):
     """Liste des consommations avec filtre de période optionnel."""
     return restaurant_service.list_sales_consumptions(tenant.id, period=period)
+
+
+@router.post("/sales/import", response_model=RestaurantSalesImportSummary)
+def import_sales_csv(
+    file: UploadFile = File(...),
+    dry_run: bool = Query(False, description="Parse only, no database insert"),
+    tenant: Tenant = Depends(get_restaurant_tenant),
+):
+    """Import SumUp order CSV products into restaurant_sales."""
+    try:
+        content = file.file.read()
+        return restaurant_service.import_sales_csv_bytes(
+            content,
+            tenant_id=tenant.id,
+            filename=file.filename,
+            dry_run=dry_run,
+        )
+    except Exception as exc:
+        logger.exception("Sales CSV import failed")
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/price-history/comparison", response_model=list[RestaurantPriceHistoryComparisonEntry])
